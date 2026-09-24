@@ -68,7 +68,7 @@ describe("saves", () => {
     ];
     const r = await (await act(post({ actions: bad }, p.token))).json();
     expect(r.results.every((x: { ok: boolean }) => !x.ok)).toBe(true);
-    expect(r.save.money).toBe(500);
+    expect(r.save.money).toBe(1000);
     // unripe harvest and spending seeds you don't have
     await act(post({ actions: [{ t: "till", ...at() }, { t: "plant", ...at(), crop: "sugarcane" }] }, p.token));
     const r2 = await (await act(post({ actions: [{ t: "harvest", ...at() }] }, p.token))).json();

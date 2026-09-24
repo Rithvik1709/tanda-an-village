@@ -11,7 +11,7 @@ import { D, W, type Plot, type World } from "./world.js";
  * is stored, so the server can recompute any price or offer and a client can't invent one.
  */
 export const LAND_SEED = 0x6c616e64; // "land"
-export const RATE_PER_CELL = 48; // ₹ per block of land at average soil, water and road
+export const RATE_PER_CELL = 40; // ₹ per block of land at average soil, water and road
 
 export const area = (p: Plot) => (p.x1 - p.x0 + 1) * (p.z1 - p.z0 + 1);
 

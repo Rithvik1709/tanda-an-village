@@ -18,25 +18,25 @@ describe("price model", () => {
     expect(CROP_IDS.map((c) => [0, 1, 7, 30, 100].map((d) => marketPrice(c, d)))).toMatchInlineSnapshot(`
       [
         [
-          4.9,
-          5,
-          5.5,
-          5.4,
-          5.1,
-        ],
-        [
-          8.7,
-          8.7,
-          7,
-          8.3,
-          12.7,
-        ],
-        [
+          8.2,
+          8.4,
           9.1,
-          9.3,
-          6.1,
-          9.8,
-          10.5,
+          8.9,
+          8.5,
+        ],
+        [
+          14.8,
+          14.9,
+          12,
+          14.2,
+          21.7,
+        ],
+        [
+          13.3,
+          13.5,
+          8.8,
+          14.2,
+          15.2,
         ],
       ]
     `);
@@ -93,16 +93,16 @@ describe("buying and selling", () => {
     const r = apply(world, s, { t: "sell", item: "onion", n: 4, where: "village" }, T);
     const expected = Math.round(buyerPrice("onion", 5, "village") * 4);
     expect(r.ok).toBe(true);
-    expect(s.money).toBe(500 + expected);
+    expect(s.money).toBe(1000 + expected);
     expect(s.inv.onion).toBe(6);
     expect(apply(world, s, { t: "buy", item: "seed:jowar", n: 10 }, T).ok).toBe(true);
-    expect(s.money).toBe(500 + expected - 80);
+    expect(s.money).toBe(1000 + expected - 60);
     expect(s.inv["seed:jowar"]).toBe(22);
     expect(s.ledger).toEqual([
       { day: 5, kind: "sell", item: "onion", n: 4, amount: expected, where: "village" },
-      { day: 5, kind: "buy", item: "seed:jowar", n: 10, amount: 80 },
+      { day: 5, kind: "buy", item: "seed:jowar", n: 10, amount: 60 },
     ]);
-    expect(s.stats).toMatchObject({ earned: expected, spent: 80 });
+    expect(s.stats).toMatchObject({ earned: expected, spent: 60 });
   });
 
   it("refuses bad trades", () => {
@@ -115,21 +115,21 @@ describe("buying and selling", () => {
     no({ t: "sell", item: "onion", n: -5, where: "village" }); // negative
     no({ t: "sell", item: "onion", n: 1.5, where: "village" }); // fractional
     no({ t: "buy", item: "gold", n: 1 }); // not for sale
-    no({ t: "buy", item: "seed:sugarcane", n: 26 }); // ₹520 > ₹500
+    no({ t: "buy", item: "seed:sugarcane", n: 67 }); // ₹1005 > ₹1000
     expect(apply(world, s, { t: "buy", item: "bigcan", n: 1 }, T).ok).toBe(true);
     no({ t: "buy", item: "bigcan", n: 1 }); // only one
-    expect(s.money).toBe(50);
+    expect(s.money).toBe(700);
     expect(s.inv.onion).toBe(3);
   });
 
-  it("the brass can holds 32; placing uses bricks and digging returns them", () => {
+  it("the brass can holds 48; placing uses bricks and digging returns them", () => {
     const s = fresh();
-    s.money = 1000;
+    s.money = 2000;
     apply(world, s, { t: "buy", item: "bigcan", n: 1 }, T);
     s.inv.water = 0;
     const wl = world.structures.find((q) => q.kind === "well") as { x: number; y: number; z: number };
     apply(world, s, { t: "refill", x: wl.x, y: wl.y - 2, z: wl.z }, T);
-    expect(s.inv.water).toBe(32);
+    expect(s.inv.water).toBe(48);
     const p = world.plots.find((q) => q.starter)!;
     const spot = { x: p.x0 + 4, y: p.y + 1, z: p.z0 + 4 };
     expect(apply(world, s, { t: "place", ...spot, b: 14 }, T).ok).toBe(true);
@@ -167,7 +167,7 @@ describe("buying and selling", () => {
     const post = (actions: unknown[]) => act(new Request("http://x", { method: "POST", body: JSON.stringify({ actions }), headers: { authorization: `Bearer ${token}` } }));
     const r = await (await post([{ t: "buy", item: "seed:onion", n: 5 }, { t: "sell", item: "onion", n: 1, where: "village" }])).json();
     expect(r.results.map((x: { ok: boolean }) => x.ok)).toEqual([true, false]);
-    expect(r.save.money).toBe(470);
+    expect(r.save.money).toBe(975);
     expect(r.save.inv["seed:onion"]).toBe(17);
     expect(r.save.ledger).toHaveLength(1);
     expect(SHOP.every((i) => i.price > 0)).toBe(true);

@@ -57,7 +57,7 @@ export type LedgerEntry = { day: number; kind: "sell" | "buy" | "borrow" | "repa
 /** Building blocks every farmer starts with (and v1 saves are given when they upgrade). */
 export const STARTER_BLOCKS = { "block:11": 20, "block:14": 20, "block:16": 12 };
 
-export const STARTING_MONEY = 500;
+export const STARTING_MONEY = 1000;
 
 export function newSave(id: string, world: World, now: number): Save {
   const starter = world.plots.find((p) => p.starter)!;

@@ -38,16 +38,16 @@ describe("borrowing and repaying through the rules", () => {
     expect(bankLimit).toBeGreaterThan(3000); // 40% of the starter plot
     expect(sahLimit).toBeGreaterThan(bankLimit / 2);
     expect(apply(world, s, { t: "borrow", lender: "bank", amount: bankLimit + 100 }, T0).ok).toBe(false);
-    expect(apply(world, s, { t: "borrow", lender: "bank", amount: 4000 }, T0).ok).toBe(true);
-    expect(s.money).toBe(4500);
-    expect(creditLimit(world, s, "bank", T0, day0)).toBe(Math.floor((bankLimit - 4000) / 100) * 100);
+    expect(apply(world, s, { t: "borrow", lender: "bank", amount: 3000 }, T0).ok).toBe(true);
+    expect(s.money).toBe(4000);
+    expect(creditLimit(world, s, "bank", T0, day0)).toBe(Math.floor((bankLimit - 3000) / 100) * 100);
     // repay part, then all, 3 days later
     const t = T0 + 3 * DAY_MS;
     expect(apply(world, s, { t: "repay", loan: 1, amount: 1000 }, t).ok).toBe(true);
-    expect(owed(s.loans[0], t)).toBe(4120 - 1000);
+    expect(owed(s.loans[0], t)).toBe(3090 - 1000);
     expect(apply(world, s, { t: "repay", loan: 1, amount: 99999 }, t)).toMatchObject({ ok: true, msg: expect.stringMatching(/paid off/) });
     expect(s.loans).toEqual([]);
-    expect(s.money).toBe(4500 - 4120);
+    expect(s.money).toBe(4000 - 3090);
     expect(s.ledger.map((l) => l.kind)).toEqual(["borrow", "repay", "repay"]);
   });
 
@@ -88,7 +88,7 @@ describe("the godown", () => {
     const rent = rentFor(s.godown.onion, 40, t);
     expect(rent).toBe(Math.ceil(40 * 0.1 * (4 - 1 / 3)));
     expect(apply(world, s, { t: "withdraw", item: "onion", n: 40 }, t).ok).toBe(true);
-    expect(s.money).toBe(500 - rent);
+    expect(s.money).toBe(1000 - rent);
     expect(s.godown.onion.n).toBe(110);
     expect(apply(world, s, { t: "withdraw", item: "onion", n: 999 }, t).ok).toBe(false);
   });
@@ -110,8 +110,8 @@ describe("net worth and titles", () => {
   it("counts money, land, goods and livestock, minus debt", () => {
     const s = newSave("t", world, T0);
     const w0 = netWorth(world, s, T0, day0);
-    expect(w0.money).toBe(500);
-    expect(w0.land).toBeGreaterThan(10000);
+    expect(w0.money).toBe(1000);
+    expect(w0.land).toBeGreaterThan(8000);
     expect(w0.total).toBe(w0.money + w0.land + w0.goods + w0.livestock - w0.debt);
     apply(world, s, { t: "borrow", lender: "bank", amount: 2000 }, T0);
     const w1 = netWorth(world, s, T0, day0);

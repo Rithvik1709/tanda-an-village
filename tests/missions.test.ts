@@ -37,7 +37,7 @@ describe("the ten missions", () => {
     for (const c of cells(6)) ok(s, { t: "till", ...c });
     const m0 = s.money;
     ok(s, { t: "claimMission" });
-    expect(s.money).toBe(m0 + 200);
+    expect(s.money).toBe(m0 + 500);
     // 2 first crop: the sickle adds one to each harvest
     grow(s, "onion", 6, 4);
     ok(s, { t: "visit", place: "prices" });
@@ -62,7 +62,7 @@ describe("the ten missions", () => {
     expect(s.perks).toContain("discount");
     const before = s.money;
     ok(s, { t: "buy", item: "seed:onion", n: 10 });
-    expect(before - s.money).toBe(48); // 20% off ₹60
+    expect(before - s.money).toBe(40); // 20% off ₹50
     // 5 the bulls
     s.money += 10000;
     ok(s, { t: "buy", item: "bulls", n: 1 });
@@ -153,7 +153,7 @@ describe("the ten missions", () => {
     k.perks.push("dripSubsidy");
     k.money = 10000;
     ok(k, { t: "buy", item: "drip", n: 1 });
-    expect(k.money).toBe(7000);
+    expect(k.money).toBe(8500);
   });
 
   it("refusing Ramu costs reputation; delivering what nobody asked for is refused", () => {

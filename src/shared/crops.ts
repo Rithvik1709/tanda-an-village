@@ -20,17 +20,17 @@ export type CropDef = {
 
 export const CROPS: Record<CropId, CropDef> = {
   jowar: {
-    id: "jowar", name: "Jowar", local: "ज्वारी", growDays: 2, yield: 6, seedPrice: 8, basePrice: 6,
+    id: "jowar", name: "Jowar", local: "ज्वारी", growDays: 2, yield: 14, seedPrice: 6, basePrice: 10,
     season: { kharif: 1.1, rabi: 1.0, unhala: 0.7 },
     stages: [B.JOWAR_0, B.JOWAR_1, B.JOWAR_2, B.JOWAR_3],
   },
   onion: {
-    id: "onion", name: "Onion", local: "कांदा", growDays: 1.5, yield: 5, seedPrice: 6, basePrice: 7,
+    id: "onion", name: "Onion", local: "कांदा", growDays: 1.5, yield: 10, seedPrice: 5, basePrice: 12,
     season: { kharif: 0.8, rabi: 1.15, unhala: 0.9 },
     stages: [B.ONION_0, B.ONION_1, B.ONION_2, B.ONION_3],
   },
   sugarcane: {
-    id: "sugarcane", name: "Sugarcane", local: "ऊस", growDays: 4, yield: 8, seedPrice: 20, basePrice: 11,
+    id: "sugarcane", name: "Sugarcane", local: "ऊस", growDays: 4, yield: 20, seedPrice: 15, basePrice: 16,
     season: { kharif: 1.15, rabi: 0.9, unhala: 0.85 },
     stages: [B.CANE_0, B.CANE_1, B.CANE_2, B.CANE_3],
   },
@@ -39,10 +39,10 @@ export const CROP_IDS = Object.keys(CROPS) as CropId[];
 export const isCrop = (s: string): s is CropId => s in CROPS;
 
 /** Dry soil still grows a crop, just slowly. */
-export const DRY_RATE = 0.3;
+export const DRY_RATE = 0.5;
 /** How long one watering keeps the soil wet, by season (the monsoon keeps it damp longer). */
-export const WET_MS: Record<Season, number> = { kharif: DAY_MS * 0.8, rabi: DAY_MS * 0.5, unhala: DAY_MS * 0.3 };
-export const CAN_MAX = 16;
+export const WET_MS: Record<Season, number> = { kharif: DAY_MS * 1.2, rabi: DAY_MS * 0.9, unhala: DAY_MS * 0.6 };
+export const CAN_MAX = 24;
 
 export type Planting = {
   crop: CropId;
@@ -90,7 +90,8 @@ export const stageOf = (progress: number) => (progress >= 1 ? 3 : progress >= 0.
 export function yieldOf(p: Planting, quality: number): number {
   const total = p.wetMs + p.dryMs;
   const wetShare = total > 0 ? p.wetMs / total : 0;
-  return Math.max(1, Math.round(CROPS[p.crop].yield * (0.5 + 0.5 * wetShare) * (0.7 + 0.3 * quality)));
+  // a dry crop still gives two-thirds; good soil adds up to a fifth
+  return Math.max(1, Math.round(CROPS[p.crop].yield * (0.65 + 0.35 * wetShare) * (0.8 + 0.2 * quality)));
 }
 
 /** Milliseconds until ripe if kept wet from now (for the tooltip). */

@@ -61,7 +61,7 @@ export const MISSIONS: Mission[] = [
       { id: "visit", text: "Walk to your field, Aamrai", need: 1, have: (s) => since(s, "visit:aamrai") },
       { id: "till", text: "Plough 6 patches of Aamrai's soil", need: 6, have: (s, c) => cellsIn(s, c.world, starter(c.world).id).length },
     ],
-    reward: { money: 200, items: { "seed:onion": 6 }, text: "₹200 and 6 onion seeds" },
+    reward: { money: 500, items: { "seed:onion": 10 }, text: "₹500 and 10 onion seeds" },
   },
   {
     id: "firstcrop", title: "Pehli Fasal", local: "पहिली फसल · The first crop", who: "Ganpat Seth",
@@ -82,7 +82,7 @@ export const MISSIONS: Mission[] = [
       { id: "vihir", text: "Fill your can at the vihir in the fields", need: 1, have: (s) => since(s, "refill:vihir") },
       { id: "water", text: "Water your crops 16 times", need: 16, have: (s) => since(s, "water") },
     ],
-    reward: { items: { bigcan: 1 }, text: "A brass watering can (holds 32)" },
+    reward: { items: { bigcan: 1 }, text: "A brass watering can (holds 48)" },
   },
   {
     id: "order", title: "Sitabai ki Maang", local: "सीताबाईंची मागणी · Sitabai's order", who: "Sitabai",
@@ -94,7 +94,7 @@ export const MISSIONS: Mission[] = [
   },
   {
     id: "bulls", title: "Sarja aur Raja", local: "सर्जा-राजा · Sarja and Raja", who: "Sitabai",
-    story: "A Khillari pair from Mhaswad is for sale — Sarja and Raja, strong as the ghats. ₹4,500. If you're short, the Sahakari Bank lends cheap… the sahukar lends fast, and dear. Choose wisely.",
+    story: "A Khillari pair from Mhaswad is for sale — Sarja and Raja, strong as the ghats. ₹2,500. If you're short, the Sahakari Bank lends cheap… the sahukar lends fast, and dear. Choose wisely.",
     done: "Look at them! A farmer with a pair of bulls is a farmer no longer alone.",
     objectives: [
       { id: "buy", text: "Buy the bull pair (Sitabai's stall)", need: 1, have: (s) => (s.bulls ? 1 : 0) },

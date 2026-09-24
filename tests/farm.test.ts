@@ -54,11 +54,11 @@ describe("crop growth", () => {
     expect(many.progress).toBeCloseTo(once.progress, 9);
     expect(once.wetMs).toBeCloseTo(DAY_MS * 0.5);
   });
-  it("yields fully when kept wet on good soil and half-ish when dry", () => {
+  it("yields fully when kept wet on good soil and about two-thirds when dry", () => {
     const wet = advance(p0(), Infinity, 10 * DAY_MS);
     const dry = advance(p0(), 0, 20 * DAY_MS);
     expect(yieldOf(wet, 1)).toBe(CROPS.jowar.yield);
-    expect(yieldOf(dry, 1)).toBeLessThan(CROPS.jowar.yield * 0.6);
+    expect(yieldOf(dry, 1)).toBeLessThan(CROPS.jowar.yield * 0.75);
     expect(stageOf(0)).toBe(0);
     expect(stageOf(0.6)).toBe(2);
     expect(stageOf(1)).toBe(3);
@@ -119,7 +119,7 @@ describe("farming rules", () => {
     const found: [number, number, number] = [wl.x, wl.y - 2, wl.z];
     expect(world.voxels[wl.x + 192 * (wl.z + 192 * (wl.y - 2))]).toBe(B.WATER);
     expect(apply(world, s, { t: "refill", x: found![0], y: found![1], z: found![2] }, T0).ok).toBe(true);
-    expect(s.inv.water).toBe(16);
+    expect(s.inv.water).toBe(24);
     const { x, y, z } = spot(5, 5);
     apply(world, s, { t: "till", x, y, z }, T0);
     apply(world, s, { t: "plant", x, y, z, crop: "onion" }, T0);

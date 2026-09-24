@@ -189,7 +189,7 @@ function story(world: World, save: Save, a: Extract<Action, { t: "talk" | "visit
       }
       for (const [k, n] of Object.entries(r.items ?? {})) {
         if (k === "bigcan" && save.inv.bigcan) {
-          save.money += 450; // already had one: take its value instead
+          save.money += 300; // already had one: take its value instead
           continue;
         }
         save.inv[k] = (save.inv[k] ?? 0) + n;
@@ -433,7 +433,7 @@ function land(world: World, save: Save, a: Extract<Action, { t: "buyPlot" | "lis
 const qty = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 9999;
 
 /** Watering can capacity: the brass can holds twice as much. */
-export const canCapacity = (save: Save) => (save.inv.bigcan ? 32 : CAN_MAX);
+export const canCapacity = (save: Save) => (save.inv.bigcan ? 48 : CAN_MAX);
 
 function record(save: Save, e: LedgerEntry) {
   save.ledger.push(e);
