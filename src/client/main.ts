@@ -43,6 +43,7 @@ import { Audio, renderRms, SOUNDS } from "./audio";
 import { Guide } from "./ui/guide";
 import { Leaderboard } from "./ui/leaderboard";
 import { PhoneMenu } from "./ui/phonemenu";
+import { AccountCard } from "./ui/account";
 import { current } from "../shared/missions";
 import { loadSettings, SettingsPanel, TitleScreen, Tutorial } from "./ui/screens";
 import { isTouch, TouchControls } from "./player/touch";
@@ -318,6 +319,18 @@ let switching = false;
 let autoSkip = false; // test hook: scripts that aren't about the story tap its cards away before acting
 const STILL = { forward: 0, right: 0, jump: false, sprint: false };
 const phoneMenu = new PhoneMenu(uiRoot, () => net.recoveryCode);
+const accountCard = new AccountCard(uiRoot, () => ({ account: net.account, code: net.recoveryCode, enabled: net.authEnabled }));
+accountCard.onGoogle = () => net.google();
+accountCard.onEmail = (email) => net.emailLink(email);
+accountCard.onSignOut = () => net.signOut();
+accountCard.onClose = () => (titleScreen.open ? hud.setPlaying(true) : resumePlay());
+function showAccount(prompted = false) {
+  closeWindows();
+  accountCard.show(game.save.missions.i, prompted);
+  hud.setPlaying(true);
+  releaseMouse();
+}
+hud.onAccountCard = () => showAccount();
 const WINDOWS = () => [
   { open: () => !!panels.open, close: () => panels.close() },
   { open: () => map.open, close: () => map.close() },
@@ -325,6 +338,7 @@ const WINDOWS = () => [
   { open: () => settingsPanel.open, close: () => settingsPanel.close() },
   { open: () => guide.helpOpen, close: () => guide.toggleHelp(false) },
   { open: () => phoneMenu.open, close: () => phoneMenu.close() },
+  { open: () => accountCard.open, close: () => accountCard.close() },
 ];
 function closeWindows() {
   switching = true;
@@ -334,7 +348,7 @@ function closeWindows() {
 function windowOpen() {
   return !!ploughJob || WINDOWS().some((w) => w.open()) || guide.dialogueOpen || !!document.querySelector(".welcome, .fs-gate:not([hidden])");
 }
-phoneMenu.onPick = (what) => (what === "map" ? showMap() : what === "board" ? showBoard() : what === "help" ? controls.onHelp() : what === "view" ? controls.onView() : what === "torch" ? controls.onTorch() : settingsPanel.show());
+phoneMenu.onPick = (what) => (what === "account" ? showAccount() : what === "map" ? showMap() : what === "board" ? showBoard() : what === "help" ? controls.onHelp() : what === "view" ? controls.onView() : what === "torch" ? controls.onTorch() : settingsPanel.show());
 phoneMenu.onClose = () => resumePlay();
 phoneMenu.onRestore = async (code) => {
   const err = await net.restore(code);
@@ -1193,6 +1207,11 @@ renderer.setAnimationLoop(() => {
     BULB_LIGHTS.forEach((l) => (l.intensity = nightK * 9));
     const elec = current(game.save)?.id === "election";
     guide.nearChoice = elec ? schoolHere() && (game.save.missions.c["visit:gramsabha"] ?? 0) > (game.save.missions.base["visit:gramsabha"] ?? 0) : Math.hypot(body.pos.x - 99.5, body.pos.z - 124) < 5;
+    // the first mission is done: offer to save the farm to an account (once a session, if it's due)
+    if (!signInOffered && net.authEnabled && !net.account && mode === "play" && !titleScreen.open && !windowOpen() && !farmyard.ride && AccountCard.due(game.save.missions.i)) {
+      signInOffered = true;
+      showAccount(true);
+    }
     if (!titleScreen.open) tutorial.update(game.save, game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]), now);
   }
   if (ploughJob) {
@@ -1373,10 +1392,27 @@ function debugText(dt: number) {
 }
 
 /** Sign in and load the farm, retrying until the village server answers. */
+/** A message to show once the game is up (e.g. "Signed in"). */
+let signInOffered = false;
+let bootToast: { msg: string; kind: "ok" | "bad" } | null = null;
 async function bootNet() {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await net.boot();
+      const first = await net.boot();
+      // back from Google or an email link? Supabase puts the sign-in in the URL's #fragment
+      const hash = new URLSearchParams(location.hash.slice(1));
+      const access = hash.get("access_token"), failed = hash.get("error_description");
+      if (access || failed) history.replaceState(null, "", location.pathname + location.search); // never leave tokens in the address bar
+      if (failed) bootToast = { msg: `Sign-in didn't complete: ${failed.replace(/\+/g, " ")}`, kind: "bad" };
+      if (!access) return first;
+      bootStep(0.66, "Signing you in…");
+      const r = await net.finishSignIn(access);
+      if (r.error) {
+        bootToast = { msg: r.error, kind: "bad" };
+        return first;
+      }
+      bootToast = { msg: r.switched ? `Welcome back! Your farm from ${r.email} is here.` : `Your farm is saved to ${r.email}. Sign in with it on any device.`, kind: "ok" };
+      return await net.boot(); // (a switched farm: load it; otherwise refresh the account details)
     } catch {
       hud.setBanner("Can't reach the village server — retrying…");
       await new Promise((r) => setTimeout(r, Math.min(8000, 1000 * 2 ** attempt)));
@@ -1412,7 +1448,8 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
   booted_ = true;
   game.skew = boot.serverNow - Date.now();
   net.attach(game);
-  hud.setAccount(net.recoveryCode);
+  hud.setAccount(net.recoveryCode, net.account, await net.checkAuth());
+  if (bootToast) setTimeout(() => bootToast && hud.toast(bootToast.msg, bootToast.kind), 1500);
   const t0 = performance.now();
   game.syncAll(); // saved edits and fields go to the worker before the first mesh
   syncFields();

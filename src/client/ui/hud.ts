@@ -124,12 +124,27 @@ export class Hud {
     this.banner.hidden = !text;
   }
 
-  /** The pause panel's account box: your recovery code, and a way to continue another farm. */
-  setAccount(code: string) {
-    this.account.innerHTML = `
-      <div class="code-row">Your farm is saved online. Recovery code <code>${code}</code> <button data-copy>Copy</button></div>
+  /** Opens the "Save your farm" card. */
+  onAccountCard: () => void = () => {};
+
+  /** The pause panel's account box: where the farm is saved, and (folded away) the recovery code. */
+  setAccount(code: string, account: { email: string; provider: string } | null = null, authEnabled = false) {
+    const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+    const line = account
+      ? `<div class="account-line saved">✅ Saved to <b>${esc(account.email)}</b> <button data-acct>Account</button></div>`
+      : authEnabled
+        ? `<div class="account-line">Your farm is only on this device. <button data-acct>Save your farm</button></div>`
+        : "";
+    this.account.innerHTML = `${line}
+      <details class="code-fold" ${line ? "" : "open"}><summary>Recovery code</summary>
+      <div class="code-row">Recovery code <code>${code}</code> <button data-copy>Copy</button></div>
       <form class="restore"><input name="code" placeholder="Have a code? XXXX-XXXX-XXXX" maxlength="16" autocomplete="off" spellcheck="false"><button>Continue that farm</button></form>
-      <div class="restore-msg"></div>`;
+      <div class="restore-msg"></div></details>`;
+    this.account.querySelector("[data-acct]")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.onAccountCard();
+    });
+    this.account.querySelector("summary")?.addEventListener("click", (e) => e.stopPropagation());
     const msg = this.account.querySelector(".restore-msg") as HTMLElement;
     this.account.querySelector("[data-copy]")!.addEventListener("click", async (e) => {
       e.stopPropagation();

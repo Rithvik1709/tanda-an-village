@@ -25,11 +25,16 @@ const writeToken = (t: string) => {
   }
 };
 
-type StateReply = { save: Save; recoveryCode: string; serverNow: number };
+export type AccountInfo = { email: string; provider: string };
+type StateReply = { save: Save; recoveryCode: string; serverNow: number; account?: AccountInfo | null };
 
 export class Net {
   token: string | null = readToken();
   recoveryCode = "";
+  /** Who this farm is saved to (Google or email sign-in), if anyone. */
+  account: AccountInfo | null = null;
+  /** Is sign-in available on this server? */
+  authEnabled = false;
   status: SyncStatus = "saved";
   private queue: Action[] = [];
   private inFlight = false;
@@ -74,7 +79,51 @@ export class Net {
 
   private accept(d: StateReply) {
     this.recoveryCode = d.recoveryCode;
+    this.account = d.account ?? null;
     return d;
+  }
+
+  // ---- sign-in (see api/auth.ts) ----
+  /** Where sign-in returns to: this page, without any old #fragment. */
+  private back = () => `${location.origin}${location.pathname}`;
+  async checkAuth() {
+    this.authEnabled = !!(await this.call<{ enabled?: boolean }>("auth").catch(() => ({ data: {} as { enabled?: boolean } }))).data.enabled;
+    return this.authEnabled;
+  }
+  /** Off to Google (through Supabase); the page comes back with #access_token=…. */
+  google() {
+    location.href = `/api/auth?go=google&back=${encodeURIComponent(this.back())}`;
+  }
+  /** Email a magic link. Returns an error message, or null when sent. */
+  async emailLink(email: string): Promise<string | null> {
+    const r = await this.call<{ sent?: boolean; error?: string }>("auth", { email, back: this.back() }).catch(() => null);
+    if (!r) return "Couldn't reach the village. Check your connection.";
+    return r.data.sent ? null : (r.data.error ?? "Couldn't send the email.");
+  }
+  /**
+   * Finish a sign-in: hand the access token from the URL to our server, which links this farm to the
+   * account, or (signing in on another device) hands back that account's farm. "switched" means the
+   * page must reload to load the other farm.
+   */
+  async finishSignIn(accessToken: string): Promise<{ error?: string; switched?: boolean; email?: string }> {
+    const r = await this.call<{ token?: string; email?: string; switched?: boolean; error?: string }>("auth", { accessToken }).catch(() => null);
+    if (!r) return { error: "Couldn't reach the village. Check your connection." };
+    if (r.status !== 200) return { error: r.data.error ?? "Sign-in failed. Please try again." };
+    if (r.data.token) {
+      this.token = r.data.token;
+      writeToken(this.token);
+    }
+    this.account = { email: r.data.email ?? "", provider: this.account?.provider ?? "" };
+    return { switched: !!r.data.switched, email: r.data.email };
+  }
+  /** Forget this device's key to the farm (the farm stays safe in the account). */
+  signOut() {
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      /* ignore */
+    }
+    location.reload();
   }
 
   private game: Game | null = null;

@@ -5,7 +5,7 @@
 export class PhoneMenu {
   private el: HTMLElement;
   open = false;
-  onPick: (what: "map" | "board" | "help" | "settings" | "view" | "torch") => void = () => {};
+  onPick: (what: "map" | "board" | "help" | "settings" | "view" | "torch" | "account") => void = () => {};
   onRestore: (code: string) => Promise<string | null> = async () => null;
   onClose: () => void = () => {};
 
@@ -45,6 +45,7 @@ export class PhoneMenu {
       <h2>Menu</h2>
       <div class="pm-grid">
         <button data-close class="pm-primary">▶ Continue</button>
+        <button data-m="account">☁ Save your farm</button>
         <button data-m="map">Map</button>
         <button data-m="view">Change view</button>
         <button data-m="torch">Torch on / off</button>

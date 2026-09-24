@@ -457,3 +457,30 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 @media (prefers-reduced-motion: reduce) { .sk, #boot .b-shine, #boot .b-wheel { animation: none; } }
 .interact small.hours { font-weight: 500; opacity: 0.7; font-size: 0.85em; }
 .panel-card .hours-line { margin: -4px 0 8px; font-size: 12px; color: var(--ink-2); }
+/* ---- "Save your farm" (sign in) ---- */
+.account-card { z-index: 40; }
+.account-card .panel-card { width: min(440px, calc(var(--app-w, 100vw) - 32px)) !important; text-align: center; }
+.account-card .ac-icon { font-size: 34px; margin: 2px 0 4px; }
+.account-card .lede { margin: 6px 0 16px; }
+.account-card .ac-google { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid #dadce0; background: #fff; color: #1f1f1f; font: 600 15px system-ui; cursor: pointer; }
+.account-card .ac-google:hover { background: #f6f7f8; }
+.account-card .ac-or { display: flex; align-items: center; gap: 10px; margin: 14px 0; color: var(--ink-2); font-size: 12px; }
+.account-card .ac-or::before, .account-card .ac-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.account-card .ac-email { display: flex; gap: 8px; }
+.account-card .ac-email input { flex: 1; min-width: 0; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,244,220,0.07); color: inherit; font: 15px system-ui; }
+.account-card .ac-email button { padding: 0 14px; border-radius: 10px; border: 0; background: var(--rust); color: #fff; font: 700 14px system-ui; cursor: pointer; white-space: nowrap; }
+.account-card .ac-email button:disabled { opacity: 0.6; }
+.account-card .ac-msg { min-height: 1.3em; margin-top: 8px; font-size: 13px; color: var(--ink-2); }
+.account-card .ac-msg.bad { color: #ffb4a0; }
+.account-card .ac-later { margin-top: 6px; background: none; border: 0; color: var(--ink-2); font: 600 13px system-ui; text-decoration: underline; cursor: pointer; }
+.account-card .ac-code { margin-top: 14px; font-size: 12px; color: var(--ink-2); text-align: left; }
+.account-card .ac-code summary { cursor: pointer; text-align: center; }
+.account-card .ac-code code { color: var(--gold-2, #f1d58a); font: 700 13px ui-monospace, Menlo, monospace; }
+.account-card .big-acts { display: flex; flex-direction: column; gap: 8px; }
+.account-card .big-acts .ghost { background: none !important; border: 1px solid var(--line) !important; color: var(--ink-2) !important; }
+.account-line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; font-size: 13px; }
+.account-line button { font: 700 13px system-ui; padding: 7px 12px; border-radius: 9px; border: 0; background: var(--rust); color: #fff; cursor: pointer; }
+.account-line.saved button { background: rgba(255,244,220,0.12); border: 1px solid var(--line); }
+.play-prompt .code-fold { margin-top: 8px; font-size: 12px; }
+.play-prompt .code-fold summary { cursor: pointer; opacity: 0.75; }
+.account-card .big-code { display: block; margin-top: 10px; font: 700 20px ui-monospace, Menlo, monospace; color: var(--gold-2, #f1d58a); letter-spacing: 0.06em; }
