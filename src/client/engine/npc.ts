@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeBoxes } from "./merge";
 
 /** A blocky villager standing at a stall: dhoti, kurta, a topi or pheta. Turns to face the player. */
 export type NpcLook = { kurta: string; dhoti: string; hat: string; hatTall?: boolean; skin?: string };
@@ -40,6 +41,7 @@ export class Npc {
     } else box(0.4, 0.14, 0.26, look.hat, 0, 0.44, 0, this.head); // Gandhi topi
     this.group.position.set(x, y, z);
     this.group.rotation.y = facing;
+    mergeBoxes(this.group);
   }
 
   /** Idle sway; the head turns toward the player when they're close. */

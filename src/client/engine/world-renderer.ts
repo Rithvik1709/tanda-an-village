@@ -29,6 +29,17 @@ export class WorldRenderer {
     });
   }
 
+  /** Hide chunks beyond the render distance (their centre, in blocks, from the camera). */
+  cull(cam: THREE.Vector3, distance: number) {
+    const r = distance + CHUNK;
+    for (const [key, list] of this.meshes) {
+      const [cx, cz] = key.split(",").map(Number);
+      const dx = (cx + 0.5) * CHUNK - cam.x, dz = (cz + 0.5) * CHUNK - cam.z;
+      const vis = dx * dx + dz * dz < r * r;
+      for (const m of list) m.visible = vis;
+    }
+  }
+
   static chunkCount() {
     return (W / CHUNK) * (D / CHUNK);
   }

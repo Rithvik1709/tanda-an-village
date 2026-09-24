@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeBoxes } from "./merge";
 
 /*
  * The Khillari bull pair and the bullock cart, built from boxes like everything else.
@@ -128,6 +129,7 @@ export class Rig {
     this.cart.group.position.z = -1.35;
     this.cart.group.visible = false;
     this.group.add(this.cart.group);
+    mergeBoxes(this.group);
   }
 
   setHitched(on: boolean) {
@@ -156,5 +158,6 @@ export function parkedCart(): THREE.Group {
   pivot.add(c.group);
   const g = new THREE.Group();
   g.add(pivot);
+  mergeBoxes(g);
   return g;
 }

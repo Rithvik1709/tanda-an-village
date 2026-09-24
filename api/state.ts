@@ -1,5 +1,5 @@
-import { authed, json, loadSave, type Player, serverNow, unauthorized } from "./lib/game";
-import { store } from "./lib/store";
+import { authed, json, loadSave, type Player, serverNow, unauthorized } from "./_lib/game";
+import { store } from "./_lib/store";
 
 /** GET /api/state → { save, recoveryCode, serverNow } for the signed-in farmer. */
 export async function GET(req: Request): Promise<Response> {

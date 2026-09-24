@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { FileStore, MemoryStore, type Store, UpstashStore } from "../api/lib/store";
+import { FileStore, MemoryStore, type Store, UpstashStore } from "../api/_lib/store";
 
 /** A stand-in for Upstash's REST endpoint: POST [cmd, ...args] → { result }. */
 function fakeUpstash(): typeof fetch {

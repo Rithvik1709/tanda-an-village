@@ -12,12 +12,16 @@ export class Signs {
     for (const [id, s] of this.signs)
       if (!wanted.has(id)) {
         this.group.remove(s.obj);
+        dispose(s.obj);
         this.signs.delete(id);
       }
     for (const [id, w] of wanted) {
       const key = w.lines.join("|") + w.color;
       if (this.signs.get(id)?.key === key) continue;
-      if (this.signs.has(id)) this.group.remove(this.signs.get(id)!.obj);
+      if (this.signs.has(id)) {
+        this.group.remove(this.signs.get(id)!.obj);
+        dispose(this.signs.get(id)!.obj);
+      }
       const obj = this.make(plots[id], w.lines, w.color);
       this.group.add(obj);
       this.signs.set(id, { key, obj });
@@ -70,4 +74,16 @@ export class Signs {
     g.rotation.y = Math.atan2(out[0], out[1]); // board's +z face looks out toward the road
     return g;
   }
+}
+
+/** Free a sign's GPU memory (its canvas texture and geometry). */
+function dispose(o: THREE.Object3D) {
+  o.traverse((c) => {
+    if (!(c instanceof THREE.Mesh)) return;
+    c.geometry.dispose();
+    for (const m of [c.material].flat()) {
+      (m as THREE.MeshLambertMaterial).map?.dispose();
+      if ((m as THREE.MeshLambertMaterial).map) m.dispose();
+    }
+  });
 }

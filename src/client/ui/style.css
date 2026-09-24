@@ -119,3 +119,41 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .title-card .progress i { display: block; height: 100%; background: #8a5a10; }
 .info .title { color: #f3d9a0; font-weight: 700; }
 .info .debt { color: #ffb4a0; font-weight: 700; }
+/* ---- title screen ---- */
+.title-screen { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: auto; background: linear-gradient(180deg, rgba(20,14,10,0.0) 30%, rgba(20,14,10,0.55)); transition: opacity 0.6s; z-index: 10; }
+.title-screen.gone { opacity: 0; pointer-events: none; }
+.title-inner { text-align: center; color: #fff; margin-top: 8vh; }
+.wordmark { font: 800 clamp(56px, 11vw, 112px)/0.9 Georgia, "Times New Roman", serif; letter-spacing: -0.02em; text-shadow: 0 4px 30px rgba(60, 20, 0, 0.55), 0 2px 0 rgba(120, 50, 10, 0.5); color: #fff4dc; }
+.wordmark span { display: block; font: 700 clamp(22px, 3.2vw, 34px) system-ui; letter-spacing: 0.04em; margin-top: 10px; color: #ffd98a; }
+.tagline { font-size: 17px; margin: 18px auto 8px; max-width: 520px; text-shadow: 0 1px 8px rgba(0,0,0,0.6); }
+.title-save { min-height: 22px; font-size: 15px; color: #ffe6b0; text-shadow: 0 1px 6px rgba(0,0,0,0.6); }
+.title-buttons { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 14px; }
+.title-buttons button { font: 700 16px system-ui; padding: 11px 26px; min-width: 240px; border-radius: 12px; border: 0; background: rgba(246, 238, 219, 0.92); color: #2a2530; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+.title-buttons button.primary { background: #b8553a; color: #fff; font-size: 18px; padding: 13px 30px; }
+.title-buttons button.link { background: none; box-shadow: none; color: #fff; font-weight: 600; font-size: 14px; text-decoration: underline; min-width: 0; }
+.title-buttons button:hover { transform: translateY(-1px); }
+.title-screen .keys { margin-top: 18px; font-size: 12px; opacity: 0.75; }
+.title-screen .loading { position: absolute; bottom: 30px; left: 0; right: 0; text-align: center; color: #fff; font-size: 14px; opacity: 0; transition: opacity 0.3s; }
+.title-screen.busy .loading { opacity: 0.9; }
+.title-screen.busy .title-buttons { opacity: 0.4; }
+.ui-title .hud > :not(.toasts):not(.banner) { visibility: hidden; }
+/* ---- settings, tutorial, phone note ---- */
+.settings-card label { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; font-weight: 600; font-size: 14px; }
+.settings-card label b { position: absolute; right: 22px; font-weight: 700; color: #8a5a10; }
+.settings-card label { position: relative; }
+.settings-card input[type="range"] { width: 100%; accent-color: #b8553a; }
+.tutorial { position: absolute; left: 12px; top: 56px; max-width: 300px; padding: 10px 12px; border-radius: 10px; background: rgba(246, 238, 219, 0.94); color: #2a2530; font-size: 14px; line-height: 1.45; pointer-events: auto; box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
+.tutorial .tut-head { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.6; margin-bottom: 4px; }
+.tutorial button { border: 0; background: none; font: 600 11px system-ui; cursor: pointer; opacity: 0.8; text-decoration: underline; }
+.tutorial kbd { margin: 0 1px; }
+.mobile-note { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; pointer-events: auto; background: rgba(20,14,10,0.55); z-index: 20; }
+.mobile-note .panel-card { max-width: 420px; }
+.play-prompt .pause-buttons { display: flex; gap: 8px; justify-content: center; }
+.play-prompt .pause-buttons button { font: 600 12px system-ui; padding: 5px 12px; border-radius: 6px; border: 0; background: #f4ecd8; color: #2a2530; cursor: pointer; }
+.title-restore { display: flex; gap: 6px; }
+.title-restore input { font: 14px ui-monospace, Menlo, monospace; padding: 8px 10px; border-radius: 8px; border: 0; width: 200px; text-transform: uppercase; }
+.title-restore button { min-width: 0 !important; padding: 8px 14px !important; font-size: 14px !important; }
+.title-screen .restore-msg { color: #fff; font-size: 13px; min-height: 1em; }
+.tutorial kbd { background: #2a2530; color: #f4ecd8; }
+.panel-card, .map-card { box-sizing: border-box; }
+.mobile-note .panel-card { width: 100%; }

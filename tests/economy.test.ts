@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { POST as act } from "../api/act";
-import { MemoryStore, setStoreForTests } from "../api/lib/store";
+import { MemoryStore, setStoreForTests } from "../api/_lib/store";
 import { POST as session } from "../api/session";
 import { CROP_IDS, CROPS } from "../src/shared/crops";
 import { buyerPrice, eventFor, marketPrice, seasonOfDay, SHOP } from "../src/shared/economy";

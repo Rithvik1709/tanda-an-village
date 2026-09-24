@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MemoryStore } from "../api/lib/store";
+import { MemoryStore } from "../api/_lib/store";
 
 describe("store", () => {
   it("round-trips a value", async () => {

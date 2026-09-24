@@ -22,6 +22,8 @@ import { askingPrice, forSale } from "../shared/land";
 import { bullsMoodWord, bullsNow } from "../shared/bulls";
 import { isOverdue, netWorth, TITLES, titleFor } from "../shared/bank";
 import { Farmyard } from "./farmyard";
+import { Audio, renderRms, SOUNDS } from "./audio";
+import { isTouchOnly, loadSettings, SettingsPanel, showMobileNote, TitleScreen, Tutorial } from "./ui/screens";
 import { groundY } from "./player/path";
 
 type Hooks = {
@@ -88,7 +90,48 @@ const controls = new Controls(canvas);
 controls.yaw = 0.25; // face up the north road, your first field off to the left
 const hotbar = new Hotbar();
 const hud = new Hud(document.getElementById("ui")!, atlas.image as HTMLCanvasElement, hotbar);
-let mode: "play" | "cinematic" = "play";
+let mode: "play" | "cinematic" | "title" = "title";
+const audio = new Audio();
+const uiRoot = document.getElementById("ui")!;
+uiRoot.classList.add("ui-title");
+const settings = loadSettings();
+controls.sensitivity = settings.sensitivity;
+audio.setVolume(settings.volume);
+const titleScreen = new TitleScreen(uiRoot);
+const settingsPanel = new SettingsPanel(uiRoot, settings);
+const tutorial = new Tutorial(uiRoot);
+settingsPanel.onChange = (st) => {
+  controls.sensitivity = st.sensitivity;
+  audio.setVolume(st.volume);
+  applyRenderDistance();
+};
+settingsPanel.onClose = () => hud.setPlaying(titleScreen.open);
+function applyRenderDistance() {
+  const fog = scene.fog as THREE.Fog | null;
+  if (fog) {
+    fog.near = settings.renderDistance * 0.5;
+    fog.far = settings.renderDistance * 1.3;
+  }
+}
+/** Leave the title screen for the village. `lock` asks for the mouse (a real click); scripts skip it. */
+function enterGame(lock: boolean) {
+  if (!titleScreen.open) return;
+  titleScreen.hide();
+  uiRoot.classList.remove("ui-title");
+  mode = "play";
+  audio.unlock();
+  hud.setPlaying(false);
+  if (lock) canvas.requestPointerLock?.();
+}
+titleScreen.onPlay = () => enterGame(true);
+titleScreen.onSettings = () => settingsPanel.show();
+const showSettings = settingsPanel.show.bind(settingsPanel);
+settingsPanel.show = () => {
+  showSettings();
+  hud.setPlaying(true); // the pause panel steps aside
+  document.exitPointerLock?.();
+};
+if (isTouchOnly()) showMobileNote(uiRoot, () => {});
 let target: Hit | null = null;
 
 const outline = new THREE.LineSegments(
@@ -375,7 +418,7 @@ function refreshStatus() {
   hud.setInfo(`<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${title.name}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${overdue ? `<span class="debt">loan overdue!</span>` : ""}<span class="sync ${net.status}">${saved}</span><span>${fmtHour(hourOverride ?? c.hour)}</span><span>${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}</span>`);
 }
 game.onChange(refreshStatus);
-const sfxQueue: string[] = []; // sound arrives in M9; the queue keeps the call sites honest
+const sfxQueue = { push: (name: string) => audio.play(name) };
 
 controls.onDig = () => void useLeft();
 controls.onPlace = () => void useRight();
@@ -406,13 +449,25 @@ document.querySelector(".play-prompt")!.addEventListener("click", (e) => {
   if (!(e.target as HTMLElement).closest(".account")) canvas.requestPointerLock?.();
 });
 controls.onLockChange = (locked) => {
+  if (locked) enterGame(false);
   if (locked) {
     mode = "play";
     panels.close();
   }
   if (locked) map.close();
-  hud.setPlaying(locked || !!panels.open || map.open);
+  hud.setPlaying(locked || !!panels.open || map.open || titleScreen.open);
 };
+// the pause panel gets a Settings button
+{
+  const b = document.createElement("div");
+  b.className = "pause-buttons";
+  b.innerHTML = `<button data-settings>Settings</button>`;
+  document.querySelector(".play-prompt")!.insertBefore(b, document.querySelector(".play-prompt .account"));
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    settingsPanel.show();
+  });
+}
 
 // the land beyond the map: a wide fogged plain with an exact square hole where the world is,
 // so the map never ends in a hard edge against the sky
@@ -430,6 +485,7 @@ controls.onLockChange = (locked) => {
 let hourOverride: number | null = null;
 const lookAt = new THREE.Vector3();
 function setCamera(pos: readonly number[], look: readonly number[]) {
+  enterGame(false);
   mode = "cinematic";
   camera.position.set(pos[0], pos[1], pos[2]);
   lookAt.set(look[0], look[1], look[2]);
@@ -480,7 +536,16 @@ renderer.setAnimationLoop(() => {
     target = raycast(e, lookDir(), MOVE.reach, cur.kind === "tool" && cur.tool === "can" ? pickWater : pickable, plantBox);
     outline.visible = !!target;
     if (target) outline.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5);
+  } else if (mode === "title") {
+    // the title screen: a slow circle over the village at golden hour
+    const a = now / 1000 * 0.045;
+    camera.position.set(96 + Math.cos(a) * 78, 40, 92 + Math.sin(a) * 78);
+    camera.lookAt(94, 17, 90);
+    outline.visible = false;
   } else outline.visible = false;
+  if (mode === "play" && !farmyard.ride) footsteps(dt);
+  if (farmyard.ride && Math.random() < dt * 2.2) audio.play("bells");
+  audio.ambience(hourOverride ?? clock(game.now()).hour, !!game.save.bulls && farmyard.distTo(body.pos, farmyard.pos.x, farmyard.pos.z) < 12);
   if (now - lastTick > 500) {
     lastTick = now;
     game.tick();
@@ -491,17 +556,31 @@ renderer.setAnimationLoop(() => {
     const st = mode === "play" && !panels.open && !farmyard.ride ? nearStall() : undefined;
     hud.setHint(farmyard.ride || panels.open ? "" : st ? `<kbd>E</kbd> ${st.label}` : cartHint());
     hud.setBulls(bullsChip());
+    if (!titleScreen.open) tutorial.update(game.save, game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]), now);
   }
+  worldRenderer.cull(camera.position, mode === "title" ? 200 : settings.renderDistance);
   for (const s of STALLS) s.npc.update(dt, camera.position);
   worldRenderer.flush();
-  const hour = hourOverride ?? clock(game.now()).hour;
+  const hour = hourOverride ?? (mode === "title" ? 17.4 : clock(game.now()).hour);
   sky.update(hour, dt, camera.position);
+  if (mode !== "title") applyRenderDistance();
   renderer.render(scene, camera);
   if (hud.debugOn) hud.setDebug(debugText(dt));
 });
 
 let lastTick = 0;
 let fpsAvg = 60;
+let stepAcc = 0;
+/** A footstep every so often while walking on the ground; road crunches brighter than grass. */
+function footsteps(dt: number) {
+  const speed = Math.hypot(body.vel.x, body.vel.z);
+  if (!body.onGround || speed < 1) return void (stepAcc = 0.3);
+  stepAcc += dt * speed;
+  if (stepAcc < 2.1) return;
+  stepAcc = 0;
+  const under = get(Math.floor(body.pos.x), Math.floor(body.pos.y - 0.1), Math.floor(body.pos.z));
+  audio.play("step", under === B.ROAD || under === B.COBBLE ? 1 : under === B.SAND ? 0.6 : 0.2);
+}
 function debugText(dt: number) {
   fpsAvg += (1 / Math.max(dt, 1e-3) - fpsAvg) * 0.05;
   const p = body.pos;
@@ -536,6 +615,12 @@ net.onRejected = (errs) => {
   hud.toast(`The village refused: ${errs[0]}`, "bad");
   sfxQueue.push("refused");
 };
+titleScreen.onRestore = async (code) => {
+  const err = await net.restore(code);
+  if (err) return err;
+  location.reload();
+  return null;
+};
 hud.onRestore = async (code) => {
   const err = await net.restore(code);
   if (err) return err;
@@ -555,6 +640,7 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
   await worldRenderer.meshAll();
   refreshStatus();
   const meshAllMs = performance.now() - t0;
+  titleScreen.ready(game.save, titleFor(netWorth(world, game.save, game.now(), clock(game.now()).day).total).name);
   Object.assign(window.__bailgaadi, {
     ready: true,
     setHour: (h: number | null) => {
@@ -565,9 +651,11 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     setCamera,
     // ---- M2 test hooks: drive the player without pointer lock ----
     play: () => {
+      enterGame(false);
       mode = "play";
     },
     teleport: (x: number, y: number, z: number, yaw = controls.yaw, pitch = controls.pitch) => {
+      enterGame(false);
       mode = "play";
       hud.setPlaying(true); // scripted play counts as playing: hide the click prompt
       Object.assign(body.pos, { x, y, z });
@@ -631,6 +719,9 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
         }
       : {}),
     toggleDebug: () => hud.toggleDebug(),
+    title: () => ({ open: titleScreen.open, mode }),
+    openSettings: () => settingsPanel.show(),
+    audioSelfTest: async () => Object.fromEntries(await Promise.all(Object.keys(SOUNDS).map(async (k) => [k, Math.round((await renderRms(k)) * 1e4) / 1e4]))),
     openStall: (kind: PanelKind, tab?: string) => openStall(kind, tab),
     closePanel: () => panels.close(),
     showMap: () => showMap(),

@@ -1,6 +1,6 @@
 import { newSave } from "../src/shared/save";
-import { issueToken, json, normalizeCode, type Player, randomHex, readJson, recoveryCode, world, writeSave } from "./lib/game";
-import { store } from "./lib/store";
+import { issueToken, json, normalizeCode, type Player, randomHex, readJson, recoveryCode, world, writeSave } from "./_lib/game";
+import { store } from "./_lib/store";
 
 /**
  * POST /api/session

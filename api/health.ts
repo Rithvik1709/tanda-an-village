@@ -1,4 +1,4 @@
-import { store } from "./lib/store";
+import { store } from "./_lib/store";
 
 export async function GET(): Promise<Response> {
   const s = store();

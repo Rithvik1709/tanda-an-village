@@ -1,4 +1,4 @@
-import { authed, devClockAllowed, json, loadSave, readJson, serverNow, unauthorized, writeSave } from "./lib/game";
+import { authed, devClockAllowed, json, loadSave, readJson, serverNow, unauthorized, writeSave } from "./_lib/game";
 
 /** POST /api/dev { skipMs?, money? } — dev only: fast-forward this save's clock, or grant money for tests. 404 in production. */
 export async function POST(req: Request): Promise<Response> {
