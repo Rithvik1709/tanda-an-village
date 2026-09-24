@@ -4,7 +4,15 @@ import { DAY_MS } from "./time.js";
  * Your bull pair (a Khillari jodi): stamina for work, mood from care. Both change with time, and
  * like crops they're integrated from timestamps so the server can recompute them exactly.
  */
-export type Bulls = { stamina: number; mood: number; fedAt: number; updatedAt: number };
+export type Bulls = {
+  stamina: number;
+  mood: number;
+  fedAt: number;
+  updatedAt: number;
+  tied?: boolean; // tied at home (the khunta behind your house) instead of following you
+  sheltered?: boolean; // tied inside your own gotha: they get hungry half as fast and rest better
+};
+export const FIELD_PLOUGH_MAX = 40; // blocks the pair ploughs in one go (P)
 export const BULL_NAMES = ["Sarja", "Raja"] as const;
 
 export const PLOUGH_COST = 2; // stamina per ploughed block
@@ -21,9 +29,9 @@ export function bullsNow(b: Bulls, now: number): Bulls {
   const days = (now - b.updatedAt) / DAY_MS;
   const hungryFrom = b.fedAt + DAY_MS;
   const hungryDays = Math.max(0, (now - Math.max(hungryFrom, b.updatedAt)) / DAY_MS);
-  const mood = Math.max(0, b.mood - hungryDays * 25);
+  const mood = Math.max(0, b.mood - hungryDays * (b.sheltered ? 12.5 : 25));
   const avgMood = (b.mood + mood) / 2;
-  const stamina = Math.min(100, b.stamina + days * 40 * (0.3 + 0.7 * (avgMood / 100)));
+  const stamina = Math.min(100, b.stamina + days * (b.sheltered ? 55 : 40) * (0.3 + 0.7 * (avgMood / 100)));
   return { ...b, mood: round(mood), stamina: round(stamina), updatedAt: now };
 }
 const round = (n: number) => Math.round(n * 100) / 100;

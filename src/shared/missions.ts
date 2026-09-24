@@ -99,7 +99,7 @@ export const MISSIONS: Mission[] = [
     objectives: [
       { id: "buy", text: "Buy the bull pair (Sitabai's stall)", need: 1, have: (s) => (s.bulls ? 1 : 0) },
       { id: "feed", text: "Feed them kadba (F near the bulls)", need: 1, have: (s) => since(s, "feed") },
-      { id: "plough", text: "Plough a row with them (Shift + right-click with the hoe; needs a plough)", need: 1, have: (s) => since(s, "plough") },
+      { id: "plough", text: "Plough with them: press P in your field (needs a plough)", need: 1, have: (s) => since(s, "plough") },
     ],
     reward: { rep: 5, money: 500, text: "₹500 · +5 reputation" },
   },

@@ -4,6 +4,7 @@ import { type Buyer, buyerPrice, LEDGER_DAYS, shopItem } from "./economy.js";
 import { askingPrice, clearPlot, forSale, offersFor, valuePlot } from "./land.js";
 import { carried, CARRY, creditLimit, GODOWN_CAPACITY, isOverdue, LENDERS, type Lender, type Loan, owed, rentFor, stored } from "./bank.js";
 import { begin, BANDH_PLOT, bump, complete, current, deadlineAt, since } from "./missions.js";
+import { FIELD_PLOUGH_MAX } from "./bulls.js";
 import { BULL_NAMES, bullsNow, CART_CAPACITY, FEED, MIN_MOOD, newBulls, PLOUGH_COST, PLOUGH_ROW, TRIP_COST, TRIP_MS } from "./bulls.js";
 import { hash2 } from "./rng.js";
 import type { LedgerEntry, Save } from "./save.js";
@@ -47,6 +48,8 @@ export type Action =
   | { t: "installDrip"; plot: number }
   | { t: "setName"; name: string }
   | { t: "sleep" }
+  | { t: "tieBulls"; tie: boolean }
+  | { t: "ploughField"; plot: number }
   | { t: "friends" };
 
 export type Result = { ok: true; msg?: string; gained?: Record<string, number> } | { ok: false; error: string };
@@ -92,7 +95,7 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
-const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends"]);
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends", "tieBulls", "ploughField"]);
 export const isNight = (hour: number) => hour >= 19.5 || hour < 4;
 /** How long until 6 am, from a night hour (ms). */
 export const untilMorning = (hour: number) => ((hour >= 19.5 ? 30 : 6) - hour) * HOUR_MS;
@@ -351,7 +354,7 @@ function livestock(save: Save, a: Extract<Action, { t: "feed" | "startTrip" | "s
       save.inv[item] -= n;
       if (!save.inv[item]) delete save.inv[item];
     }
-    save.bulls = { ...b, stamina: b.stamina - TRIP_COST };
+    save.bulls = { ...b, stamina: b.stamina - TRIP_COST, tied: false, sheltered: false };
     save.trip = { startedAt: now, load };
     return { ok: true, msg: `Loaded ${total} — off to the town mandi!` };
   }
@@ -472,6 +475,44 @@ function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: numbe
 export function apply(world: World, save: Save, a: Action, now: number): Result {
   if (!a || typeof a !== "object" || !KNOWN.has(a.t)) return fail("Unknown action.");
   if (save.missions) checkDeadline(world, save, now);
+  if (a.t === "tieBulls") {
+    if (!save.bulls) return fail("You don't have bulls yet.");
+    save.bulls = { ...bullsNow(save.bulls, now), tied: !!a.tie, sheltered: !!a.tie && !!save.inv.gotha };
+    save.updatedAt = now;
+    return { ok: true, msg: a.tie ? (save.inv.gotha ? "Sarja & Raja are tied in their gotha, fodder in the trough" : "Sarja & Raja are tied at the khunta behind your house") : "You untie Sarja & Raja — they follow you" };
+  }
+  if (a.t === "ploughField") {
+    const p = Number.isInteger(a.plot) ? world.plots[a.plot] : undefined;
+    if (!p || !save.plots.includes(p.id)) return fail("Your bulls plough only your own fields.");
+    if (!save.bulls || !save.inv.plough) return fail("You need bulls and a plough (Sitabai sells both).");
+    let b = bullsNow(save.bulls, now);
+    if (b.mood < MIN_MOOD) return fail("The bulls are sulking — feed them first.");
+    if (b.stamina < PLOUGH_COST) return fail("The bulls are tired. Let them rest or feed them.");
+    b = { ...b, tied: false, sheltered: false };
+    let done = 0;
+    // row by row, inside the fence, skipping what's already ploughed
+    for (let z = p.z0 + 1; z < p.z1 && done < FIELD_PLOUGH_MAX; z++)
+      for (let x = p.x0 + 1; x < p.x1 && done < FIELD_PLOUGH_MAX; x++) {
+        if (b.stamina < PLOUGH_COST) break;
+        const ck = key(x, p.y, z);
+        if (save.farm[ck]) continue;
+        const b0 = blockAt(world, save, x, p.y, z, now);
+        if (!block(b0).farmable) continue;
+        const above = blockAt(world, save, x, p.y + 1, z, now);
+        if (above !== B.AIR && !(block(above).shape === "cross" && !isCropBlock(above))) continue;
+        if (above !== B.AIR) save.edits[key(x, p.y + 1, z)] = B.AIR;
+        const q = soilQuality(world, x, z, b0);
+        save.farm[ck] = { baseQ: q, q, wetUntil: save.drip.includes(p.id) ? FOREVER : 0, restedAt: now };
+        delete save.edits[ck];
+        b.stamina -= PLOUGH_COST;
+        done++;
+      }
+    save.bulls = b;
+    if (!done) return fail(b.stamina < PLOUGH_COST ? "The bulls are tired." : "This field is already ploughed.");
+    bump(save, "plough");
+    save.updatedAt = now;
+    return { ok: true, msg: `Sarja & Raja ploughed ${done} patches of ${p.name}`, gained: { ploughed: done } };
+  }
   if (a.t === "sleep") {
     const c = clock(now);
     if (!isNight(c.hour)) return fail("It's not night yet — sleep after 7:30 pm.");

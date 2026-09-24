@@ -39,6 +39,8 @@ export class TouchControls {
         <button data-a="torch">Torch</button>
         <button data-a="cart">Cart</button>
         <button data-a="feed">Feed</button>
+        <button data-a="plough">Plough</button>
+        <button data-a="tie">Tie</button>
         <button data-a="map">Map</button>
         <button data-a="menu" class="t-menu">☰</button>
       </div>`;
@@ -97,7 +99,7 @@ export class TouchControls {
       b.addEventListener("touchstart", (e) => {
         e.preventDefault();
         b.classList.add("down");
-        ({ use: c.onPlace, harvest: c.onDig, talk: c.onInteract, map: c.onMap, view: c.onView, torch: c.onTorch, cart: c.onRide, feed: c.onFeed, board: c.onBoard, help: c.onHelp, menu: this.onMenu } as Record<string, () => void>)[a]?.call(c);
+        ({ use: c.onPlace, harvest: c.onDig, talk: c.onInteract, map: c.onMap, view: c.onView, torch: c.onTorch, cart: c.onRide, feed: c.onFeed, board: c.onBoard, help: c.onHelp, menu: this.onMenu, plough: c.onPloughField, tie: c.onTie } as Record<string, () => void>)[a]?.call(c);
       }, { passive: false });
       b.addEventListener("touchend", () => b.classList.remove("down"));
     });

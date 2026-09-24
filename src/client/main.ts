@@ -163,7 +163,14 @@ const grass = new Grass(
 scene.add(grass.group);
 const fields = new Fields();
 scene.add(fields.group);
-const syncFields = () => fields.sync(game.save, game.now(), (x, z) => hf.at(x, z));
+const syncFields = () => {
+  let save = game.save;
+  if (reveal.size) {
+    const t = performance.now();
+    save = { ...save, farm: Object.fromEntries(Object.entries(save.farm).filter(([k]) => !(reveal.get(k)! > t))) };
+  }
+  fields.sync(save, game.now(), (x, z) => hf.at(x, z));
+};
 const farmer = new Figure(FARMER);
 scene.add(farmer.root);
 
@@ -313,7 +320,7 @@ function closeWindows() {
   switching = false;
 }
 function windowOpen() {
-  return WINDOWS().some((w) => w.open()) || guide.dialogueOpen || !!document.querySelector(".welcome, .fs-gate:not([hidden])");
+  return !!ploughJob || WINDOWS().some((w) => w.open()) || guide.dialogueOpen || !!document.querySelector(".welcome, .fs-gate:not([hidden])");
 }
 phoneMenu.onPick = (what) => (what === "map" ? showMap() : what === "board" ? showBoard() : what === "help" ? controls.onHelp() : settingsPanel.show());
 phoneMenu.onClose = () => resumePlay();
@@ -499,7 +506,7 @@ for (const p of infra.poleSpots) {
 }
 const nav = new Nav(vox, (x, z) => hf.at(x, z));
 const villagers = new Villagers(world, (x, z) => hf.at(x, z), nav);
-const nights = new Nights(world, (x, z) => hf.at(x, z));
+const nights = new Nights(world, (x, z) => hf.at(x, z), (x, z) => nav.isBlocked(x, z));
 scene.add(nights.group);
 // stall keepers and the neighbours by the well stand still; everyone else keeps clear of them
 const fixedBodies = [...STALLS.map((s) => s.npc), ...NEIGHBOURS].map((n) => ({ pos: { x: n.group.position.x, z: n.group.position.z }, r: 0.34, fixed: true }));
@@ -606,6 +613,9 @@ function cartHint(): string {
     const sabha = (ms.c["visit:gramsabha"] ?? 0) > (ms.base["visit:gramsabha"] ?? 0);
     return !sabha ? "<kbd>E</kbd> Join the gram sabha" : !ms.choice ? "Decide whom you back…" : "<kbd>E</kbd> Vote at the polling booth";
   }
+  if (game.save.bulls && !game.save.bulls.tied && nearYard()) return `<kbd>G</kbd> Tie Sarja & Raja ${game.save.inv.gotha ? "in their gotha" : "at the khunta"}`;
+  if (game.save.bulls?.tied && nearYard()) return `<kbd>G</kbd> Untie Sarja & Raja`;
+  if (game.save.bulls && game.save.inv.plough && game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)])) return "<kbd>P</kbd> Let Sarja & Raja plough this field";
   if (nearBulls() && game.save.inv.gerua && current(game.save)?.id === "pola" && !game.save.missions.flags.decorated) return "<kbd>F</kbd> Paint Sarja & Raja's horns with gerua";
   if (nearBulls()) return `<kbd>F</kbd> Feed Sarja & Raja (${game.save.inv.fodder ?? 0} kadba)`;
   return "";
@@ -671,10 +681,59 @@ const plantBox = (x: number, y: number, z: number): Box | null => {
 };
 
 type Outcome = Result | null;
+let actionUntil = 0;
+/** Your farmer does the work you asked for: swing the hoe, tip the can, bend to sow or pick. */
+function perform(sfx: string) {
+  const pose = sfx === "till" || sfx === "plough" ? "hoe" : sfx === "water" || sfx === "fill" ? "pour" : sfx === "plant" || sfx === "harvest" ? "bend" : null;
+  if (!pose) return;
+  farmer.action = pose;
+  actionUntil = performance.now() + 750;
+  if (target) body.heading = Math.atan2(target.x + 0.5 - body.pos.x, target.z + 0.5 - body.pos.z);
+  if (sfx === "water" && target) pourAt(new THREE.Vector3(target.x + 0.5, hf.at(target.x + 0.5, target.z + 0.5) + 0.1, target.z + 0.5));
+}
+// a small pool of water drops for the can
+const dropGeo = new THREE.SphereGeometry(0.03, 5, 4);
+const dropMat = new THREE.MeshBasicMaterial({ color: "#bfe4f0", transparent: true, opacity: 0.85 });
+const drops: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
+let pourTo: THREE.Vector3 | null = null, pourLeft = 0;
+function pourAt(p: THREE.Vector3) {
+  pourTo = p;
+  pourLeft = 0.7;
+}
+function updateDrops(dt: number) {
+  if (pourTo && pourLeft > 0) {
+    pourLeft -= dt;
+    const h = body.heading;
+    const from = new THREE.Vector3(body.pos.x + Math.sin(h) * 0.55 + Math.cos(h) * 0.2, body.pos.y + 0.95, body.pos.z + Math.cos(h) * 0.55 - Math.sin(h) * 0.2);
+    for (let i = 0; i < 3; i++) {
+      const m = drops.length < 90 ? new THREE.Mesh(dropGeo, dropMat) : null;
+      if (!m) break;
+      m.position.copy(from);
+      scene.add(m);
+      const v = pourTo.clone().sub(from).multiplyScalar(1.6);
+      v.x += (Math.random() - 0.5) * 0.4;
+      v.z += (Math.random() - 0.5) * 0.4;
+      v.y = 0.6 + Math.random() * 0.4;
+      drops.push({ m, v, life: 0.9 });
+    }
+  }
+  for (let i = drops.length - 1; i >= 0; i--) {
+    const d = drops[i];
+    d.v.y -= 9 * dt;
+    d.m.position.addScaledVector(d.v, dt);
+    d.life -= dt;
+    if (d.life <= 0 || d.m.position.y < hf.at(d.m.position.x, d.m.position.z)) {
+      scene.remove(d.m);
+      drops.splice(i, 1);
+    }
+  }
+}
+
 function report(r: Outcome, sfx: string): Outcome {
   if (!r) return r;
   if (r.ok) {
     sfxQueue.push(sfx);
+    perform(sfx);
     if (r.msg) hud.toast(r.msg);
   } else hud.toast(r.error, "bad");
   return r;
@@ -791,6 +850,66 @@ controls.onScroll = (d) => {
   hud.refresh();
 };
 controls.onToggleDebug = () => hud.toggleDebug();
+/* ---------- bulls at home, and the pair ploughing a field by themselves (P) ---------- */
+const nearYard = () => Math.hypot(body.pos.x - nights.home.yard.x, body.pos.z - nights.home.yard.z) < 4;
+function tieToggle() {
+  if (!game.save.bulls) return hud.toast("You don't have bulls yet — Sitabai sells a Khillari pair.", "bad");
+  const tied = !!game.save.bulls.tied;
+  if (!tied && !nearYard()) return hud.toast("Bring Sarja & Raja home to tie them — the khunta is behind your house.", "bad");
+  const r = game.act({ t: "tieBulls", tie: !tied });
+  hud.toast(r.ok ? (r.msg ?? "") : r.error, r.ok ? "ok" : "bad");
+  if (r.ok) audio.play("bells");
+}
+let ploughJob: { cells: { x: number; z: number }[]; t0: number; dur: number; msg: string; center: THREE.Vector3 } | null = null;
+const reveal = new Map<string, number>(); // freshly ploughed cells appear as the plough passes
+function startFieldPlough() {
+  if (ploughJob || farmyard.ride) return;
+  if (!game.save.bulls) return hud.toast("You need bulls — Sitabai sells a Khillari pair.", "bad");
+  if (!game.save.inv.plough) return hud.toast("You need a plough (nangar) — Sitabai sells one.", "bad");
+  const here = world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)];
+  const plotId = game.save.plots.includes(here) ? here : game.save.plots[0];
+  const before = new Set(Object.keys(game.save.farm));
+  const r = game.act({ t: "ploughField", plot: plotId });
+  if (!r.ok) return hud.toast(r.error, "bad");
+  const p = world.plots[plotId];
+  const cells = Object.keys(game.save.farm).filter((k) => !before.has(k)).map((k) => ({ k, x: Number(k) % W, z: Math.floor(Number(k) / W) % D }));
+  // the way a pair really ploughs: up one row, back down the next
+  cells.sort((a, b) => a.z - b.z || (a.z % 2 ? b.x - a.x : a.x - b.x));
+  const t0 = performance.now(), dur = 5000;
+  cells.forEach((c, i) => reveal.set(c.k, t0 + (dur * (i + 1)) / cells.length));
+  ploughJob = { cells, t0, dur, msg: r.msg ?? "", center: new THREE.Vector3((p.x0 + p.x1) / 2, p.y, (p.z0 + p.z1) / 2) };
+  farmyard.driven = true;
+  farmyard.tiedAt = null;
+  farmyard.rig.setPlough(true);
+  audio.play("plough");
+  hud.toast("Sarja & Raja start ploughing — watch from above");
+}
+function updatePloughJob(now: number) {
+  const j = ploughJob!;
+  const t = Math.min(1, (now - j.t0) / j.dur);
+  const f = t * (j.cells.length - 1);
+  const i = Math.floor(f), a = j.cells[i], b = j.cells[Math.min(j.cells.length - 1, i + 1)];
+  const k = f - i;
+  const x = a.x + 0.5 + (b.x - a.x) * k, z = a.z + 0.5 + (b.z - a.z) * k;
+  if (b.x !== a.x || b.z !== a.z) farmyard.pos.heading = Math.atan2(b.x - a.x, b.z - a.z);
+  farmyard.pos.x = x + Math.sin(farmyard.pos.heading) * 1.4; // the bulls walk ahead of the share
+  farmyard.pos.z = z + Math.cos(farmyard.pos.heading) * 1.4;
+  // the drone: circling above the field, looking down at the pair
+  const ang = (now - j.t0) / 4000;
+  // follow the pair from a low, slow orbit so the fresh furrows show behind the plough
+  camera.position.set(farmyard.pos.x + Math.cos(ang) * 7, j.center.y + 6.5, farmyard.pos.z + Math.sin(ang) * 7);
+  camera.lookAt(farmyard.pos.x, farmyard.pos.y + 0.8, farmyard.pos.z);
+  if (Math.random() < 0.08) audio.play("till");
+  if (t >= 1) {
+    ploughJob = null;
+    reveal.clear();
+    farmyard.driven = false;
+    farmyard.rig.setPlough(false);
+    syncFields();
+    hud.toast(j.msg);
+  }
+}
+
 /** Pola: lead the bulls into the chowk. */
 function polaHere() {
   const ch = world.chowk;
@@ -865,6 +984,8 @@ controls.onHelp = () => {
   guide.toggleHelp();
   if (guide.helpOpen) releaseMouse();
 };
+controls.onPloughField = () => void (!windowOpen() && startFieldPlough());
+controls.onTie = () => void (!windowOpen() && tieToggle());
 controls.onTorch = () => {
   torchOn = !torchOn;
   hud.toast(torchOn ? "Torch on" : "Torch off");
@@ -977,6 +1098,9 @@ renderer.setAnimationLoop(() => {
   if (frameTimes.length > 240) frameTimes.shift();
   last = now;
   farmyard.set(!!game.save.bulls, !!game.save.inv.cart);
+  const tb = game.save.bulls?.tied;
+  farmyard.tiedAt = tb && !ploughJob ? { x: nights.home.yard.x + Math.sin(nights.home.yardFace) * 1.0, z: nights.home.yard.z + Math.cos(nights.home.yardFace) * 1.0, heading: nights.home.yardFace + Math.PI } : null;
+  nights.setGotha(!!game.save.inv.gotha);
   farmyard.update(dt, body.pos);
   if (farmyard.ride) {
     // on the cart: the road does the walking, you look around — and your view turns with the cart
@@ -1030,7 +1154,7 @@ renderer.setAnimationLoop(() => {
     refreshSigns();
     if (mode === "play") checkPlotEntry();
     const st = mode === "play" && !panels.open && !farmyard.ride ? nearStall() : undefined;
-    hud.setHint(farmyard.ride || panels.open ? "" : st ? `<kbd>E</kbd> ${st.label}` : cartHint() || (nightK > 0.6 && !torchOn && mode === "play" ? "<kbd>T</kbd> Switch on your torch" : ""));
+    hud.setHint(farmyard.ride || panels.open || ploughJob ? "" : st ? `<kbd>E</kbd> ${st.label}` : cartHint() || (nightK > 0.6 && !torchOn && mode === "play" ? "<kbd>T</kbd> Switch on your torch" : ""));
     hud.setBulls(bullsChip());
     // the watchdog: nothing may leave the player stuck — no pause panel on a phone, controls back when windows close
     if (TOUCH) {
@@ -1050,6 +1174,15 @@ renderer.setAnimationLoop(() => {
     guide.nearChoice = elec ? schoolHere() && (game.save.missions.c["visit:gramsabha"] ?? 0) > (game.save.missions.base["visit:gramsabha"] ?? 0) : Math.hypot(body.pos.x - 99.5, body.pos.z - 124) < 5;
     if (!titleScreen.open) tutorial.update(game.save, game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]), now);
   }
+  if (ploughJob) {
+    updatePloughJob(now);
+    syncFields();
+  }
+  // what's in your hand shows in your hand, and using it shows too
+  const cur = hotbar.current;
+  farmer.hold(cur.kind === "tool" ? (cur.tool === "hoe" ? "hoe" : "can") : cur.kind === "seed" ? "bag" : "none");
+  if (now > actionUntil) farmer.action = "none";
+  updateDrops(dt);
   worldRenderer.cull(camera.position, mode === "title" ? 200 : settings.renderDistance);
   const electionOn = current(game.save)?.id === "election";
   campaign.visible = electionOn;
@@ -1310,6 +1443,9 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     setView: (v: "first" | "third") => (rig.view = v),
     torch: (on: boolean) => (torchOn = on),
     villagerDebug: () => villagers.debug(),
+    yard: () => ({ ...nights.home.yard }),
+    yardFace: () => nights.home.yardFace,
+    ploughing: () => !!ploughJob,
     // test hook: tap through any story card that's showing (they're tested in missions.js)
     autoSkipStory: (on: boolean) => (autoSkip = on),
     skipStory: () => {

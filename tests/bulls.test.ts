@@ -119,3 +119,21 @@ describe("the cart to the town mandi", () => {
     expect(m).toMatchObject({ version: 7, bulls: null, trip: null });
   });
 });
+
+describe("tying up and ploughing a field", () => {
+  it("tie at home, a gotha halves hunger, P ploughs the field row by row", () => {
+    const s = farmer();
+    expect(apply(world, s, { t: "tieBulls", tie: true }, T0).ok).toBe(true);
+    expect(s.bulls).toMatchObject({ tied: true, sheltered: false });
+    s.money += 2000;
+    apply(world, s, { t: "buy", item: "gotha", n: 1 }, T0);
+    apply(world, s, { t: "tieBulls", tie: true }, T0);
+    expect(s.bulls!.sheltered).toBe(true);
+    const later = bullsNow({ ...s.bulls!, mood: 80, fedAt: T0 }, T0 + 3 * DAY_MS);
+    expect(later.mood).toBe(55); // 2 hungry days × 12.5, not 25
+    const r = apply(world, s, { t: "ploughField", plot: starter.id }, T0);
+    expect(r).toMatchObject({ ok: true, gained: { ploughed: 40 } });
+    expect(s.bulls).toMatchObject({ tied: false, stamina: 20 });
+    expect(apply(world, s, { t: "ploughField", plot: 0 }, T0).ok).toBe(false); // not my field
+  });
+});

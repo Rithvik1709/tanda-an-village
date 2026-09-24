@@ -21,6 +21,10 @@ export class Farmyard {
   readonly town: Park;
   ride: { path: Pt[]; len: number; d: number; speed: number; dest: Dest } | null = null;
   hasBulls = false;
+  /** Tied at home: they stand here instead of following you. */
+  tiedAt: { x: number; z: number; heading: number } | null = null;
+  /** Someone else is steering them (the plough job sets pos directly). */
+  driven = false;
   hasCart = false;
   onArrive: (dest: Dest) => void = () => {};
   private walkTo: { x: number; z: number } | null = null;
@@ -85,6 +89,19 @@ export class Farmyard {
         this.cart.visible = this.hasCart;
         this.onArrive(dest);
       }
+    } else if (this.driven) {
+      // moved by the plough job
+    } else if (this.hasBulls && this.tiedAt) {
+      const t = this.tiedAt;
+      const dx = t.x - this.pos.x, dz = t.z - this.pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > 30) Object.assign(this.pos, { x: t.x, z: t.z });
+      else if (dist > 0.15) {
+        const sp = Math.min(3, dist * 2 + 0.4);
+        this.pos.x += (dx / dist) * sp * dt;
+        this.pos.z += (dz / dist) * sp * dt;
+        this.pos.heading = lerpAngle(this.pos.heading, Math.atan2(dx, dz), Math.min(1, dt * 4));
+      } else this.pos.heading = lerpAngle(this.pos.heading, t.heading, Math.min(1, dt * 2));
     } else if (this.hasBulls) {
       const goal = this.walkTo ?? player;
       const dx = goal.x - this.pos.x, dz = goal.z - this.pos.z;

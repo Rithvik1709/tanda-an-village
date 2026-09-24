@@ -323,11 +323,11 @@ export class Figure {
 
   /** speed in m/s drives the gait; call every frame. */
   /** What a villager is doing: the arms and body pose on top of the walk. */
-  action: "none" | "hoe" | "bend" | "carry" | "sit" | "draw" = "none";
+  action: "none" | "hoe" | "bend" | "carry" | "sit" | "draw" | "pour" = "none";
   private props = new Map<string, THREE.Object3D>();
 
   /** Give the figure something to hold: a hoe (kudal) in the hands, or a clay pot (matka) on the head. */
-  hold(kind: "hoe" | "pot" | "none") {
+  hold(kind: "hoe" | "pot" | "can" | "bag" | "none") {
     for (const [k, o] of this.props) o.visible = k === kind;
     if (kind === "none" || this.props.has(kind)) return;
     const g = new THREE.Group();
@@ -337,6 +337,20 @@ export class Figure {
       blade.rotation.x = 0.5;
       g.position.set(0, -0.3, 0.05);
       g.rotation.x = Math.PI / 2;
+      this.elbows[1].add(g);
+    } else if (kind === "can") {
+      // a brass watering can with its long spout, held by the handle
+      part(new THREE.CylinderGeometry(0.1, 0.11, 0.2, 12), "#c9a24a", g, 0, -0.08, 0.08, 0.35);
+      const spout = part(new THREE.CylinderGeometry(0.014, 0.02, 0.3, 6), "#b08a30", g, 0, -0.02, 0.26, 0.35);
+      spout.rotation.x = 1.0;
+      part(new THREE.TorusGeometry(0.06, 0.012, 5, 10, Math.PI), "#b08a30", g, 0, 0.04, 0.02, 0.35);
+      g.position.set(0, -0.3, 0);
+      this.elbows[1].add(g);
+    } else if (kind === "bag") {
+      // a cloth seed bag in the hand
+      part(new THREE.SphereGeometry(0.08, 10, 8).scale(1, 1.2, 0.8), "#d8c29a", g, 0, -0.06, 0.03, 1);
+      part(new THREE.CylinderGeometry(0.03, 0.05, 0.05, 8), "#a0453a", g, 0, 0.04, 0.03, 1);
+      g.position.set(0, -0.3, 0);
       this.elbows[1].add(g);
     } else {
       part(lathe([[0.001, 0], [0.1, 0.02], [0.15, 0.1], [0.14, 0.2], [0.06, 0.28], [0.07, 0.32], [0.001, 0.32]], 16), "#a8542e", g, 0, 0, 0, 0.7);
@@ -365,6 +379,7 @@ export class Figure {
     this.body.position.y = Math.abs(Math.cos(ph)) * 0.035 * walking + Math.sin(this.t * 1.6) * 0.004;
     this.head.rotation.y = Math.sin(this.t * 0.35) * 0.15 * (1 - walking);
     this.body.rotation.x = 0;
+    for (const [k, o] of this.props) if (k === "can" && this.action !== "pour") o.rotation.x = 0;
     if (this.action === "hoe") {
       // raise the hoe overhead and bring it down into the soil, about once a second
       const c = (this.t * 1.1) % 1;
@@ -388,6 +403,12 @@ export class Figure {
       // one hand steadies the pot on the head
       this.shoulders[0].rotation.x = -2.9;
       this.elbows[0].rotation.x = -0.9;
+    } else if (this.action === "pour") {
+      // the can held out in front and tipped
+      this.shoulders[1].rotation.x = -1.15;
+      this.elbows[1].rotation.x = -0.25;
+      this.body.rotation.x = 0.12;
+      for (const [k, o] of this.props) if (k === "can") o.rotation.x = 0.7 + Math.sin(this.t * 6) * 0.05;
     } else if (this.action === "draw") {
       // hauling the bucket rope up hand over hand
       const c = Math.sin(this.t * 3.2);

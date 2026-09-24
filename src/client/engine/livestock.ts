@@ -187,6 +187,24 @@ export class Rig {
     this.cart.group.position.z = -1.4;
     this.cart.group.visible = false;
     this.group.add(this.cart.group);
+    // the nangar: a pole from the yoke back to a wooden plough whose iron share cuts the soil
+    const wood = M("#6a4a2c", 0.9);
+    const pole = new THREE.CylinderGeometry(0.05, 0.06, 2.4, 8);
+    pole.rotateX(Math.PI / 2 - 0.35);
+    add(this.plough, pole, wood, 0, 1.0, -0.4);
+    const body = new THREE.BoxGeometry(0.16, 0.12, 0.9);
+    body.rotateX(0.35);
+    add(this.plough, body, wood, 0, 0.3, -1.65);
+    add(this.plough, new THREE.ConeGeometry(0.08, 0.35, 6).rotateX(Math.PI / 2 + 0.6), M("#6b7078", 0.4, 0.6), 0, 0.12, -1.25);
+    const handle = new THREE.CylinderGeometry(0.035, 0.035, 1.1, 6);
+    handle.rotateX(-0.6);
+    add(this.plough, handle, wood, 0, 0.8, -2.1);
+    this.plough.visible = false;
+    this.group.add(this.plough);
+  }
+  private plough = new THREE.Group();
+  setPlough(on: boolean) {
+    this.plough.visible = on;
   }
 
   private decorKey = "";

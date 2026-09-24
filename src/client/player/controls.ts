@@ -24,6 +24,8 @@ export class Controls {
   onTorch: () => void = () => {};
   onHelp: () => void = () => {};
   onBoard: () => void = () => {};
+  onPloughField: () => void = () => {};
+  onTie: () => void = () => {};
   onLockChange: (locked: boolean) => void = () => {};
 
   constructor(el: HTMLElement) {
@@ -67,6 +69,8 @@ export class Controls {
       if (e.code === "KeyT" && !e.repeat) this.onTorch();
       if (e.code === "KeyH" && !e.repeat) this.onHelp();
       if (e.code === "KeyL" && !e.repeat) this.onBoard();
+      if (e.code === "KeyP" && !e.repeat) this.onPloughField();
+      if (e.code === "KeyG" && !e.repeat) this.onTie();
       if (this.locked) {
         this.held.add(e.code);
         if (e.code === "Space") e.preventDefault();

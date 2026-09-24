@@ -565,23 +565,29 @@ export class Village {
   }
 
   private well(s: Extract<Structure, { kind: "well" }>, M: Record<string, () => THREE.Material>) {
-    const { x, z, y } = s;
+    const { x, z, y } = s; // y = the ground around the well
     const cx = x + 0.5, cz = z + 0.5;
-    const ring = new THREE.CylinderGeometry(1.35, 1.45, 0.9, 20, 1, true);
-    this.put("stone", M.stone, ring, new THREE.Matrix4().makeTranslation(cx, y + 0.45 - 1, cz));
-    const inner = new THREE.CylinderGeometry(0.95, 0.95, 0.9, 20, 1, true);
-    inner.scale(-1, 1, 1);
-    this.put("stone", M.stone, inner, new THREE.Matrix4().makeTranslation(cx, y + 0.45 - 1, cz));
-    const lip = new THREE.TorusGeometry(1.15, 0.22, 6, 24);
+    // the stone parapet standing above the ground, open at the top
+    this.put("stone", M.stone, new THREE.CylinderGeometry(1.35, 1.45, 0.85, 22, 1, true), new THREE.Matrix4().makeTranslation(cx, y + 0.42, cz));
+    const lip = new THREE.TorusGeometry(1.15, 0.22, 6, 26);
     lip.rotateX(Math.PI / 2);
-    this.put("stone", M.stone, lip, new THREE.Matrix4().makeTranslation(cx, y - 0.1, cz));
-    for (const s2 of [-1, 1]) this.box("wood", M.wood, 0.16, 2.4, 0.16, cx + s2 * 1.25, y + 0.6, cz);
-    this.box("wood", M.wood, 2.8, 0.14, 0.14, cx, y + 1.8, cz);
+    this.put("stone", M.stone, lip, new THREE.Matrix4().makeTranslation(cx, y + 0.86, cz));
+    // looking in: dark, damp stone going down, and the water shining at the bottom
+    const shaft = new THREE.CylinderGeometry(0.97, 0.97, 0.8, 22, 1, true);
+    shaft.scale(-1, 1, 1);
+    this.put("wellShaft", () => new THREE.MeshStandardMaterial({ color: "#3b352d", roughness: 1 }), shaft, new THREE.Matrix4().makeTranslation(cx, y + 0.45, cz));
+    const water = new THREE.Mesh(new THREE.CircleGeometry(0.96, 28), new THREE.MeshStandardMaterial({ color: "#2c5f66", roughness: 0.12, metalness: 0.35, emissive: new THREE.Color("#0c2428"), emissiveIntensity: 0.6 }));
+    water.rotation.x = -Math.PI / 2;
+    water.position.set(cx, y + 0.12, cz);
+    this.group.add(water);
+    // the frame, the beam and the pulley, a rope down to a brass pot resting on the rim
+    for (const s2 of [-1, 1]) this.box("wood", M.wood, 0.16, 2.5, 0.16, cx + s2 * 1.3, y + 1.25, cz);
+    this.box("wood", M.wood, 2.9, 0.14, 0.14, cx, y + 2.45, cz);
     const pulley = new THREE.CylinderGeometry(0.22, 0.22, 0.12, 14);
     pulley.rotateX(Math.PI / 2);
-    this.put("wood", M.wood, pulley, new THREE.Matrix4().makeTranslation(cx, y + 1.62, cz));
-    this.box("rope", M.rope, 0.03, 1.3, 0.03, cx + 0.2, y + 0.95, cz);
-    this.put("gold", M.gold, new THREE.CylinderGeometry(0.16, 0.12, 0.25, 10), new THREE.Matrix4().makeTranslation(cx + 0.2, y + 0.25, cz)); // a brass pot
+    this.put("wood", M.wood, pulley, new THREE.Matrix4().makeTranslation(cx, y + 2.25, cz));
+    this.box("rope", M.rope, 0.03, 1.9, 0.03, cx + 0.2, y + 1.3, cz);
+    this.put("gold", M.gold, new THREE.CylinderGeometry(0.16, 0.12, 0.25, 10), new THREE.Matrix4().makeTranslation(cx + 1.1, y + 1.0, cz + 0.2));
   }
 
   private hay(s: Extract<Structure, { kind: "hay" }>, M: Record<string, () => THREE.Material>) {
