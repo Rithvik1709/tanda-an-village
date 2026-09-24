@@ -205,3 +205,28 @@ _(one line per loop iteration: date · task · how it was verified · commit)_
 - 2026-09-24 · M9 up to deploy · vercel.json, README deploy steps; api helpers moved to api/_lib so Vercel doesn't treat them as endpoints. Remaining: Vercel login, Upstash, domain and the live smoke test (needs the user).
 - 2026-09-24 · The user's requests: renamed to **Tanda**, village **Ukhali Tanda · उखळी तांडा**; Banjara elements added (women in mirror-work ghaghra, kanchali, coin-edged odhni, bangle stacks and silver earrings; embroidered torans over doors; mirror-work stall awnings; Sevalal Maharaj mandir with white flags; Teej sprout baskets; Naik Dhavlu the headman runs land; Sitabai runs the seed shop; "Ram Ram" greetings); night: tungsten bulbs at every door and stall (emissive + a pool of 8 point lights on the nearest ones) and a hand torch (T, spotlight that also lights the grass shader). Screenshots of the square at night, torch, women and Sitabai looked at; fixed an inside-out skirt and the well pit. Domain now tanda.gajananrathod.in.
 - 2026-09-24 · The user's requests: (1) a living tanda: villagers hoe and tend neighbours' fields (those fields grow their own crops), women carry matkas from the well, people walk the real roads, children play in the chowk; work poses and props on the figure rig. (2) The real Ukhali map: roads and lanes from OpenStreetMap, fields, village extent, red scrub and the field vihir placed from satellite imagery; ~4.2 m per block; the Jalna road runs north and the town mandi sits at its west end; 41 houses fill the gaothan; river removed (village well + vihir). (3) Easier to follow: a welcome card, an 11-step goal chain, a golden world marker with distance arrow, H help card, plain-language tips. Verified: 66 vitest, build, m4 13/13, m3/m5/m6/m7/m8 error-free; screenshots of the map, village, lanes, working fields, ride and guide looked at. Fixed: nearest-stall selection (the Naik's door is next to Ganpat's stall), starter keeps the name Aamrai.
+
+---
+
+## 8. Missions (proposed · v1.1)
+A 10-mission story arc for Ukhali Tanda. It replaces the flat goal chain, and each mission teaches one system.
+The server checks missions like everything else: progress comes from the save, and rewards are granted by
+`rules.ts`. Missions run one at a time, and each has a story card, 2–4 objectives, and a reward.
+
+| # | Mission | Story | Objectives | New system | Reward |
+|---|---|---|---|---|---|
+| 1 | **Ghar Wapsi** (Homecoming) | You return to the tanda. Naik Dhavlu meets you at the chowk and walks you to Aamrai. | Talk to the Naik · walk to Aamrai · clear the weeds · plough 6 patches | talking to NPCs with dialogue | ₹200 + onion seeds |
+| 2 | **Pehli Fasal** (First crop) | Your first onions. Ganpat Seth offers a low price. | Sow and water 6 onions · harvest · check the Prices tab · sell when the price is above ₹7 | haggling, a lowball first offer | Sickle (faster harvest) |
+| 3 | **Vihir ka Paani** (Water) | Summer: the village well is running low and there's a queue. | Fetch water from the vihir in the fields · keep 8 crops watered through 2 days | well water level, the far well, wilting | Brass can |
+| 4 | **Sitabai ki Maang** (Sitabai's order) | Sitabai needs 20 jowar for the tanda's Teej feast, due in 3 days. | Grow and deliver 20 jowar before the deadline | delivery orders with deadlines | Seed discount + reputation |
+| 5 | **Sarja aur Raja** | A Khillari pair is for sale. You need ₹4,500. | Raise the money (bank loan or the sahukar, your choice) · buy the bulls · feed them · plough a row | choices with consequences (the sahukar's interest) | Plough |
+| 6 | **Teej** | The festival: girls of the tanda grow wheat sprouts in baskets, and there's singing and dancing at night. | Deliver marigolds and sprouts to the mandir · light the bulbs · join the night gathering | festivals, reputation, night event | Reputation ★, mirror-work jhool |
+| 7 | **Tandyacha Karwan** (The caravan) | The old Banjara way: take a full cart to the Jalna mandi before it closes at 2 pm. A glut is coming. | Load 50+ produce · ride before 2 pm · sell above the village price | timed trip, market events | Town-trader contact (better prices) |
+| 8 | **Sahukarache Karz** (The moneylender's debt) | Motilal threatens a neighbour's family field over a debt. | Choose: lend them money, harvest their field for them, or refuse | village relationships, moral choice | Reputation or cash, plus a different ending line |
+| 9 | **Zameen ka Sauda** (The land deal) | The Naik tells you the field by the vihir will go up for sale. Deshmukh saheb wants it too. | Save ₹25,000 in 6 days · win the bidding at the kacheri | auctions against a rival | Second field |
+| 10 | **Bail Pola** | The bull festival: paint Sarja and Raja's horns, dress them, lead the procession. | Keep the bulls happy for 3 days · decorate them · win the procession | bull care score, cosmetics, finale | Title **Bada Kisan** + credits |
+
+**Systems to build:** mission engine (shared + server), NPC dialogue cards, reputation (★ with the tanda), deadlines,
+delivery orders, choices saved in the save, festival events (Teej and Pola decorations in the world), a sickle,
+well water levels, an auction, and bull decoration.
+**Order of work:** engine + missions 1–3 → 4–6 → 7–10, each verified by a scripted play-through.
