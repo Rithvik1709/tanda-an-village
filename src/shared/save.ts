@@ -4,13 +4,13 @@ import type { GodownLot, Loan } from "./bank";
 import { type MissionState, newMissions } from "./missions";
 import type { Bulls } from "./bulls";
 import type { Listing } from "./land";
-import type { World } from "./world";
+import { LAYOUT, STARTER_PLOT, type World } from "./world";
 
 /*
  * The save: everything that differs from the seeded world, plus the player's money and goods.
  * Stored as JSON by the server. Keys of `edits` and `farm` are voxel indices (x + W*(z + D*y)).
  */
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 export type FarmCell = {
   baseQ: number; // the soil's natural quality, 0..1
@@ -43,6 +43,7 @@ export type Save = {
   rep: number; // reputation with the tanda
   perks: string[]; // earned in missions: discount, townContact, polaChampion
   drip: number[]; // plots with drip irrigation installed
+  layout: number; // which world layout the plot ids refer to
 };
 
 export type Trip = { startedAt: number; load: Record<string, number> };
@@ -79,6 +80,7 @@ export function newSave(id: string, world: World, now: number): Save {
     rep: 0,
     perks: [],
     drip: [],
+    layout: LAYOUT,
   };
 }
 
@@ -109,6 +111,22 @@ export function migrate(s: Save): Save {
     // v6: the story (existing farmers start at mission 1 too), reputation, drip irrigation
     Object.assign(s, { missions: newMissions(s.updatedAt), rep: 0, perks: [], drip: [] });
     s.version = 6;
+  }
+  if (s.version === 6) {
+    s.version = 7;
+    // saves made on the new map already own Aamrai (#9); older ones own the old starter (#5)
+    s.layout = s.layout ?? (s.plots.includes(STARTER_PLOT) ? LAYOUT : 1);
+  }
+  if ((s.layout ?? 1) < LAYOUT) {
+    // the map became the real Ukhali: plot ids and positions changed. Keep money, goods, bulls,
+    // loans and the story; give back Aamrai (with a small field of seeds) and clear old field cells.
+    s.plots = [STARTER_PLOT];
+    s.farm = {};
+    s.edits = {};
+    s.listings = {};
+    s.drip = [];
+    s.inv["seed:onion"] = (s.inv["seed:onion"] ?? 0) + 6;
+    s.layout = LAYOUT;
   }
   return s;
 }

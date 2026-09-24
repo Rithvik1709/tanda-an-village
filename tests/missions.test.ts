@@ -137,3 +137,20 @@ describe("the ten missions", () => {
     no(s, { t: "installDrip", plot: 0 }); // not my field
   });
 });
+
+describe("saves from the old map", () => {
+  it("an old farm owning plot 5 is moved onto the new Aamrai, keeping money and goods", async () => {
+    const { migrate } = await import("../src/shared/save");
+    const old = newSave("old", world, now) as Omit<Save, "layout"> & { layout?: number };
+    Object.assign(old, { version: 6, plots: [5], farm: { "123": { baseQ: 1, q: 1, wetUntil: 0, restedAt: 0 } }, money: 4321 });
+    delete old.layout;
+    old.inv.jowar = 9;
+    const s = migrate(old as Save);
+    expect(s.plots).toEqual([starter.id]);
+    expect(world.plots[s.plots[0]].name).toBe("Aamrai");
+    expect(s.farm).toEqual({});
+    expect(s.money).toBe(4321);
+    expect(s.inv.jowar).toBe(9);
+    expect(apply(world, s, { t: "till", ...cells(1)[0] }, now).ok).toBe(true); // it really is yours now
+  });
+});

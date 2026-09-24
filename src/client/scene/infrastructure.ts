@@ -186,16 +186,16 @@ export class Infrastructure {
     this.dripGroup.clear();
     const geos: THREE.BufferGeometry[] = [];
     for (const p of plots) {
-      const y = p.y + 1.03;
+      const y = p.y + 1.17; // resting on the furrow ridges
       const len = p.x1 - p.x0 - 1;
       for (let z = p.z0 + 2; z < p.z1 - 1; z += 2) {
-        const lat = new THREE.CylinderGeometry(0.025, 0.025, len, 5);
+        const lat = new THREE.CylinderGeometry(0.035, 0.035, len, 6);
         lat.rotateZ(Math.PI / 2);
-        lat.translate((p.x0 + p.x1 + 1) / 2, y, z + 0.5);
+        lat.translate((p.x0 + p.x1 + 1) / 2, y, z + 0.75);
         geos.push(lat);
         for (let x = p.x0 + 2; x < p.x1; x += 1) {
           const drop = new THREE.SphereGeometry(0.04, 5, 4);
-          drop.translate(x + 0.5, y, z + 0.5);
+          drop.translate(x + 0.5, y - 0.02, z + 0.75);
           geos.push(drop);
         }
       }

@@ -116,6 +116,6 @@ describe("the cart to the town mandi", () => {
     delete s.bulls;
     delete s.trip;
     const m = migrate(s as Save);
-    expect(m).toMatchObject({ version: 6, bulls: null, trip: null });
+    expect(m).toMatchObject({ version: 7, bulls: null, trip: null });
   });
 });

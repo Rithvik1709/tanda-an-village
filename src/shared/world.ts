@@ -14,6 +14,10 @@ export const H = 48; // y
 export const CHUNK = 16;
 export const WATER_LEVEL = 11;
 export const WORLD_SEED = 20260924;
+/** Aamrai's plot id on the Ukhali map (layout 2). */
+export const STARTER_PLOT = 9;
+/** Bumped whenever plot ids or positions change, so old saves can be moved to the new map. */
+export const LAYOUT = 2;
 
 export type Plot = {
   id: number;
@@ -152,7 +156,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     [18, 106, 46, 122], [58, 104, 72, 119], [4, 126, 30, 150], [34, 128, 60, 148],
     [10, 158, 50, 184], [96, 160, 126, 188], [136, 162, 168, 186], [140, 100, 166, 124],
   ];
-  const STARTER = 9;
+  const STARTER = STARTER_PLOT;
   const WELLS: [number, number][] = [
     [104, 125], // the village well, at the edge of the chowk
     [50, 100], // the vihir: a round open well in the fields, visible on the satellite image

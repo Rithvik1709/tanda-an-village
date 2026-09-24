@@ -132,6 +132,6 @@ describe("net worth and titles", () => {
     const s = { ...newSave("x", world, T0), version: 4 } as Partial<Save>;
     delete s.loans;
     delete s.godown;
-    expect(migrate(s as Save)).toMatchObject({ version: 6, loans: [], godown: {}, nextLoanId: 1, bestTitle: 0 });
+    expect(migrate(s as Save)).toMatchObject({ version: 7, loans: [], godown: {}, nextLoanId: 1, bestTitle: 0 });
   });
 });

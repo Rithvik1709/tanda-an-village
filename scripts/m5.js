@@ -56,7 +56,7 @@
   await wait(150);
   const m0 = g.money();
   await click('[data-item="seed:onion"][data-n="10"]');
-  await click('[data-item="block:14"][data-n="10"]');
+  await click('[data-item="fodder"][data-n="10"]');
   log.spent = m0 - g.money();
   await window.__shot("m5-shop");
   key("Escape");
