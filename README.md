@@ -108,7 +108,11 @@ node scripts/shots.mjs --name vote --eval "$(cat scripts/election.js)"    # the 
 ```
 
 The others are `m5.js` (economy), `m6.js` (land), `m7.js` (cart) and `m8.js` (bank). Screenshots
-land in `out/`.
+land in `out/`. `node scripts/perf.mjs [--tier low|medium|high]` measures frame rate, draw calls and
+triangles by day and at night.
+
+**Graphics quality** is picked per device (Low / Medium / High, from the GPU, cores and memory), can
+be changed in Settings, and on Auto it lowers itself if the frame rate drops. See `src/client/quality.ts`.
 
 ## How it works
 

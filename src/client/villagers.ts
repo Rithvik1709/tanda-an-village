@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { Q } from "./quality";
 import { CROP_IDS, type Planting } from "../shared/crops";
 import { forSale } from "../shared/land";
 import { hash2 } from "../shared/rng";
@@ -258,7 +259,7 @@ export class Villagers {
   /** Everyone a walker should steer round: other villagers, the player, the stall keepers. */
   others: { pos: Pt }[] = [];
 
-  update(dt: number, t: number, hour: number, save: Save, day: number, now: number, _near: THREE.Vector3) {
+  update(dt: number, t: number, hour: number, save: Save, day: number, now: number, near: THREE.Vector3) {
     this.refreshFields(save, day, now);
     const daytime = hour > 6.2 && hour < 19.3;
     this.fields.update(t);
@@ -270,6 +271,10 @@ export class Villagers {
       }
       // people far away don't need animating every frame
       v.update(dt, t, daytime, this.world, this.ground, this.rnd, this.nav, this.others);
+      // past the tier's distance they aren't drawn at all; nearby ones cast shadows
+      const d = Math.hypot(v.pos.x - near.x, v.pos.z - near.z);
+      if (d > Q.peopleFar) v.fig.root.visible = false;
+      else if (v.fig.root.visible) v.fig.setShadow(Q.shadows && d < Q.peopleShadow);
     }
   }
 }

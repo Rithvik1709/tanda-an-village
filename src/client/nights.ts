@@ -19,7 +19,7 @@ export class Nights {
   private doorTarget = 0;
   private friends: Figure[] = [];
   private flame: THREE.Mesh;
-  private light = new THREE.PointLight("#ff9a3c", 0, 12, 1.6);
+  readonly light = new THREE.PointLight("#ff9a3c", 0, 12, 1.6);
   private t = 0;
 
   constructor(world: World, ground: (x: number, z: number) => number, blocked: (x: number, z: number) => boolean = () => false) {

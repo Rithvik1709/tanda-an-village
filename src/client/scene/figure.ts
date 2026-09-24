@@ -100,6 +100,19 @@ export class Figure {
   private elbows: THREE.Group[] = [];
   private head = new THREE.Group();
   private t = Math.random() * 10;
+  private shadowOn = true;
+  private meshes?: THREE.Mesh[];
+  /** Far-off people needn't cast shadows (each body part is its own draw in the shadow pass). */
+  setShadow(on: boolean) {
+    if (on === this.shadowOn) return;
+    this.shadowOn = on;
+    this.meshes ??= (() => {
+      const out: THREE.Mesh[] = [];
+      this.root.traverse((o) => (o as THREE.Mesh).isMesh && (o as THREE.Mesh).castShadow && out.push(o as THREE.Mesh));
+      return out;
+    })();
+    for (const m of this.meshes) m.castShadow = on;
+  }
 
   constructor(look: Look) {
     const r = this.root;

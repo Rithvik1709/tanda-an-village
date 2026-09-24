@@ -11,8 +11,52 @@
     <meta name="description" content="Farm your fields, ride the bullock cart to market, and buy and sell farms in a Maharashtra village." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/src/client/ui/style.css" />
+    <style>
+      /* the boot screen: inline, so it shows before the game's 800 kB of script has arrived */
+      #boot { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: radial-gradient(120% 90% at 30% 20%, #3a2616 0%, #1c130c 55%, #120c07 100%); color: #f6ead2; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; transition: opacity 0.6s ease; }
+      #boot.gone { opacity: 0; pointer-events: none; }
+      #boot .b-in { width: min(420px, 82vw); text-align: center; }
+      #boot .b-word { font: 800 clamp(52px, 11vw, 88px)/1 Georgia, "Times New Roman", serif; color: #fff4dc; letter-spacing: -0.02em; text-shadow: 0 4px 30px rgba(60, 20, 0, 0.5); }
+      #boot .b-word span { display: block; font: 700 clamp(15px, 2.6vw, 20px) system-ui, sans-serif; color: #ffd98a; letter-spacing: 0.04em; margin-top: 10px; }
+      #boot .b-bar { position: relative; height: 6px; margin: 30px 0 14px; border-radius: 3px; background: rgba(255, 236, 200, 0.12); overflow: hidden; }
+      #boot .b-fill { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0.04); background: linear-gradient(90deg, #c25a36, #e8a04a); border-radius: 3px; transition: transform 0.5s ease; }
+      /* a shimmer that keeps moving even while the page is busy building the village (it runs on the compositor) */
+      #boot .b-shine { position: absolute; top: 0; bottom: 0; width: 30%; background: linear-gradient(90deg, transparent, rgba(255, 244, 220, 0.45), transparent); animation: b-shine 1.3s ease-in-out infinite; }
+      @keyframes b-shine { from { transform: translateX(-120%); } to { transform: translateX(420%); } }
+      #boot .b-step { font-size: 13px; color: rgba(246, 234, 210, 0.75); min-height: 1.2em; }
+      #boot .b-cart { font-size: 26px; margin-top: 22px; display: inline-block; animation: b-cart 1.6s ease-in-out infinite; }
+      @keyframes b-cart { 0%, 100% { transform: translateX(-14px) rotate(-2deg); } 50% { transform: translateX(14px) rotate(2deg); } }
+      #boot .b-err { display: none; margin-top: 14px; font-size: 13px; color: #ffb4a0; }
+    </style>
   </head>
   <body>
+    <div id="boot" role="status" aria-live="polite">
+      <div class="b-in">
+        <div class="b-word">Tanda<span>उखळी तांडा · Ukhali Tanda</span></div>
+        <div class="b-bar"><div class="b-fill"></div><div class="b-shine"></div></div>
+        <div class="b-step">Loading the game…</div>
+        <div class="b-cart" aria-hidden="true">🐂</div>
+        <div class="b-err">This is taking a while. Check your connection, or try reloading.</div>
+      </div>
+    </div>
+    <script>
+      // the game reports progress here as it boots: __boot(0.5, "Growing the grass…"); __boot(1) removes the screen
+      (function () {
+        var el = document.getElementById("boot"), fill = el.querySelector(".b-fill"), step = el.querySelector(".b-step"), shown = 0.04;
+        window.__boot = function (p, text) {
+          if (text) step.textContent = text;
+          shown = Math.max(shown, Math.min(1, p));
+          fill.style.transform = "scaleX(" + shown + ")";
+          if (p >= 1) {
+            el.classList.add("gone");
+            setTimeout(function () { el.remove(); }, 700);
+          }
+        };
+        // while the script downloads, creep the bar forward so it never looks stuck
+        var t = setInterval(function () { if (shown < 0.25) window.__boot(shown + 0.015); else clearInterval(t); }, 300);
+        setTimeout(function () { if (document.getElementById("boot")) el.querySelector(".b-err").style.display = "block"; }, 45000);
+      })();
+    </script>
     <canvas id="game"></canvas>
     <div id="ui"></div>
     <script type="module" src="/src/client/main.ts"></script>

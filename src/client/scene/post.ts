@@ -4,6 +4,7 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { Q } from "../quality";
 
 /*
  * The film look: a soft bloom on bright sky and sun glints, then a grade — warm highlights, a touch
@@ -32,9 +33,12 @@ export class Post {
   constructor(private renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.3;
-    this.composer = new EffectComposer(renderer);
+    // the scene target: half-float for the bloom, multisampled on the high tier (our antialiasing)
+    const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: Q.msaa });
+    this.composer = new EffectComposer(renderer, target);
     this.composer.addPass(new RenderPass(scene, camera));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.16, 0.5, 0.93);
+    this.bloom.enabled = Q.bloom;
     this.composer.addPass(this.bloom);
     this.composer.addPass(new ShaderPass(Grade));
     this.composer.addPass(new OutputPass());
@@ -42,6 +46,10 @@ export class Post {
   setSize(w: number, h: number) {
     this.composer.setSize(w, h);
     this.composer.setPixelRatio(this.renderer.getPixelRatio());
+  }
+  /** Bloom is the costliest pass (five blurs); low-end devices go without. */
+  setBloom(on: boolean) {
+    this.bloom.enabled = on;
   }
   render() {
     this.composer.render();

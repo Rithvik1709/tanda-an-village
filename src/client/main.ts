@@ -46,6 +46,7 @@ import { PhoneMenu } from "./ui/phonemenu";
 import { current } from "../shared/missions";
 import { loadSettings, SettingsPanel, TitleScreen, Tutorial } from "./ui/screens";
 import { isTouch, TouchControls } from "./player/touch";
+import { FrameWatch, Q } from "./quality";
 
 type Hooks = {
   ready: boolean;
@@ -71,18 +72,27 @@ const VIEWS = {
 } as const;
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-renderer.shadowMap.enabled = true;
+// no canvas antialiasing: everything goes through the post-processing chain, which has its own
+// (MSAA on the scene target, on the high tier) — canvas AA would only smooth the final blit
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance", stencil: false });
+renderer.shadowMap.enabled = Q.shadows;
 renderer.info.autoReset = false; // the composer renders in passes; count a whole frame
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoft costs ~2× the frame for a barely softer edge
+// the sun's shadow map is redrawn every few frames, not every frame (see the loop)
+renderer.shadowMap.autoUpdate = false;
 const TOUCH = isTouch();
-// phones: fewer pixels and a smaller shadow map keep it smooth
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, TOUCH ? 1.5 : 2));
+/** Pixels per CSS pixel: the tier's cap, times the frame-rate watcher's scale. */
+let renderScale = 1;
+const pixelRatio = () => Math.min(window.devicePixelRatio, Q.maxDpr) * renderScale;
+renderer.setPixelRatio(pixelRatio());
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 900);
 const sky = new Sky(scene);
 
+/** Progress on the boot screen (index.html); 1 removes it. */
+const bootStep = (p: number, text?: string) => (window as unknown as { __boot?: (p: number, t?: string) => void }).__boot?.(p, text);
+bootStep(0.3, "Laying out the village…");
 const world = generateWorld(WORLD_SEED);
 // what's drawn and collided with; world.voxels stays the pristine seeded world the rules diff against
 const vox = world.voxels.slice();
@@ -114,6 +124,7 @@ let booted_ = false;
 // ---- the player ----
 const spawn = world.landmarks.spawn;
 // the ground is smooth now: a height field for walking; buildings and fences still block as solid blocks
+bootStep(0.42, "Growing the grass and trees…");
 const hf = new Heightfield(world);
 const WATER_Y = WATER_LEVEL + 0.86;
 scene.add(buildTerrain(hf, WATER_Y));
@@ -176,7 +187,7 @@ scene.add(farmer.root);
 
 // ---- night: tungsten bulbs at every door, and the farmer's hand torch (T) ----
 // a fixed pool of lights follows the nearest bulbs, so the shader cost stays constant all night
-const BULB_LIGHTS = Array.from({ length: 8 }, () => {
+const BULB_LIGHTS = Array.from({ length: Q.bulbLights }, () => {
   const l = new THREE.PointLight("#ffac55", 0, 11, 1.6);
   scene.add(l);
   return l;
@@ -506,6 +517,7 @@ for (const p of infra.poleSpots) {
   for (let k = 0; k < 3; k++) if (vox[idx(x, g + k, z)] === B.AIR) vox[idx(x, g + k, z)] = B.LOG;
 }
 const nav = new Nav(vox, (x, z) => hf.at(x, z));
+bootStep(0.58, "Waking up the tanda…");
 const villagers = new Villagers(world, (x, z) => hf.at(x, z), nav);
 const nights = new Nights(world, (x, z) => hf.at(x, z), (x, z) => nav.isBlocked(x, z));
 scene.add(nights.group);
@@ -1250,6 +1262,7 @@ renderer.setAnimationLoop(() => {
   infra.update(now / 1000, nightK, (() => { const h = hourOverride ?? clock(game.now()).hour; return h > 6.5 && h < 18.5; })());
   torchModel.visible = torchOn;
   torch.intensity = torchOn ? 70 : 0;
+  setLights(nightK > 0.02, torchOn);
   if (torchOn) {
     // shine where you look, from the hand (or the eyes in first person)
     const ray = rig.ray();
@@ -1261,9 +1274,11 @@ renderer.setAnimationLoop(() => {
   grass.lights({ on: torchOn, pos: torch.position, dir: torchAim.position.clone().sub(torch.position) }, BULB_LIGHTS.map((l) => l.position), nightK);
   fields.update(now / 1000);
   const grassAt = mode === "play" ? new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z) : camera.position;
-  grass.update(now / 1000, grassAt, mode === "title" ? 90 : Math.min(90, settings.renderDistance * 0.55), sunDirection(hour), sc.sun, sc.top);
+  grass.update(now / 1000, grassAt, mode === "title" ? Q.grassFar : Math.min(Q.grassFar, settings.renderDistance * 0.55), sunDirection(hour), sc.sun, sc.top);
   if (mode !== "title") applyRenderDistance();
   renderer.info.reset();
+  if (Q.shadows && frameNo++ % Q.shadowEvery === 0) renderer.shadowMap.needsUpdate = true;
+  watch.frame(dt, mode === "play" && !windowOpen() && document.visibilityState === "visible");
   const tr0 = performance.now();
   post.render();
   prof.render = prof.render * 0.95 + (performance.now() - tr0) * 0.05;
@@ -1290,6 +1305,44 @@ function celebrate() {
 }
 let lastTick = 0;
 const prof = { villagers: 0, frame: 0, render: 0 };
+let frameNo = 0;
+/*
+ * Lights that are off still cost every pixel, so by day the bulbs and the fire aren't in the scene at
+ * all, and the torch only when it's on. Changing the number of lights needs new shaders; those are
+ * compiled once at boot for all four cases (day/night × torch off/on), so dusk doesn't stutter.
+ */
+let lightsState = "";
+function setLights(night: boolean, torchLit: boolean) {
+  const k = `${night}${torchLit}`;
+  if (k === lightsState) return;
+  lightsState = k;
+  BULB_LIGHTS.forEach((l) => (l.visible = night));
+  nights.light.visible = night;
+  torch.visible = torchLit;
+}
+async function precompileLights() {
+  const had = lightsState;
+  for (const [n, t] of [[false, true], [true, false], [true, true], [false, false]] as const) {
+    setLights(n, t);
+    await (renderer.compileAsync ? renderer.compileAsync(scene, camera) : Promise.resolve(renderer.compile(scene, camera)));
+  }
+  lightsState = "";
+  if (had) setLights(had.startsWith("true"), had.endsWith("true"));
+}
+// on a device that can't keep up: fewer pixels first, then no shadows, then no bloom
+const watch = new FrameWatch(Q, (c) => {
+  if (c.scale !== undefined) {
+    renderScale = c.scale;
+    renderer.setPixelRatio(pixelRatio());
+    resize();
+  }
+  if (c.shadows === false) {
+    renderer.shadowMap.enabled = false;
+    sky.sun.castShadow = false;
+    scene.traverse((o) => ((o as THREE.Mesh).material ? (((o as THREE.Mesh).material as THREE.Material).needsUpdate = true) : 0));
+  }
+  if (c.bloom === false) post.setBloom(false);
+});
 let fpsAvg = 60;
 let stepAcc = 0;
 /** A footstep every so often while walking on the ground; road crunches brighter than grass. */
@@ -1349,7 +1402,9 @@ hud.onRestore = async (code) => {
   return null;
 };
 
+bootStep(0.64, "Loading your farm…");
 Promise.all([booted, workerReady]).then(async ([boot]) => {
+  bootStep(0.74, "Building the houses…");
   hud.setBanner("");
   game.save = boot.save;
   booted_ = true;
@@ -1360,9 +1415,12 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
   game.syncAll(); // saved edits and fields go to the worker before the first mesh
   syncFields();
   await worldRenderer.meshAll();
+  bootStep(0.9, "Lighting the lamps…");
+  await precompileLights().catch(() => {});
   refreshStatus();
   const meshAllMs = performance.now() - t0;
   titleScreen.ready(game.save, titleFor(netWorth(world, game.save, game.now(), clock(game.now()).day).total).name);
+  bootStep(1, "Ram Ram!");
   Object.assign(window.__bailgaadi, {
     ready: true,
     setHour: (h: number | null) => {
@@ -1466,7 +1524,7 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
       settings.renderDistance = 2000;
       document.getElementById("ui")!.style.display = "none";
     },
-    prof: () => ({ ...prof }),
+    prof: () => ({ ...prof, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, programs: renderer.info.programs?.length ?? 0, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, dpr: renderer.getPixelRatio(), size: [renderer.domElement.width, renderer.domElement.height] }),
     hideLayer: (name: string, on: boolean) => {
       const m: Record<string, THREE.Object3D> = { villagers: villagers.group, grass: grass.group, trees: trees.group, village: village.group, fields: fields.group };
       if (name === "vfields") villagers.fields.group.visible = !on;

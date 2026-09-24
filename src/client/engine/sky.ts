@@ -1,3 +1,4 @@
+import { Q } from "../quality";
 import * as THREE from "three";
 import { fbm } from "../../shared/noise";
 
@@ -127,9 +128,8 @@ export class Sky {
     scene.add(this.clouds);
 
     // soft shadows from the sun, in a box that follows the player
-    this.sun.castShadow = true;
-    const phone = matchMedia("(pointer: coarse)").matches;
-    this.sun.shadow.mapSize.set(phone ? 1024 : 2048, phone ? 1024 : 2048);
+    this.sun.castShadow = Q.shadows;
+    this.sun.shadow.mapSize.set(Q.shadowSize, Q.shadowSize);
     const sc = this.sun.shadow.camera;
     sc.left = -45;
     sc.right = 45;

@@ -446,3 +446,12 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 .is-touch .toasts { top: 40px; font-size: 12px; }
 .is-touch .goal-arrow { font-size: 10px !important; }.board-table small.parts, .board-me small.parts { display: block; font-weight: 500; font-size: 11px; color: var(--ink-2); white-space: nowrap; }
 .board-me small.parts { display: inline; margin-left: 8px; }
+.settings-card select { width: 100%; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--glass-2, rgba(255,255,255,0.08)); color: inherit; font: 500 14px system-ui; }
+.settings-card .gfx b { text-transform: capitalize; font-weight: 600; font-size: 12px; }
+.settings-card .gfx-msg button { margin-left: 6px; padding: 4px 10px; border-radius: 8px; border: 0; background: var(--rust); color: #fff; font-weight: 700; cursor: pointer; }
+/* loading skeletons: soft bars with a slow shimmer */
+.sk { display: inline-block; height: 0.8em; min-width: 14px; border-radius: 6px; vertical-align: middle; background: linear-gradient(90deg, rgba(255,236,200,0.08) 0%, rgba(255,236,200,0.2) 45%, rgba(255,236,200,0.08) 90%); background-size: 300% 100%; animation: sk 1.3s ease-in-out infinite; }
+.board-table .sk + br + .sk { height: 0.6em; margin-top: 6px; opacity: 0.7; }
+.board-me .sk { height: 1em; }
+@keyframes sk { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .sk, #boot .b-shine, #boot .b-cart { animation: none; } }

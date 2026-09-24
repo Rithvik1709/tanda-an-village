@@ -1,3 +1,4 @@
+import { Q } from "../quality";
 import * as THREE from "three";
 import { B } from "../../shared/blocks";
 import { fbm } from "../../shared/noise";
@@ -14,7 +15,7 @@ import type { Heightfield } from "./heightfield";
  */
 const TILE = 16;
 // blades per block of grassy ground, near the player (fewer on phones)
-const PER_CELL = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches ? 16 : 34;
+const PER_CELL = Q.grassPerCell;
 
 export class Grass {
   readonly group = new THREE.Group();

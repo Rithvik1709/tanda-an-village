@@ -1,3 +1,4 @@
+import { detectTier, graphicsChoice, Q, setGraphicsChoice, type TierChoice } from "../quality";
 import type { Save } from "../../shared/save";
 
 /*
@@ -133,11 +134,18 @@ export class SettingsPanel {
       if (t.name === "sens") this.s.sensitivity = Number(t.value) / 10000;
       if (t.name === "rd") this.s.renderDistance = Number(t.value);
       if (t.name === "vol") this.s.volume = Number(t.value) / 100;
+      if (t.name === "gfx") {
+        setGraphicsChoice(t.value as TierChoice);
+        const msg = this.el.querySelector(".gfx-msg") as HTMLElement;
+        msg.innerHTML = `Takes effect when the game reloads. <button data-reload>Reload now</button>`;
+        return;
+      }
       saveSettings(this.s);
       this.onChange(this.s);
       this.label();
     });
     this.el.addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).closest("[data-reload]")) location.reload();
       if ((e.target as HTMLElement).closest("[data-close]")) this.close();
     });
     this.el.addEventListener("keydown", (e) => e.stopPropagation());
@@ -158,6 +166,9 @@ export class SettingsPanel {
       <label>How far you can see <b class="v-rd"></b><input type="range" name="rd" min="80" max="200" step="1" list="rd-stops" value="${this.s.renderDistance}"></label>
       <datalist id="rd-stops"><option value="80"></option><option value="128"></option><option value="200"></option></datalist>
       <label>Sound <b class="v-vol"></b><input type="range" name="vol" min="0" max="100" value="${Math.round(this.s.volume * 100)}"></label>
+      <label class="gfx">Graphics <b>running at ${Q.tier}${Q.shadows ? "" : ", no shadows"}</b>
+        <select name="gfx">${(["auto", "low", "medium", "high"] as const).map((c) => `<option value="${c}" ${graphicsChoice() === c ? "selected" : ""}>${c === "auto" ? `Auto (best for this device: ${detectTier()})` : c === "low" ? "Low: smoothest, for older phones and laptops" : c === "medium" ? "Medium" : "High: shadows, bloom and dense grass"}</option>`).join("")}</select></label>
+      <p class="hint gfx-msg">If the game stutters, choose Low. On Auto, it also lowers itself if your device can't keep up.</p>
       <p class="hint">Settings are kept on this device. Your farm itself is saved online.</p>
       <div class="big-acts"><button data-close>Done</button></div></div>`;
     this.label();

@@ -1,3 +1,4 @@
+import { Q } from "../quality";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { mulberry32 } from "../../shared/rng";
@@ -51,7 +52,7 @@ function tube(points: THREE.Vector3[], r0: number, r1: number) {
 
 /** One leafy clump: a lumpy sphere, darker underneath, with a sway weight in vertex alpha. */
 function clump(center: THREE.Vector3, radius: number, rnd: () => number, base: THREE.Color, sway: number) {
-  const g = new THREE.IcosahedronGeometry(radius, 3);
+  const g = new THREE.IcosahedronGeometry(radius, Q.treeDetail);
   const p = g.getAttribute("position") as THREE.BufferAttribute;
   const cols = new Float32Array(p.count * 4);
   const nrm = new Float32Array(p.count * 3);

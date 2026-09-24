@@ -27,7 +27,14 @@ export class Leaderboard {
   async show() {
     this.open = true;
     this.el.hidden = false;
-    this.el.innerHTML = `<div class="panel-card"><p class="hint">Loading the tanda's leaderboard…</p></div>`;
+    // a skeleton of the board while it loads, the same shape as the real thing
+    const bone = (w: number) => `<i class="sk" style="width:${w}%"></i>`;
+    this.el.innerHTML = `<div class="panel-card board-loading" aria-busy="true">
+      <button class="x" data-close>✕</button>
+      <h2>Ukhali Tanda's leaderboard <small>श्रीमंत शेतकरी</small></h2>
+      <p class="lede">Counting everyone's cash, land, crops and bulls…</p>
+      <div class="board-me">${bone(55)}</div>
+      <table class="board-table"><tbody>${Array.from({ length: 7 }, (_, i) => `<tr><td class="rank">${bone(70)}</td><td>${bone(40 + ((i * 17) % 30))}<br>${bone(28 + ((i * 11) % 20))}</td><td class="num">${bone(60)}<br>${bone(90)}</td></tr>`).join("")}</tbody></table></div>`;
     let data: Board;
     try {
       const t = this.token();
