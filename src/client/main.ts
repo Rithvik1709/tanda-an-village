@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { inject as injectAnalytics } from "@vercel/analytics";
 import { B, block, BLOCKS, isCropBlock } from "../shared/blocks";
 import { advance, CROPS, msToRipe } from "../shared/crops";
 import { canCapacity, type Result } from "../shared/rules";
@@ -55,6 +56,8 @@ declare global {
   }
 }
 window.__bailgaadi = { ready: false };
+// Vercel Web Analytics: page views only (no cookies, no personal data); it does nothing on localhost
+injectAnalytics({ mode: import.meta.env.DEV ? "development" : "production" });
 
 const VIEWS = {
   overview: { pos: [170, 60, 190], look: [100, 14, 108] },
@@ -203,6 +206,8 @@ guide.onToast = (m, k) => hud.toast(m, k);
 guide.onDialogue = (open) => {
   if (open) document.exitPointerLock?.();
   hud.setPlaying(open || titleScreen.open);
+  // closing a story card (a click, so the browser allows it) drops you straight back into play
+  if (!open && !titleScreen.open && mode === "play") canvas.requestPointerLock?.()?.catch?.(() => {});
 };
 guide.onGoalDone = (title) => {
   hud.toast(`✓ Done: ${title}`);
@@ -732,7 +737,8 @@ controls.onLockChange = (locked) => {
     panels.close();
   }
   if (locked) map.close();
-  hud.setPlaying(locked || !!panels.open || map.open || titleScreen.open);
+  // any card or panel on screen keeps the "Click to play" pause panel out of the way
+  hud.setPlaying(locked || !!panels.open || map.open || titleScreen.open || guide.dialogueOpen || board.open || settingsPanel.open || guide.helpOpen);
 };
 // the pause panel gets a Settings button
 {

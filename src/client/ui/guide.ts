@@ -144,8 +144,21 @@ export class Guide {
     this.dlg?.remove();
     const d = el("div", "panel dialogue", this.card.parentElement!);
     this.dlg = d;
-    d.innerHTML = `<div class="panel-card"><div class="dlg-who">${who}</div><h2>${title}</h2><p class="dlg-text">“${text}”</p><div class="big-acts"></div></div>`;
+    d.innerHTML = `<div class="panel-card"><div class="dlg-who">${who}</div><h2>${title}</h2><p class="dlg-text">“${text}”</p><div class="big-acts"></div>${buttons.length === 1 ? `<div class="panel-foot">Enter to continue</div>` : ""}</div>`;
     const acts = d.querySelector(".big-acts")!;
+    // Enter or Space picks the first button, when there's only one to pick
+    if (buttons.length === 1) {
+      const onKey = (e: KeyboardEvent) => {
+        if (!d.isConnected) return window.removeEventListener("keydown", onKey, true);
+        if (e.code === "Enter" || e.code === "Space") {
+          e.preventDefault();
+          e.stopPropagation();
+          (acts.querySelector("button") as HTMLButtonElement | null)?.click();
+          window.removeEventListener("keydown", onKey, true);
+        }
+      };
+      window.addEventListener("keydown", onKey, true);
+    }
     for (const b of buttons) {
       const btn = document.createElement("button");
       btn.innerHTML = b.label + (b.sub ? `<small>${b.sub}</small>` : "");
