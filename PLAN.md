@@ -91,7 +91,7 @@ another device. Google sign-in is a v2 item.
 - [x] Trees (neem / banyan-like), village buildings as generated structures.
 - [x] *Done when:* screenshots at noon and sunset look warm and readable, 60 fps on the test machine.
 
-### M2 · Walking and building
+### M2 · Walking and building *(block digging/building later retired by the visual change — see C4)*
 - [x] First-person controls with pointer lock, WASD, jump, sprint; AABB collision with blocks.
 - [x] Voxel raycast (DDA) with a block outline; dig (left click) and place (right click).
 - [x] Hotbar (1–9, mouse wheel) with tools and blocks; crosshair; FPS/coords debug toggle (F3).
@@ -148,40 +148,40 @@ renderer, pixel atlas, block models and first-person-only camera are replaced. N
 building: real farming only. Camera: third-person by default, **V** toggles first-person.
 
 ### C1 · Land, light and the farmer
-- [ ] Smooth terrain mesh from the world's height field (plots exactly flat), procedural ground shader (grass, black soil, red soil, dirt roads, river banks), detail noise, slope shading.
-- [ ] River water shader (sky-tinted, fresnel, moving ripples, soft shoreline).
-- [ ] Sky: painterly gradient dome, soft sun, drifting billboard clouds; ACES tone mapping, bloom, colour grade + vignette; soft sun shadows around the player.
-- [ ] A farmer model (kurta, dhoti, pheta) with procedural walk/idle; third-person spring camera that avoids the ground; **V** first-person; collision with terrain.
-- [ ] *Done when:* golden-hour and noon screenshots look cinematic (painterly light, depth, no blocks), 60 fps.
+- [x] Smooth terrain mesh from the world's height field (plots exactly flat), procedural ground shader (grass, black soil, red soil, dirt roads, river banks), detail noise, slope shading.
+- [x] River water shader (sky-tinted, fresnel, moving ripples, soft shoreline).
+- [x] Sky: painterly gradient dome, soft sun, drifting billboard clouds; ACES tone mapping, bloom, colour grade + vignette; soft sun shadows around the player.
+- [x] A farmer model (kurta, dhoti, pheta) with procedural walk/idle; third-person spring camera that avoids the ground; **V** first-person; collision with terrain.
+- [x] *Done when:* golden-hour and noon screenshots look cinematic (painterly light, depth, no blocks), 60 fps.
 
 ### C2 · Living landscape
-- [ ] GPU-instanced grass with wind (dense near the player, fading out), wildflowers, marigolds.
-- [ ] Neem and banyan trees (trunks, clustered canopies, wind sway), bushes, rocks.
-- [ ] *Done when:* the fields-and-village views read as a painted Deccan landscape.
+- [x] GPU-instanced grass with wind (dense near the player, fading out), wildflowers, marigolds.
+- [x] Neem and banyan trees (trunks, clustered canopies, wind sway), bushes, rocks.
+- [x] *Done when:* the fields-and-village views read as a painted Deccan landscape.
 
 ### C3 · The village, modelled
-- [ ] Whitewashed houses with Mangalore-tile roofs and verandahs, the temple with its shikhara and flag, stalls with cloth awnings, the well, the bank, the land office, the town mandi; fences and gates around plots; colliders.
-- [ ] Villagers as proper figures (same rig as the farmer) at their stalls.
-- [ ] *Done when:* the square, market and a plot gate look like a Maharashtra village street.
+- [x] Whitewashed houses with Mangalore-tile roofs and verandahs, the temple with its shikhara and flag, stalls with cloth awnings, the well, the bank, the land office, the town mandi; fences and gates around plots; colliders.
+- [x] Villagers as proper figures (same rig as the farmer) at their stalls.
+- [x] *Done when:* the square, market and a plot gate look like a Maharashtra village street.
 
 ### C4 · Fields and crops
-- [ ] Field cells on the plot grid: ploughed furrows, darker when watered; soft highlight of the aimed cell (third- and first-person).
-- [ ] Real-looking jowar, onion and sugarcane in four growth stages (instanced), swaying.
-- [ ] Rules: dig/place retired; till/plough/sow/water/harvest unchanged; HUD hotbar is tools and seeds only.
-- [ ] *Done when:* the M3 farming script passes with the new targeting and the screenshots look like a real field.
+- [x] Field cells on the plot grid: ploughed furrows, darker when watered; soft highlight of the aimed cell (third- and first-person).
+- [x] Real-looking jowar, onion and sugarcane in four growth stages (instanced), swaying.
+- [x] Rules: dig/place retired; till/plough/sow/water/harvest unchanged; HUD hotbar is tools and seeds only.
+- [x] *Done when:* the M3 farming script passes with the new targeting and the screenshots look like a real field.
 
 ### C5 · Bulls, cart and the ride
-- [ ] Smooth Khillari bull pair (painted horns, jhool, bells) and a wooden bailgaadi with spoked wheels; walk cycle; the ride with a cinematic follow camera.
-- [ ] For-sale boards, NPC panels, map and every earlier script (M4–M8) adapted and passing.
-- [ ] *Done when:* the sunset cart ride screenshot looks like a film still.
+- [x] Smooth Khillari bull pair (painted horns, jhool, bells) and a wooden bailgaadi with spoked wheels; walk cycle; the ride with a cinematic follow camera.
+- [x] For-sale boards, NPC panels, map and every earlier script (M4–M8) adapted and passing.
+- [x] *Done when:* the sunset cart ride screenshot looks like a film still.
 
 ### C6 · Performance
-- [ ] 60 fps on a normal laptop: instancing, LOD, shadow budget, draw calls; render-distance setting drives grass and fog.
+- [x] 60 fps on a normal laptop: instancing, LOD, shadow budget, draw calls; render-distance setting drives grass and fog.
 
 ### M9 · Polish and ship
-- [ ] Title screen, first-time tutorial prompts, settings (mouse sensitivity, render distance, audio).
-- [ ] Synthesized sound: footsteps, dig, place, till, water, harvest, cash, bulls' bells, ambience (birds, crickets).
-- [ ] Performance pass: draw calls, memory, 60 fps; mobile shows a friendly "play on a computer" note.
+- [x] Title screen, first-time tutorial prompts, settings (mouse sensitivity, render distance, audio).
+- [x] Synthesized sound: footsteps, dig, place, till, water, harvest, cash, bulls' bells, ambience (birds, crickets).
+- [x] Performance pass: draw calls, memory, 60 fps; mobile shows a friendly "play on a computer" note.
 - [ ] Deploy to Vercel with Upstash; custom domain `bailgaadi.gajananrathod.in`; production smoke test.
 - [ ] *Done when:* a new player can go from title screen to first profit on the live site, and the save survives a reload.
 
@@ -201,3 +201,5 @@ _(one line per loop iteration: date · task · how it was verified · commit)_
 - 2026-09-24 · M7 bulls and the cart · shared/bulls (stamina and mood integrated from timestamps: hungry after a day, rest restores), save v4 (bulls, trip), shop section "Bulls & cart" (pair ₹4,500, cart ₹2,800, plough ₹900, kadba ₹10), rules feed / plough (8-block row, 2 stamina each, stops at your fence) / startTrip (≤ 200, 20 stamina) / sellTown (only after the 20 s road, town price 1.1× vs village 0.85×, ledger lines carry the premium); voxel Khillari pair (painted horns, jhool, bells, yoke, gait animation), spoked cart that parks tipped on its shafts, A* road pathing, the ride (view turns with the cart), Haribhau the mandi agent, R / F keys, bull status chip; 7 new vitest; scripts/m7.js: bought pair+cart+plough → ploughed 8 in one pass → sowed, watered, grew 24 onions → fed the sulking pair → loaded → ~25 s ride east → sold ₹226 at the town mandi, ledger "+₹53 town premium", server = local ₹4,426; screenshots bulls/plough/cart/load/ride/town/sold/ledger looked at. Fixed: plough silently fell back to the hoe while the pair was still walking up, parked cart tipped the wrong way, ride camera sat in a bull's blanket and did not turn with the road, arrival faced the wrong way, ledger lower-cased names.
 - 2026-09-24 · M8 money tools · shared/bank: loans (bank 1%/day, 8-day term, limit 40% of land; sahukar 5%/day, 4 days, ₹3,000 + 15% of land; late = one-off fee + double rate; no new loans while overdue; max 3 per lender), carry limit 200 + godown (2,000, ₹0.1/unit/day rent on withdrawal, weighted-average lot date), net worth (cash + valued land + produce anywhere + resale of bulls/cart/tools − debt), titles Small farmer → Kisan 25k → Bada Kisan 100k → Zamindar 400k confirmed server-side in /api/act (bestTitle); save v5; Joshi saheb at the bank (Loans / Godown / Your worth), Sahukar Motilal under the banyan; ledger lists loans without counting them as income or cost; HUD title + "loan overdue!"; 11 new vitest (interest on time and late, both lenders, limits, defaulter lockout, junk, godown rent + averaging, full sacks, net worth, titles, migration); scripts/m8.js: borrowed ₹4,800 (bank max) + ₹1,000 → stored 18 onions → ₹2 rent → both loans overdue, bank refuses, HUD warns → repaid all → Kisan → Bada Kisan toasts, server bestTitle 2, money 109,072 = local; screenshots bank/sahukar/godown/overdue/worth/title looked at. Fixed: ground height stood NPCs and bulls on tree canopies; the pause panel covered hints and toasts.
 - 2026-09-24 · M9 (partial, uncommitted work saved): title screen with orbit, settings (sensitivity, render distance, volume), first-time tutorial, phone note, synthesized WebAudio sounds (16, offline-rendered self-test all non-silent), api/lib → api/_lib for Vercel. Then the user redirected the visuals: cinematic, not Minecraft → milestones C1–C6 added before M9.
+- 2026-09-24 · C1–C6 cinematic rebuild (the user's direction) · smooth blurred heightfield terrain with painterly ground shader, river shader (depth tint, fresnel, ripples), painted cloud sprites, soft PCF sun shadows following the player, ACES + bloom + warm/cool grade + vignette; a modelled farmer (kurta, dhoti, pheta) with walk cycle, third-person spring camera and V for first person; instanced wind grass (34 blades/block, player parts it, marigold/white flowers, dry-gold patches); procedural neem/banyan trees with swaying soft canopies and aerial roots; the village modelled (plastered/brick houses, tile/thatch hip roofs, verandahs, stalls with awnings and produce, temple shikhara + kalash + flag, well with pulley, haystacks, split-rail fences); ridged furrows and modelled jowar/onion/sugarcane in 4 stages; rounded Khillari bulls and spoked bailgaadi with a filmed ride; painted SVG hotbar; voxel mesher now draws nothing (voxels kept for collision and rules). Verified: 66 vitest, build, m4 13/13, m3/m5/m6/m7/m8 scripts error-free, ~60 fps (16.6 ms median, p95 18.5) at ~300 draw calls / 1.5 M tris; screenshots of spawn, noon, square, market, fields, crops, bulls, ride, sign, HUD looked at and fixed (faceted canopies, dull light, blotchy plaster, flat soil, invisible furrows, ride camera inside the jhool).
+- 2026-09-24 · M9 up to deploy · vercel.json, README deploy steps; api helpers moved to api/_lib so Vercel doesn't treat them as endpoints. Remaining: Vercel login, Upstash, domain and the live smoke test (needs the user).

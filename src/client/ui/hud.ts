@@ -1,6 +1,4 @@
-import { block, T } from "../../shared/blocks";
 import { CROP_IDS, CROPS } from "../../shared/crops";
-import { ATLAS_COLS, TILE } from "../engine/uv";
 import { type Hotbar, type Slot, slotName } from "../player/hotbar";
 
 /** The in-game HTML overlay: crosshair, hotbar, info chips, toasts, tooltip, F3 panel, play prompt. */
@@ -23,7 +21,7 @@ export class Hud {
   /** Called with a recovery code the player typed; resolves to an error message or null. */
   onRestore: (code: string) => Promise<string | null> = async () => null;
 
-  constructor(parent: HTMLElement, private atlas: HTMLCanvasElement, private hotbar: Hotbar) {
+  constructor(parent: HTMLElement, _atlas: HTMLCanvasElement, private hotbar: Hotbar) {
     this.root = el("div", "hud", parent);
     el("div", "crosshair", this.root);
     this.tip = el("div", "tip", this.root);
@@ -158,15 +156,25 @@ export class Hud {
   }
 
   private icon(s: Slot): HTMLElement {
-    if (s.kind === "block") return blockIcon(this.atlas, s.block);
-    if (s.kind === "seed") return seedIcon(this.atlas, T.CROP0 + CROP_IDS.indexOf(s.crop) * 4 + 3);
-    if (s.kind === "tool") return pixelIcon(s.tool === "hoe" ? HOE : CAN);
-    const h = document.createElement("div");
-    h.className = "hand-icon";
-    h.textContent = "✋";
-    return h;
+    const k = s.kind === "seed" ? `seed-${s.crop}` : s.kind === "tool" ? s.tool : s.kind === "hand" ? "hand" : "hand";
+    const d = document.createElement("div");
+    d.className = "icon";
+    d.innerHTML = ICONS[k] ?? ICONS.hand;
+    return d;
   }
+
 }
+
+/** Painted SVG icons for the hotbar — soft shapes, no pixel art. */
+const bag = (plant: string) => `<svg viewBox="0 0 48 48"><path d="M13 20 Q12 42 24 43 Q36 42 35 20 Z" fill="#d8c29a" stroke="#8a6a3c" stroke-width="1.5"/><path d="M14 20 Q24 16 34 20" fill="none" stroke="#8a6a3c" stroke-width="2"/><path d="M17 19 Q24 22 31 19" fill="none" stroke="#a0453a" stroke-width="2.5"/>${plant}</svg>`;
+const ICONS: Record<string, string> = {
+  hand: `<svg viewBox="0 0 48 48"><path d="M16 26 V14 a2.5 2.5 0 0 1 5 0 V24 V10 a2.5 2.5 0 0 1 5 0 V24 V12 a2.5 2.5 0 0 1 5 0 V26 V18 a2.5 2.5 0 0 1 5 0 V30 q0 12 -11 12 q-7 0 -11 -7 l-5 -8 a2.5 2.5 0 0 1 4 -3 z" fill="#c68b5e" stroke="#7a4e30" stroke-width="1.5"/></svg>`,
+  hoe: `<svg viewBox="0 0 48 48"><path d="M10 40 L33 12" stroke="#8a6440" stroke-width="4" stroke-linecap="round"/><path d="M29 9 L41 12 L38 20 Q33 15 29 16 Z" fill="#9aa0a8" stroke="#4a4e54" stroke-width="1.5"/></svg>`,
+  can: `<svg viewBox="0 0 48 48"><path d="M12 20 H32 V38 Q32 41 29 41 H15 Q12 41 12 38 Z" fill="#c9a24a" stroke="#7a5a1c" stroke-width="1.5"/><path d="M32 24 L43 15" stroke="#c9a24a" stroke-width="4" stroke-linecap="round"/><circle cx="43.5" cy="14.5" r="3" fill="#b08a30"/><path d="M16 20 Q22 9 28 20" fill="none" stroke="#7a5a1c" stroke-width="2.5"/></svg>`,
+  "seed-jowar": bag(`<path d="M24 20 V6" stroke="#7a9a3c" stroke-width="2"/><ellipse cx="24" cy="8" rx="4" ry="6" fill="#c8924e"/><path d="M24 16 Q17 12 14 14 M24 13 Q31 9 34 11" stroke="#6f9a3a" stroke-width="2" fill="none"/>`),
+  "seed-onion": bag(`<path d="M22 20 Q20 8 18 5 M24 20 V4 M26 20 Q28 8 31 6" stroke="#5a9a45" stroke-width="2" fill="none"/><ellipse cx="24" cy="30" rx="5" ry="4.5" fill="#b0506a" opacity="0.9"/>`),
+  "seed-sugarcane": bag(`<path d="M21 20 V4 M27 20 V6" stroke="#a8b84a" stroke-width="3"/><path d="M19 9 H23 M25 12 H29 M19 15 H23" stroke="#556b2a" stroke-width="1.5"/><path d="M21 5 Q14 3 11 7 M27 7 Q34 4 37 8" stroke="#6f9a3a" stroke-width="2" fill="none"/>`),
+};
 
 function el(tag: string, cls: string, parent: HTMLElement) {
   const e = document.createElement(tag);
@@ -175,71 +183,7 @@ function el(tag: string, cls: string, parent: HTMLElement) {
   return e;
 }
 
-const src = (t: number) => [(t % ATLAS_COLS) * TILE, Math.floor(t / ATLAS_COLS) * TILE] as const;
 
-/** A little isometric cube drawn from the block's atlas tiles. */
-function blockIcon(atlas: HTMLCanvasElement, id: number): HTMLCanvasElement {
-  const S = 48;
-  const c = document.createElement("canvas");
-  c.width = c.height = S;
-  const g = c.getContext("2d")!;
-  g.imageSmoothingEnabled = false;
-  const [top, side] = block(id).tiles;
-  const face = (t: number, m: [number, number, number, number, number, number], shade: number) => {
-    g.save();
-    g.setTransform(...m);
-    const [sx, sy] = src(t);
-    g.drawImage(atlas, sx, sy, TILE, TILE, 0, 0, 1, 1);
-    if (shade < 1) {
-      g.fillStyle = `rgba(0,0,0,${1 - shade})`;
-      g.fillRect(0, 0, 1, 1);
-    }
-    g.restore();
-  };
-  const w = 20, h = 11, v = 22, cx = 24, cy = 3;
-  face(top, [w, h, -w, h, cx, cy], 1);
-  face(side, [w, h, 0, v, cx - w, cy + h], 0.8);
-  face(side, [w, -h, 0, v, cx, cy + 2 * h], 0.64);
-  return c;
-}
 
-/** A cloth seed bag with the ripe crop peeking over the top. */
-function seedIcon(atlas: HTMLCanvasElement, tile: number): HTMLCanvasElement {
-  const c = document.createElement("canvas");
-  c.width = c.height = 16;
-  const g = c.getContext("2d")!;
-  g.imageSmoothingEnabled = false;
-  const [sx, sy] = src(tile);
-  g.drawImage(atlas, sx, sy, TILE, 10, 1, 0, 14, 9);
-  g.fillStyle = "#c9a870";
-  g.fillRect(3, 7, 10, 8);
-  g.fillRect(4, 6, 8, 1);
-  g.fillStyle = "#8a6a3c";
-  g.fillRect(3, 14, 10, 1);
-  g.fillRect(5, 9, 6, 1);
-  return c;
-}
 
-// 16×16 pixel art: '.' clear, letters index the palette
-const HOE = { pal: { w: "#8a6440", d: "#5a3f24", m: "#b8bcc4", k: "#6f737a" }, rows: [
-  "................", "...........mmm..", "..........mmkkm.", "..........mk.mm.", "..........dm....", ".........wd.....",
-  "........wd......", ".......wd.......", "......wd........", ".....wd.........", "....wd..........", "...wd...........",
-  "..wd............", ".wd.............", ".d..............", "................"] };
-const CAN = { pal: { g: "#6f8f9a", d: "#4a646e", l: "#9ab8c2", b: "#2e434a" }, rows: [
-  "................", "................", "......dddd......", ".....d....d.....", "....gggggggg....", "...ggllgggggg..b",
-  "...glgggggggg.b.", "...gggggggggggb.", "...ggggggggggb..", "...gggggggggd...", "...gggggggggd...", "...dggggggggd...",
-  "....dddddddd....", "................", "................", "................"] };
 
-function pixelIcon(art: { pal: Record<string, string>; rows: string[] }): HTMLCanvasElement {
-  const c = document.createElement("canvas");
-  c.width = c.height = 16;
-  const g = c.getContext("2d")!;
-  art.rows.forEach((row, y) =>
-    [...row].forEach((ch, x) => {
-      if (ch === ".") return;
-      g.fillStyle = art.pal[ch];
-      g.fillRect(x, y, 1, 1);
-    }),
-  );
-  return c;
-}
