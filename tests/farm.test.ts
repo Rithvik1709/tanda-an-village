@@ -110,13 +110,14 @@ describe("farming rules", () => {
     expect(apply(world, s, { t: "dig", x: 1.5, y, z } as never, T0).ok).toBe(false); // fractional coords
   });
 
-  it("refills at the river and uproots with a dig", () => {
+  it("refills at the well and uproots with a dig", () => {
     const s = fresh();
     s.inv.water = 0;
-    // find a river water block
-    let found: [number, number, number] | null = null;
-    for (let x = 0; x < 40 && !found; x++) if (world.voxels[x + 192 * (60 + 192 * 11)] === B.WATER) found = [x, 11, 60];
-    expect(found).not.toBeNull();
+
+    // the village well's water
+    const wl = world.structures.find((q) => q.kind === "well") as { x: number; y: number; z: number };
+    const found: [number, number, number] = [wl.x, wl.y - 2, wl.z];
+    expect(world.voxels[wl.x + 192 * (wl.z + 192 * (wl.y - 2))]).toBe(B.WATER);
     expect(apply(world, s, { t: "refill", x: found![0], y: found![1], z: found![2] }, T0).ok).toBe(true);
     expect(s.inv.water).toBe(16);
     const { x, y, z } = spot(5, 5);

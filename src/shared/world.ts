@@ -1,4 +1,5 @@
 import { B } from "./blocks";
+import { type RoadKind, UKHALI_ROADS } from "./ukhali-osm";
 import { fbm } from "./noise";
 import { hash2, mulberry32 } from "./rng";
 
@@ -45,6 +46,8 @@ export type World = {
   voxels: Uint8Array; // index = x + W * (z + D * y)
   plots: Plot[];
   plotMap: Int16Array; // per column: plot id or -1
+  /** The chowk (village square): flat, open ground. */
+  chowk: { x0: number; z0: number; x1: number; z1: number; y: number };
   trees: Tree[];
   structures: Structure[];
   landmarks: Record<"spawn" | "temple" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat", Landmark>;
@@ -54,8 +57,8 @@ export const idx = (x: number, y: number, z: number) => x + W * (z + D * y);
 export const inWorld = (x: number, y: number, z: number) => x >= 0 && z >= 0 && y >= 0 && x < W && z < D && y < H;
 
 const MARATHI_PLOT_NAMES = [
-  "Nadikath", "Vadacha Mala", "Pimpalwadi", "Kalya Matiche Shet", "Vihirwadi", "Aamrai", "Tekdi", "Devrai",
-  "Bandh", "Otyache Shet", "Mhasoba Mala", "Gavthan", "Ghatmatha", "Chinchwadi", "Bor Mala", "Dhangarwadi",
+  "Nadikath", "Vadacha Mala", "Pimpalwadi", "Kalya Matiche Shet", "Vihirwadi", "Otyache Shet", "Tekdi", "Devrai",
+  "Bandh", "Aamrai", "Mhasoba Mala", "Gavthan", "Ghatmatha", "Chinchwadi", "Bor Mala", "Dhangarwadi",
 ];
 
 export function riverCenter(z: number) {
@@ -77,24 +80,19 @@ export function generateWorld(seed = WORLD_SEED): World {
   };
   const get = (x: number, y: number, z: number) => (inWorld(x, y, z) ? vox[idx(x, y, z)] : B.AIR);
 
-  /* ---------- 1. terrain heights ---------- */
+  /* ---------- 1. terrain: the gentle Deccan plain, rising into red scrub land to the east ---------- */
+  const scrub = (x: number, z: number) => Math.max(0, Math.min(1, (x - 132) / 26)) * Math.max(0, Math.min(1, (158 - z) / 18)) * Math.max(0, Math.min(1, (z - 58) / 14));
   for (let z = 0; z < D; z++)
     for (let x = 0; x < W; x++) {
-      const n = fbm(x / 46, z / 46, seed, 4);
-      let h = 15 + Math.round((n - 0.5) * 4);
-      // hills toward the edges of the map (the ghats in the distance)
-      // …but never over the town market or the road to it (they must sit at plain level)
-      const marketZone = x > 140 && Math.abs(z - 96) < 26;
-      const edge = marketZone ? 0 : Math.max(0, Math.hypot(x - 96, z - 96) - 78);
-      h += Math.round(Math.min(10, edge * 0.35) * fbm(x / 20, z / 20, seed + 7, 3) * 1.6);
-      // river valley in the west
-      const dr = Math.abs(x - riverCenter(z)) - riverHalfWidth(z);
-      if (dr < 6) h = Math.min(h, dr <= 0 ? 8 : Math.round(11 + dr * 0.7));
-      height[col(x, z)] = Math.max(4, Math.min(H - 10, h));
-      top[col(x, z)] = dr <= 1.5 ? B.SAND : B.GRASS;
+      const n = fbm(x / 52, z / 52, seed, 4);
+      let h = 15 + Math.round((n - 0.5) * 3);
+      const sc = scrub(x, z);
+      h += Math.round(sc * (2 + 3 * fbm(x / 18, z / 18, seed + 7, 3)));
+      height[col(x, z)] = Math.max(12, Math.min(H - 10, h));
+      top[col(x, z)] = sc > 0.35 && fbm(x / 7, z / 7, seed + 5, 2) > 0.45 ? B.RED_SOIL : B.GRASS;
     }
 
-  /* ---------- 2. flat areas: village square, roads, plots, market ---------- */
+  /* ---------- 2. the village ground, and the real roads of Ukhali (from OpenStreetMap) ---------- */
   const flatten = (x0: number, z0: number, x1: number, z1: number, y: number, surface: number, mark = true) => {
     for (let z = z0; z <= z1; z++)
       for (let x = x0; x <= x1; x++) {
@@ -104,98 +102,93 @@ export function generateWorld(seed = WORLD_SEED): World {
         if (mark) reserved[col(x, z)] = 1;
       }
   };
-  const SQUARE = { x0: 82, z0: 82, x1: 110, z1: 110, y: 15 };
-  flatten(SQUARE.x0, SQUARE.z0, SQUARE.x1, SQUARE.z1, SQUARE.y, B.GRASS);
-  // packed-earth ring around the square
-  for (let z = SQUARE.z0; z <= SQUARE.z1; z++)
-    for (let x = SQUARE.x0; x <= SQUARE.x1; x++) if (hash2(x, z, seed + 3) < 0.55) top[col(x, z)] = B.DIRT;
-
-  // roads: N–S through the square, E to the town market, W down to the river ghat
-  const road = (x0: number, z0: number, x1: number, z1: number) => {
-    for (let z = z0; z <= z1; z++)
-      for (let x = x0; x <= x1; x++) {
-        const c = col(x, z);
-        const y = Math.max(13, Math.min(17, height[c]));
-        height[c] = y;
-        top[c] = B.ROAD;
-        reserved[c] = 1;
-      }
+  // the gaothan (village site) sits on one level; the chowk is its open heart
+  const inVillage = (x: number, z: number) => {
+    const dx = (x - 104) / 29, dz = (z - 112) / 40;
+    return dx * dx + dz * dz < 1;
   };
-  road(95, 4, 97, 187);
-  road(97, 95, 187, 97);
-  const ghatX = Math.round(riverCenter(96) + riverHalfWidth(96) + 2);
-  road(ghatX, 95, 95, 97);
-  // smooth road heights along their length so there are no cliffs
-  for (let pass = 0; pass < 6; pass++) {
-    for (let z = 5; z < 187; z++) for (let x = 95; x <= 97; x++) height[col(x, z)] = Math.round((height[col(x, z - 1)] + height[col(x, z)] + height[col(x, z + 1)]) / 3);
-    for (let x = ghatX + 1; x < 187; x++) for (let z = 95; z <= 97; z++) height[col(x, z)] = Math.round((height[col(x - 1, z)] + height[col(x, z)] + height[col(x + 1, z)]) / 3);
+  for (let z = 70; z <= 152; z++) for (let x = 74; x <= 132; x++) if (inVillage(x, z)) height[col(x, z)] = 15;
+  const SQUARE = { x0: 97, z0: 108, x1: 113, z1: 122, y: 15 };
+  flatten(SQUARE.x0, SQUARE.z0, SQUARE.x1, SQUARE.z1, SQUARE.y, B.DIRT);
+  for (let z = SQUARE.z0; z <= SQUARE.z1; z++) for (let x = SQUARE.x0; x <= SQUARE.x1; x++) if (hash2(x, z, seed + 3) < 0.4) top[col(x, z)] = B.GRASS;
+  // roads: stamp each polyline with its width; main roads are wider, field tracks narrower
+  const roadCells = new Uint8Array(W * D);
+  const WIDTH: Record<RoadKind, number> = { main: 2.2, road: 1.7, lane: 1.3, track: 1.0 };
+  for (const r of UKHALI_ROADS) {
+    const w = WIDTH[r.k];
+    for (let i = 1; i < r.p.length; i++) {
+      const [ax, az] = r.p[i - 1], [bx, bz] = r.p[i];
+      const len = Math.hypot(bx - ax, bz - az);
+      for (let t = 0; t <= len; t += 0.4) {
+        const x = ax + ((bx - ax) * t) / Math.max(len, 1e-6), z = az + ((bz - az) * t) / Math.max(len, 1e-6);
+        for (let dz = -Math.ceil(w); dz <= Math.ceil(w); dz++)
+          for (let dx = -Math.ceil(w); dx <= Math.ceil(w); dx++) {
+            const X = Math.round(x + dx), Z = Math.round(z + dz);
+            if (X < 0 || Z < 0 || X >= W || Z >= D || Math.hypot(X - x, Z - z) > w) continue;
+            roadCells[col(X, Z)] = r.k === "track" ? 2 : 1;
+          }
+      }
+    }
   }
-  // the square stays level where roads cross it
-  for (let z = SQUARE.z0; z <= SQUARE.z1; z++) for (let x = SQUARE.x0; x <= SQUARE.x1; x++) height[col(x, z)] = SQUARE.y;
+  for (let c = 0; c < W * D; c++)
+    if (roadCells[c]) {
+      top[c] = roadCells[c] === 2 ? B.DIRT : B.ROAD;
+      reserved[c] = 1;
+    }
+  // roads run smooth: blur their heights so there are no steps
+  for (let pass = 0; pass < 4; pass++)
+    for (let z = 1; z < D - 1; z++)
+      for (let x = 1; x < W - 1; x++) {
+        const c = col(x, z);
+        if (!roadCells[c] || inVillage(x, z)) continue;
+        height[c] = Math.round((height[c] * 2 + height[c - 1] + height[c + 1] + height[c - W] + height[c + W]) / 6);
+      }
 
-  /* ---------- 3. farm plots ---------- */
+  /* ---------- 3. the fields: laid over the real field strips around the village ---------- */
   const rng = mulberry32(seed ^ 0x51ab);
-  const cols: [number, number][] = [
-    [36, 60],
-    [64, 90],
-    [102, 128],
-    [132, 166],
+  const FIELDS: [number, number, number, number][] = [
+    [58, 30, 77, 41], [84, 30, 101, 41], [102, 42, 124, 60], [58, 50, 77, 68],
+    [30, 44, 54, 62], [4, 40, 26, 60], [4, 72, 28, 94], [30, 76, 54, 96],
+    [18, 106, 46, 122], [58, 104, 72, 119], [4, 126, 30, 150], [34, 128, 60, 148],
+    [10, 158, 50, 184], [96, 160, 126, 188], [136, 162, 168, 186], [140, 100, 166, 124],
   ];
-  const rows: [number, number][] = [
-    [12, 38],
-    [44, 78],
-    [114, 146],
-    [152, 182],
+  const STARTER = 9;
+  const WELLS: [number, number][] = [
+    [104, 125], // the village well, at the edge of the chowk
+    [50, 100], // the vihir: a round open well in the fields, visible on the satellite image
   ];
   const plots: Plot[] = [];
-  let pid = 0;
-  for (let ri = 0; ri < rows.length; ri++)
-    for (let ci = 0; ci < cols.length; ci++) {
-      let [x0, x1] = cols[ci];
-      let [z0, z1] = rows[ri];
-      const starter = ci === 1 && ri === 1;
-      if (starter) {
-        // a small plot close to the village to start with
-        x0 = 72;
-        x1 = 87;
-        z0 = 62;
-        z1 = 77;
-      } else {
-        x0 += Math.floor(rng() * 4);
-        x1 -= Math.floor(rng() * 4);
-        z0 += Math.floor(rng() * 4);
-        z1 -= Math.floor(rng() * 4);
+  FIELDS.forEach(([x0, z0, x1, z1], pid) => {
+    let sum = 0;
+    let n = 0;
+    for (let z = z0; z <= z1; z++)
+      for (let x = x0; x <= x1; x++) {
+        sum += height[col(x, z)];
+        n++;
       }
-      let sum = 0;
-      let n = 0;
-      for (let z = z0; z <= z1; z++)
-        for (let x = x0; x <= x1; x++) {
-          sum += height[col(x, z)];
-          n++;
-        }
-      const y = Math.round(sum / n);
-      const red = ci >= 2 && rng() < 0.4;
-      flatten(x0, z0, x1, z1, y, red ? B.RED_SOIL : B.BLACK_SOIL);
-      for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) plotMap[col(x, z)] = pid;
-      const cx = (x0 + x1) / 2;
-      const cz = (z0 + z1) / 2;
-      const riverDist = Math.max(0, x0 - (riverCenter(cz) + riverHalfWidth(cz)));
-      const roadDist = Math.min(Math.abs(cx - 96) - (x1 - x0) / 2, Math.abs(cz - 96) - (z1 - z0) / 2);
-      plots.push({
-        id: pid,
-        name: MARATHI_PLOT_NAMES[pid],
-        x0,
-        z0,
-        x1,
-        z1,
-        y,
-        soil: starter ? 0.55 : Math.round((0.45 + rng() * 0.5 - (red ? 0.08 : 0)) * 100) / 100,
-        water: Math.round(Math.max(0.2, Math.min(1, 1 - riverDist / 120)) * 100) / 100,
-        road: Math.round(Math.max(0.2, Math.min(1, 1 - Math.max(0, roadDist) / 60)) * 100) / 100,
-        starter,
-      });
-      pid++;
-    }
+    const y = Math.round(sum / n);
+    const starter = pid === STARTER;
+    const red = x0 > 130 || (!starter && rng() < 0.2);
+    flatten(x0, z0, x1, z1, y, red ? B.RED_SOIL : B.BLACK_SOIL);
+    for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) plotMap[col(x, z)] = pid;
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    const wellDist = Math.min(...WELLS.map(([wx, wz]) => Math.hypot(wx - cx, wz - cz)));
+    let roadDist = 99;
+    for (let z = z0 - 6; z <= z1 + 6; z += 2) for (let x = x0 - 6; x <= x1 + 6; x += 2) if (x >= 0 && z >= 0 && x < W && z < D && roadCells[col(x, z)]) roadDist = Math.min(roadDist, Math.max(0, Math.max(x0 - x, x - x1, z0 - z, z - z1)));
+    plots.push({
+      id: pid,
+      name: MARATHI_PLOT_NAMES[pid],
+      x0,
+      z0,
+      x1,
+      z1,
+      y,
+      soil: starter ? 0.55 : Math.round((0.45 + rng() * 0.5 - (red ? 0.08 : 0)) * 100) / 100,
+      water: Math.round(Math.max(0.2, Math.min(1, 1 - wellDist / 110)) * 100) / 100,
+      road: Math.round(Math.max(0.2, Math.min(1, 1 - roadDist / 12)) * 100) / 100,
+      starter,
+    });
+  });
 
   /* ---------- 4. write columns ---------- */
   for (let z = 0; z < D; z++)
@@ -211,7 +204,17 @@ export function generateWorld(seed = WORLD_SEED): World {
 
   /* ---------- 5. fences around plots, with a gate facing the nearest road ---------- */
   for (const p of plots) {
-    const gateSide = Math.abs((p.x0 + p.x1) / 2 - 96) > Math.abs((p.z0 + p.z1) / 2 - 96) ? ((p.x0 + p.x1) / 2 < 96 ? "E" : "W") : (p.z0 + p.z1) / 2 < 96 ? "S" : "N";
+    // the gate opens toward the nearest road or lane
+    let best = { d: 1e9, side: "S" as "N" | "S" | "E" | "W" };
+    for (let z = 0; z < D; z += 1)
+      for (let x = 0; x < W; x += 1) {
+        if (!roadCells[col(x, z)]) continue;
+        const dx = x < p.x0 ? p.x0 - x : x > p.x1 ? x - p.x1 : 0, dz = z < p.z0 ? p.z0 - z : z > p.z1 ? z - p.z1 : 0;
+        const d = Math.hypot(dx, dz);
+        if (d >= best.d) continue;
+        best = { d, side: dx > dz ? (x < p.x0 ? "W" : "E") : z < p.z0 ? "N" : "S" };
+      }
+    const gateSide = best.side;
     const midX = Math.round((p.x0 + p.x1) / 2);
     const midZ = Math.round((p.z0 + p.z1) / 2);
     const isGate = (x: number, z: number) =>
@@ -301,10 +304,9 @@ export function generateWorld(seed = WORLD_SEED): World {
   };
 
   // temple: whitewash plinth + stepped shikhara + saffron flag
-  const temple = (() => {
-    const x0 = 84;
-    const z0 = 84;
-    const y0 = SQUARE.y + 1;
+  const temple = ((x0: number, z0: number) => {
+    const y0 = height[col(x0 + 4, z0 + 4)] + 1;
+    flatten(x0 - 1, z0 - 1, x0 + 9, z0 + 10, y0 - 1, B.DIRT);
     structures.push({ kind: "temple", x0, z0, y: y0 });
     for (let z = z0; z < z0 + 9; z++) for (let x = x0; x < x0 + 9; x++) set(x, y0, z, B.COBBLE);
     for (let s = 0; s < 6; s++) {
@@ -320,18 +322,18 @@ export function generateWorld(seed = WORLD_SEED): World {
     set(x0 + 5, y0 + 9, z0 + 4, B.SAFFRON);
     for (let z = z0; z < z0 + 9; z++) for (let x = x0; x < x0 + 9; x++) reserved[col(x, z)] = 1;
     return { x: x0 + 4, y: y0, z: z0 + 10 };
-  })();
+  })(113, 95); // the Sevalal Maharaj mandir, north-east of the chowk
 
-  const trader = stall(100, 84, 5, 4, B.SAFFRON);
-  const seedShop = stall(100, 100, 5, 4, B.BLUE_WOOD);
-  const landOffice = house(84, 100, 6, 5, B.WHITEWASH, B.ROOF_TILE, "E");
-  const bank = house(111, 100, 7, 6, B.BRICK, B.ROOF_TILE, "N");
+  // the chowk: Ganpat's and Sitabai's stalls on its north side, the Naik's kacheri to the west
+  const trader = stall(98, 109, 5, 4, B.SAFFRON);
+  const seedShop = stall(106, 109, 5, 4, B.BLUE_WOOD);
+  const landOffice = house(89, 111, 6, 5, B.WHITEWASH, B.ROOF_TILE, "E");
+  const bank = house(114, 125, 7, 6, B.BRICK, B.ROOF_TILE, "W");
 
-  // the village well
-  const well = (() => {
-    const cx = 91;
-    const cz = 95;
-    const y0 = SQUARE.y;
+  // wells: the village well by the chowk, and the round vihir out in the fields
+  const makeWell = (cx: number, cz: number) => {
+    const y0 = height[col(cx, cz)];
+    flatten(cx - 2, cz - 2, cx + 2, cz + 2, y0, B.DIRT);
     structures.push({ kind: "well", x: cx, z: cz, y: y0 + 1 });
     for (let z = cz - 1; z <= cz + 1; z++)
       for (let x = cx - 1; x <= cx + 1; x++) {
@@ -340,44 +342,66 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
     set(cx - 1, y0 + 2, cz - 1, B.LOG);
     set(cx + 1, y0 + 2, cz + 1, B.LOG);
-    reserved[col(cx, cz)] = 1;
     return { x: cx, y: y0 + 1, z: cz + 2 };
-  })();
+  };
+  const well = makeWell(WELLS[0][0], WELLS[0][1]);
+  const vihir = makeWell(WELLS[1][0], WELLS[1][1]);
 
-  // houses along the north road
-  house(100, 56, 6, 5, B.WHITEWASH, B.THATCH, "W");
-  house(100, 66, 5, 5, B.WHITEWASH, B.ROOF_TILE, "W");
-  house(88, 50, 5, 5, B.WHITEWASH, B.THATCH, "E");
-  house(100, 118, 6, 5, B.WHITEWASH, B.THATCH, "W");
-  house(88, 122, 5, 6, B.BRICK, B.ROOF_TILE, "E");
+  // the rest of the gaothan: houses packed along the lanes, each door facing the nearest lane
+  // the footprint must be free; the one-block yard around it only needs to stay off the lanes
+  const fits = (x0: number, z0: number, w: number, d: number) => {
+    for (let z = z0 - 1; z <= z0 + d; z++)
+      for (let x = x0 - 1; x <= x0 + w; x++) {
+        if (x < 1 || z < 1 || x >= W - 1 || z >= D - 1) return false;
+        const c = col(x, z);
+        const inner = x >= x0 && x < x0 + w && z >= z0 && z < z0 + d;
+        if (roadCells[c] || plotMap[c] >= 0 || !inVillage(x, z) || (inner && reserved[c])) return false;
+      }
+    return true;
+  };
+  const houseRng = mulberry32(seed ^ 0x40e);
+  let houses = 0;
+  for (let z = 72; z < 152; z += 1)
+    for (let x = 75; x < 132; x += 1) {
+      const w = 4 + Math.floor(houseRng() * 3), d = 4 + Math.floor(houseRng() * 2);
+      if (!fits(x, z, w, d) || houseRng() < 0.08) continue;
+      // which side is the lane on?
+      const cx = x + w / 2, cz = z + d / 2;
+      let bestSide: "N" | "S" | "E" | "W" = "S", bestD = 1e9;
+      for (let r = 1; r < 14 && bestD === 1e9; r++)
+        for (const [side, px, pz] of [["N", cx, z - r], ["S", cx, z + d - 1 + r], ["W", x - r, cz], ["E", x + w - 1 + r, cz]] as const) {
+          const X = Math.round(px), Z = Math.round(pz);
+          if (X >= 0 && Z >= 0 && X < W && Z < D && roadCells[col(X, Z)] && r < bestD) {
+            bestD = r;
+            bestSide = side;
+          }
+        }
+      const roofs = houseRng() < 0.3 ? B.THATCH : B.ROOF_TILE;
+      house(x, z, w, d, houseRng() < 0.25 ? B.BRICK : B.WHITEWASH, roofs, bestSide);
+      houses++;
+    }
 
-  // town market at the end of the east road
+  // the town mandi, where the main road leaves for Jalna in the west
   const market = (() => {
-    const cx = 180;
-    flatten(170, 84, 190, 108, 15, B.DIRT);
-    for (let z = 84; z <= 108; z++) for (let x = 170; x <= 190; x++) if (hash2(x, z, seed + 9) < 0.35) top[col(x, z)] = B.ROAD;
-    for (let z = 84; z <= 108; z++)
-      for (let x = 170; x <= 190; x++) {
+    const x0 = 3, z0 = 14, x1 = 27, z1 = 32;
+    flatten(x0, z0, x1, z1, 15, B.DIRT);
+    for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) if (hash2(x, z, seed + 9) < 0.35) top[col(x, z)] = B.ROAD;
+    for (let z = z0; z <= z1; z++)
+      for (let x = x0; x <= x1; x++) {
         for (let y = 12; y <= 15; y++) set(x, y, z, y === 15 ? top[col(x, z)] : B.DIRT);
         for (let y = 16; y < 30; y++) set(x, y, z, B.AIR);
       }
-    // re-lay the road into the market (the fill above covered it)
-    for (let x = 170; x <= 187; x++) for (let z = 95; z <= 97; z++) set(x, 15, z, B.ROAD);
-    stall(172, 86, 5, 4, B.SAFFRON);
-    stall(180, 86, 5, 4, B.BLUE_WOOD);
-    stall(172, 101, 5, 4, B.BLUE_WOOD);
-    stall(180, 101, 5, 4, B.SAFFRON);
-    for (const [x, z] of [
-      [186, 92],
-      [187, 92],
-      [186, 93],
-      [178, 99],
-    ]) {
+    stall(5, 16, 5, 4, B.SAFFRON);
+    stall(13, 16, 5, 4, B.BLUE_WOOD);
+    stall(5, 26, 5, 4, B.BLUE_WOOD);
+    stall(19, 26, 5, 4, B.SAFFRON);
+    for (const [x, z] of [[24, 18], [25, 18], [24, 19], [14, 24]]) {
       set(x, 16, z, B.HAY);
       structures.push({ kind: "hay", x, z, y: 16 });
     }
-    return { x: cx, y: 16, z: 96 };
+    return { x: 15, y: 16, z: 23 };
   })();
+  void houses;
 
   /* ---------- 7. trees: neem everywhere, a few great banyans ---------- */
   const treeRng = mulberry32(seed ^ 0x7ee);
@@ -390,7 +414,7 @@ export function generateWorld(seed = WORLD_SEED): World {
         if (reserved[col(X, Z)]) return false;
       }
     const t = top[col(x, z)];
-    return t === B.GRASS && height[col(x, z)] > WATER_LEVEL;
+    return (t === B.GRASS || t === B.RED_SOIL) && height[col(x, z)] > WATER_LEVEL;
   };
   const trees: Tree[] = [];
   const neem = (x: number, z: number) => {
@@ -439,10 +463,10 @@ export function generateWorld(seed = WORLD_SEED): World {
     for (let dz = -6; dz <= 7; dz++) for (let dx = -6; dx <= 7; dx++) if (x + dx >= 0 && z + dz >= 0 && x + dx < W && z + dz < D) reserved[col(x + dx, z + dz)] = 1;
   };
   // the village banyan, in the square's corner; two more at the ghat and on the market road
-  banyan(104, 106);
+  banyan(98, 120); // the chowk's great banyan, where the tanda sits in the evenings
   for (const [bx, bz] of [
-    [ghatX + 4, 102],
-    [150, 102],
+    [57, 100], // by the vihir
+    [150, 140],
   ])
     if (canTree(bx, bz, 1)) banyan(bx, bz);
   for (let gz = 2; gz < D - 2; gz += 7)
@@ -452,11 +476,20 @@ export function generateWorld(seed = WORLD_SEED): World {
       const z = gz + Math.floor(treeRng() * 5);
       if (canTree(x, z, 2)) neem(x, z);
     }
-  // a neat row of neem trees along the east road
-  for (let x = 112; x < 168; x += 9) {
-    if (canTree(x, 92, 1)) neem(x, 92);
-    if (canTree(x + 4, 100, 1)) neem(x + 4, 100);
-  }
+  // neem trees along the lanes and the main road, as the satellite shows
+  for (const r of UKHALI_ROADS)
+    for (let i = 1; i < r.p.length; i++) {
+      const [ax, az] = r.p[i - 1], [bx, bz] = r.p[i];
+      const len = Math.hypot(bx - ax, bz - az);
+      for (let t = 4; t < len; t += 11) {
+        const x = ax + ((bx - ax) * t) / len, z = az + ((bz - az) * t) / len;
+        const nx = -(bz - az) / len, nz = (bx - ax) / len;
+        for (const sgn of [1, -1]) {
+          const X = Math.round(x + nx * 4 * sgn), Z = Math.round(z + nz * 4 * sgn);
+          if (treeRng() < 0.6 && canTree(X, Z, 1)) neem(X, Z);
+        }
+      }
+    }
 
   /* ---------- 8. grass tufts and marigolds ---------- */
   for (let z = 1; z < D - 1; z++)
@@ -471,16 +504,16 @@ export function generateWorld(seed = WORLD_SEED): World {
     }
 
   const lm = (p: { x: number; y: number; z: number }, label: string): Landmark => ({ ...p, label });
-  const starter = plots.find((p) => p.starter)!;
   return {
     seed,
     voxels: vox,
     plots,
     plotMap,
+    chowk: SQUARE,
     trees,
     structures,
     landmarks: {
-      spawn: { x: 96.5, y: SQUARE.y + 1, z: 90.5, label: "Village square" },
+      spawn: { x: 109.5, y: SQUARE.y + 1, z: 116.5, label: "The chowk" },
       temple: lm(temple, "Sevalal Maharaj mandir"),
       trader: lm(trader, "Trader"),
       seedShop: lm(seedShop, "Seed & tool shop"),
@@ -488,7 +521,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       bank: lm(bank, "Cooperative bank"),
       well: lm(well, "Well"),
       market: lm(market, "Town market"),
-      ghat: { x: ghatX, y: 12, z: 96, label: `River ghat (near ${starter.name})` },
+      ghat: { ...vihir, label: "Vihir (field well)" },
     },
   };
 }

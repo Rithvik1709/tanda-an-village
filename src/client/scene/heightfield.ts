@@ -27,7 +27,8 @@ export class Heightfield {
         for (; y > 0; y--) if (TERRAIN.has(v[x + W * (z + D * y)])) break;
         colTop[x + W * z] = y + 1;
         // the square is level ground: don't let the old well shaft dent it
-        if (x >= 82 && x <= 110 && z >= 82 && z <= 110) colTop[x + W * z] = Math.max(colTop[x + W * z], 16);
+        const ch = world.chowk;
+        if (x >= ch.x0 && x <= ch.x1 && z >= ch.z0 && z <= ch.z1) colTop[x + W * z] = Math.max(colTop[x + W * z], ch.y + 1);
         this.surface[x + W * z] = v[x + W * (z + D * y)];
       }
     const n = this.n;
@@ -36,7 +37,8 @@ export class Heightfield {
     const col = (x: number, z: number) => colTop[Math.max(0, Math.min(W - 1, x)) + W * Math.max(0, Math.min(D - 1, z))];
     const flat = (x: number, z: number) => {
       if (x < 0 || z < 0 || x >= W || z >= D) return false;
-      return world.plotMap[x + W * z] >= 0 || (x >= 82 && x <= 110 && z >= 82 && z <= 110);
+      const ch = world.chowk;
+      return world.plotMap[x + W * z] >= 0 || (x >= ch.x0 && x <= ch.x1 && z >= ch.z0 && z <= ch.z1);
     };
     for (let j = 0; j < n; j++)
       for (let i = 0; i < n; i++) {

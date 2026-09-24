@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { B } from "../src/shared/blocks";
-import { D, generateWorld, idx, riverCenter, surfaceY, W, WATER_LEVEL } from "../src/shared/world";
+import { D, generateWorld, idx, surfaceY, W } from "../src/shared/world";
 import { hashStr } from "../src/shared/rng";
 
 describe("world generation", () => {
@@ -36,11 +36,15 @@ describe("world generation", () => {
       expect(a.plotMap[x + W * z]).toBe(p.id);
     }
   });
-  it("the river has water at the water level", () => {
-    const z = 60;
-    const x = Math.round(riverCenter(z));
-    expect(a.voxels[idx(x, WATER_LEVEL, z)]).toBe(B.WATER);
+  it("the village well and the field vihir hold water", () => {
+    const w = generateWorld();
+    for (const s of w.structures.filter((q) => q.kind === "well")) {
+      const q = s as { x: number; y: number; z: number };
+      expect(w.voxels[idx(q.x, q.y - 2, q.z)]).toBe(8);
+    }
+    expect(w.structures.filter((q) => q.kind === "well")).toHaveLength(2);
   });
+
   it("spawn stands on solid ground in the square", () => {
     const s = a.landmarks.spawn;
     expect(surfaceY(a, Math.floor(s.x), Math.floor(s.z))).toBe(s.y - 1);

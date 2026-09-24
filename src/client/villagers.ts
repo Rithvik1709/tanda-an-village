@@ -3,6 +3,7 @@ import { CROP_IDS, type Planting } from "../shared/crops";
 import { forSale } from "../shared/land";
 import { hash2 } from "../shared/rng";
 import type { Save } from "../shared/save";
+import { UKHALI_ROADS } from "../shared/ukhali-osm";
 import { idx, type World } from "../shared/world";
 import { Fields } from "./scene/crops";
 import { banjaraWoman, Figure, type Look } from "./scene/figure";
@@ -107,17 +108,22 @@ export class Villagers {
     const doors = w.structures.filter((s) => s.kind === "house").map((h) => {
       const side = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] }[h.door];
       return { x: h.x0 + h.w / 2 + side[0] * (h.w / 2 + 1.6), z: h.z0 + h.d / 2 + side[1] * (h.d / 2 + 1.6) };
-    });
+    }).sort((a, b) => Math.hypot(a.x - well.x, a.z - well.z) - Math.hypot(b.x - well.x, b.z - well.z));
     const woman = (i: number) => banjaraWoman(["#a8262c", "#1f4fa0", "#1b6a3a", "#7a1f4a", "#8a4a10"][i % 5], ["#e8a030", "#c0392b", "#8a2a8a", "#d04a2a", "#2e8a8a"][i % 5]);
     const man = (i: number): Look => ({ kurta: ["#f1ead9", "#e8e0c8", "#dfe6ee"][i % 3], dhoti: "#e9e1cd", hat: ["#f2f2ee", "#e0762a", "#c0392b"][i % 3], hatStyle: i % 2 ? "pheta" : "topi", skin: "#9a6240" });
     // water carriers: from the well to a few doorsteps and back
-    doors.slice(0, 4).forEach((d, i) => this.add(new Villager(woman(i), { kind: "water", route: [well, { x: (well.x + d.x) / 2, z: 96 }, d, { x: (well.x + d.x) / 2, z: 96 }] }, { x: d.x, z: d.z })));
+    doors.slice(0, 4).forEach((d, i) => this.add(new Villager(woman(i), { kind: "water", route: [well, d] }, { x: d.x, z: d.z })));
     // men walking the roads: the square to the north fields, and out to the mandi road
-    this.add(new Villager(man(0), { kind: "walker", route: [{ x: 96.5, z: 92 }, { x: 96.5, z: 30 }, { x: 96.5, z: 60 }] }, { x: 96.5, z: 70 }));
-    this.add(new Villager(man(1), { kind: "walker", route: [{ x: 100, z: 96.5 }, { x: 165, z: 96.5 }] }, { x: 130, z: 96.5 }));
-    this.add(new Villager(woman(5), { kind: "walker", route: [{ x: 96.5, z: 104 }, { x: 96.5, z: 160 }] }, { x: 96.5, z: 130 }));
+    // people walking the real roads: out along each road and back again
+    const roads = UKHALI_ROADS.filter((r) => r.k !== "lane").map((r) => r.p.map(([x, z]) => ({ x, z })).filter((q) => q.x > 2 && q.z > 2 && q.x < 190 && q.z < 190));
+    roads.forEach((pts, i) => {
+      if (pts.length < 2) return;
+      const route = [...pts, ...pts.slice(1, -1).reverse()];
+      this.add(new Villager(i % 2 ? woman(i + 5) : man(i), { kind: "walker", route }, pts[Math.floor(pts.length / 2)]));
+    });
     // children in the square
-    for (let i = 0; i < 3; i++) this.add(new Villager(i % 2 ? woman(i + 2) : man(i + 1), { kind: "child", center: { x: 94, z: 90 }, r: 2.5 + i }, { x: 94 + i, z: 90 }, 0.62 + i * 0.04));
+    const ch = w.chowk;
+    for (let i = 0; i < 3; i++) this.add(new Villager(i % 2 ? woman(i + 2) : man(i + 1), { kind: "child", center: { x: (ch.x0 + ch.x1) / 2 + 2, z: (ch.z0 + ch.z1) / 2 }, r: 2.5 + i }, { x: ch.x0 + 6 + i, z: ch.z0 + 6 }, 0.62 + i * 0.04));
     // farmers for every neighbour's field (made visible when that field is worked)
     for (const p of w.plots) {
       if (p.starter) continue;

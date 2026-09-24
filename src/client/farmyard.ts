@@ -18,14 +18,15 @@ export class Farmyard {
   pos = { x: 0, y: 0, z: 0, heading: 0 };
   cartAt: Park;
   readonly home: Park;
-  readonly town: Park = { x: 172.5, z: 96.5, heading: Math.PI / 2 };
+  readonly town: Park;
   ride: { path: Pt[]; len: number; d: number; speed: number; dest: Dest } | null = null;
   hasBulls = false;
   hasCart = false;
   onArrive: (dest: Dest) => void = () => {};
   private walkTo: { x: number; z: number } | null = null;
 
-  constructor(private vox: Uint8Array, starter: Plot, private groundY: (x: number, z: number) => number) {
+  constructor(private vox: Uint8Array, starter: Plot, private groundY: (x: number, z: number) => number, market: { x: number; z: number }) {
+    this.town = { x: market.x + 5.5, z: market.z + 1.5, heading: -Math.PI / 2 };
     const g = starter.gate!;
     const out = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] }[g.side];
     // park beside the gate, out on the lane, facing away from the fence

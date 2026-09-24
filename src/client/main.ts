@@ -53,11 +53,11 @@ declare global {
 window.__bailgaadi = { ready: false };
 
 const VIEWS = {
-  overview: { pos: [150, 50, 150], look: [78, 14, 82] },
-  square: { pos: [98, 18.8, 114], look: [90, 19, 88] },
-  fields: { pos: [100, 24, 42], look: [48, 15, 60] },
-  river: { pos: [34, 17, 112], look: [14, 11, 92] },
-  market: { pos: [160, 24, 110], look: [182, 16, 96] },
+  overview: { pos: [170, 60, 190], look: [100, 14, 108] },
+  square: { pos: [112, 19, 128], look: [102, 17, 110] },
+  fields: { pos: [80, 26, 96], look: [30, 15, 70] },
+  river: { pos: [56, 20, 110], look: [50, 15, 100] },
+  market: { pos: [30, 22, 40], look: [14, 16, 22] },
 } as const;
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
@@ -252,24 +252,25 @@ const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: N
   },
   {
     kind: "sahukar",
-    at: { x: 108.5, y: hf.at(108.5, 108.5), z: 108.5 },
-    npc: new Npc({ kurta: "#f2e6c8", dhoti: "#f6f0e0", hat: "#c0392b", hatTall: true, skin: "#b07a52" }, 108.5, hf.at(108.5, 110.3), 110.3, Math.PI),
+    at: { x: 102.5, y: hf.at(102.5, 124.5), z: 124.5 },
+    npc: new Npc({ kurta: "#f2e6c8", dhoti: "#f6f0e0", hat: "#c0392b", hatTall: true, skin: "#b07a52" }, 108.5, hf.at(102.5, 126.3), 126.3, Math.PI),
     label: "Borrow from Sahukar Motilal (fast, but dear)",
   },
   {
     kind: "town",
-    at: { x: 176.5, y: world.landmarks.market.y, z: 96.5 },
-    npc: new Npc({ kurta: "#e8d8a8", dhoti: "#f0ead8", hat: "#c0392b", hatTall: true, skin: "#9a6440" }, 178.8, world.landmarks.market.y, 96.5, -Math.PI / 2),
+    at: { x: world.landmarks.market.x + 1.5, y: world.landmarks.market.y, z: world.landmarks.market.z },
+    npc: new Npc({ kurta: "#e8d8a8", dhoti: "#f0ead8", hat: "#c0392b", hatTall: true, skin: "#9a6440" }, world.landmarks.market.x - 1.5, world.landmarks.market.y, world.landmarks.market.z, Math.PI / 2),
     label: "Talk to Haribhau at the town mandi",
   },
 ];
 for (const s of STALLS) scene.add(s.npc.group);
 // the people of the tanda going about their day (not traders — just neighbours)
+const WL = world.landmarks.well;
 const NEIGHBOURS = [
-  new Npc({ kurta: "", dhoti: "#1f4fa0", hat: "#c0392b", woman: true }, 89.5, hf.at(89.5, 97.5), 97.5, 0.6), // at the well
-  new Npc({ kurta: "", dhoti: "#7a1f4a", hat: "#e8a030", woman: true }, 92.8, hf.at(92.8, 96.2), 96.2, -2.2),
-  new Npc({ kurta: "", dhoti: "#1b6a3a", hat: "#8a2a8a", woman: true }, 88.5, hf.at(88.5, 95.5), 95.5, 3.0), // at Sevalal's shrine
-  new Npc({ kurta: "#f1ead9", dhoti: "#e9e1cd", hat: "#f2f2ee", hatTall: true }, 86.4, hf.at(86.4, 96), 96, 1.2),
+  new Npc({ kurta: "", dhoti: "#1f4fa0", hat: "#c0392b", woman: true }, WL.x - 1.5, hf.at(WL.x - 1.5, WL.z), WL.z, 0.6), // at the well
+  new Npc({ kurta: "", dhoti: "#7a1f4a", hat: "#e8a030", woman: true }, WL.x + 1.8, hf.at(WL.x + 1.8, WL.z - 1), WL.z - 1, -2.2),
+  new Npc({ kurta: "", dhoti: "#1b6a3a", hat: "#8a2a8a", woman: true }, world.landmarks.temple.x - 2, hf.at(world.landmarks.temple.x - 2, world.landmarks.temple.z + 1), world.landmarks.temple.z + 1, 3.0), // at Sevalal's shrine
+  new Npc({ kurta: "#f1ead9", dhoti: "#e9e1cd", hat: "#f2f2ee", hatTall: true }, 99.5, hf.at(99.5, 124), 124, 1.2), // under the banyan
 ];
 for (const n of NEIGHBOURS) scene.add(n.group);
 const villagers = new Villagers(world, (x, z) => hf.at(x, z));
@@ -311,7 +312,7 @@ function refreshSigns() {
 }
 
 // ---- Sarja & Raja, and the bailgaadi ----
-const farmyard = new Farmyard(vox, world.plots.find((p) => p.starter)!, (x, z) => hf.at(x, z));
+const farmyard = new Farmyard(vox, world.plots.find((p) => p.starter)!, (x, z) => hf.at(x, z), world.landmarks.market);
 scene.add(farmyard.group);
 let rideHeading = 0;
 function startRide(dest: "town" | "home") {
@@ -331,7 +332,7 @@ farmyard.onArrive = (dest) => {
   Object.assign(body.vel, { x: 0, y: 0, z: 0 });
   hud.setPlaying(false);
   // turn to whoever you came to see
-  const look = dest === "town" ? { x: 178.8, z: 96.5 } : { x: farmyard.pos.x, z: farmyard.pos.z };
+  const look = dest === "town" ? { x: world.landmarks.market.x - 1.5, z: world.landmarks.market.z } : { x: farmyard.pos.x, z: farmyard.pos.z };
   controls.yaw = Math.atan2(-(look.x - x), -(look.z - z));
   controls.pitch = -0.1;
   if (dest === "town") openStall("town");
@@ -384,7 +385,16 @@ function checkPlotEntry() {
 
 /** The stall the player is standing at, if any (within a few steps of its counter). */
 function nearStall() {
-  return STALLS.find((s) => Math.hypot(body.pos.x - s.at.x, body.pos.z - s.at.z) < 3.4 && Math.abs(body.pos.y - s.at.y) < 2);
+  // the nearest one wins (the Naik's door and Ganpat's stall are neighbours on the chowk)
+  let best: (typeof STALLS)[number] | undefined, bd = 3.4;
+  for (const s of STALLS) {
+    const d = Math.hypot(body.pos.x - s.at.x, body.pos.z - s.at.z);
+    if (d < bd && Math.abs(body.pos.y - s.at.y) < 2) {
+      bd = d;
+      best = s;
+    }
+  }
+  return best;
 }
 function openStall(kind: PanelKind, tab?: string) {
   panels.show(kind, tab);
@@ -661,8 +671,8 @@ renderer.setAnimationLoop(() => {
     fields.setAim(null);
     // the title screen: a slow circle over the village at golden hour
     const a = now / 1000 * 0.045;
-    camera.position.set(96 + Math.cos(a) * 78, 40, 92 + Math.sin(a) * 78);
-    camera.lookAt(94, 17, 90);
+    camera.position.set(104 + Math.cos(a) * 70, 42, 112 + Math.sin(a) * 70);
+    camera.lookAt(104, 17, 110);
     outline.visible = false;
   } else outline.visible = false;
   if (mode === "play" && !farmyard.ride) footsteps(dt);
@@ -896,6 +906,10 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     setView: (v: "first" | "third") => (rig.view = v),
     torch: (on: boolean) => (torchOn = on),
     villagerDebug: () => villagers.debug(),
+    noFog: () => {
+      settings.renderDistance = 2000;
+      document.getElementById("ui")!.style.display = "none";
+    },
     prof: () => ({ ...prof }),
     hideLayer: (name: string, on: boolean) => {
       const m: Record<string, THREE.Object3D> = { villagers: villagers.group, grass: grass.group, trees: trees.group, village: village.group, fields: fields.group };

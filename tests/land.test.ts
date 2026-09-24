@@ -13,22 +13,22 @@ describe("plot value model", () => {
   it("is pinned for the seeded village", () => {
     expect(world.plots.map((p) => landValue(p, 40))).toMatchInlineSnapshot(`
       [
-        19160,
-        32800,
-        30380,
-        24030,
-        43040,
-        11790,
-        38450,
-        36250,
-        32200,
-        43840,
-        34770,
-        40810,
-        22670,
-        35010,
-        27880,
-        33150,
+        11970,
+        11180,
+        14410,
+        18600,
+        22360,
+        17090,
+        26540,
+        26420,
+        22660,
+        10960,
+        28610,
+        23130,
+        46370,
+        33500,
+        32250,
+        29960,
       ]
     `);
   });
@@ -40,7 +40,7 @@ describe("plot value model", () => {
     expect(v({ soil: 0.9 })).toBeGreaterThan(v({}));
     expect(v({ water: 0.9 })).toBeGreaterThan(v({}));
     expect(v({ road: 0.9 })).toBeGreaterThan(v({}));
-    expect(area(starter)).toBe(256);
+    expect(area(starter)).toBe((starter.x1 - starter.x0 + 1) * (starter.z1 - starter.z0 + 1));
   });
 
   it("the land mood drifts slowly, within ±15%", () => {

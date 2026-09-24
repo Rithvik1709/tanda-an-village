@@ -52,7 +52,7 @@ describe("ploughing", () => {
     expect(s.bulls!.stamina).toBe(100 - 16);
     // it stops at the fence line: the row can't leave your land
     const edge = apply(world, s, { t: "plough", x: starter.x1 - 3, y: starter.y, z: starter.z0 + 7, dir: "x+" }, T0);
-    expect(edge.ok && edge.gained?.ploughed).toBeLessThanOrEqual(3);
+    expect(edge.ok && edge.gained?.ploughed).toBeLessThanOrEqual(4); // x1-3 … x1, never past the boundary
   });
 
   it("needs bulls, a plough and a willing pair", () => {

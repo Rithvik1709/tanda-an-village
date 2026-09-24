@@ -18,7 +18,7 @@
   log.bankLoan = g.money() - m0;
   await window.__shot("m8-bank");
   g.closePanel();
-  await visit("sahukar", 108.5, g.player().y, 107);
+  await visit("sahukar", 102.5, g.player().y, 122.5);
   const m1 = g.money();
   document.querySelector("input[data-borrow]").value = "1000";
   await click('[data-do="borrow:sahukar"]');

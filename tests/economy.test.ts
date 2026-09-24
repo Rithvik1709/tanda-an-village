@@ -127,9 +127,8 @@ describe("buying and selling", () => {
     s.money = 1000;
     apply(world, s, { t: "buy", item: "bigcan", n: 1 }, T);
     s.inv.water = 0;
-    const river = { x: 0, y: 11, z: 60 };
-    for (let x = 0; x < 40; x++) if (world.voxels[x + 192 * (60 + 192 * 11)] === 8) { river.x = x; break; }
-    apply(world, s, { t: "refill", ...river }, T);
+    const wl = world.structures.find((q) => q.kind === "well") as { x: number; y: number; z: number };
+    apply(world, s, { t: "refill", x: wl.x, y: wl.y - 2, z: wl.z }, T);
     expect(s.inv.water).toBe(32);
     const p = world.plots.find((q) => q.starter)!;
     const spot = { x: p.x0 + 4, y: p.y + 1, z: p.z0 + 4 };

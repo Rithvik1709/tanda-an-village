@@ -176,3 +176,4 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .action-tip .no { color: #ffb4a0; }
 .tutorial { display: none !important; }
 .welcome { z-index: 30; background: rgba(20,14,10,0.55); }
+.map-credit { font-size: 10px; opacity: 0.55; margin-top: 4px; }

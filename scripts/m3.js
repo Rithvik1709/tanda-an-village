@@ -43,7 +43,7 @@
   await pretty("m3-sown");
   const refill = async () => {
     const w = g.landmarks().well; // well water sits two blocks down inside the cobble ring
-    g.teleport(91.5, 16, 97.6, 0, -0.5); // looking at the well's rim from the path
+    const wl = g.landmarks().well; g.teleport(wl.x + 0.5, wl.y, wl.z + 0.6, 0, -0.5); // looking at the well's rim
     await wait(60);
     const t = g.target();
     const r = await g.right();

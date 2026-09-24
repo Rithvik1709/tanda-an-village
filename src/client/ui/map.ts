@@ -23,7 +23,7 @@ export class MapView {
     this.el.className = "mapview";
     this.el.hidden = true;
     this.el.innerHTML = `<div class="map-card"><button class="x" title="Close (M)">✕</button><h2>Ukhali Tanda <small>उखळी तांडा · the tanda map</small></h2><canvas></canvas>
-      <div class="map-legend"><span><i style="background:#3fbf5a"></i>your land</span><span><i style="background:#f0a030"></i>for sale</span><span><i style="background:#5a8fe0"></i>you listed</span><span><i style="background:#ffffff"></i>other farms</span><span>▲ you</span></div></div>`;
+      <div class="map-legend"><span><i style="background:#3fbf5a"></i>your land</span><span><i style="background:#f0a030"></i>for sale</span><span><i style="background:#5a8fe0"></i>you listed</span><span><i style="background:#ffffff"></i>other farms</span><span>▲ you</span></div><div class="map-credit">Roads: © OpenStreetMap contributors</div></div>`;
     parent.appendChild(this.el);
     this.canvas = this.el.querySelector("canvas")!;
     this.el.querySelector(".x")!.addEventListener("click", () => this.close());
@@ -92,8 +92,8 @@ export class MapView {
       [L.seedShop, "Seed shop", 6, 8, "left"],
       [L.landOffice, "Naik (land)", -6, 8, "right"],
       [L.bank, "Bank", 6, -6, "left"],
-      [L.market, "Town market", -4, -12, "right"],
-      [L.ghat, "Ghat", 8, 4, "left"],
+      [L.market, "Town mandi (to Jalna)", 6, -10, "left"],
+      [L.ghat, "Vihir", 8, 4, "left"],
     ];
     for (const [lm, text, dx, dz, align] of pins) {
       const px = (lm.x + 0.5) * S, pz = (lm.z + 0.5) * S;

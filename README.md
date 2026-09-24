@@ -23,3 +23,11 @@ land. Runs in the browser (Three.js). A server checks every move, and your farm 
    to `cname.vercel-dns.com`.
 
 The dev-only endpoint `/api/dev` (clock fast-forward and money grant) returns 404 on Vercel.
+
+## The map
+
+The map is based on the real Ukhali, Jalna district (19.819° N, 76.214° E). The roads and lanes come
+from OpenStreetMap (© OpenStreetMap contributors, ODbL; data in `src/shared/ukhali-osm.ts`). The field
+strips, the village's extent, the red scrub to the east and the round field well were placed by
+reading satellite imagery. The scale is about 4 m per block, and buildings are game-sized, so the
+village has fewer, larger houses than the real one.
