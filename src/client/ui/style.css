@@ -352,8 +352,12 @@ kbd, .goal kbd, .help kbd, .welcome kbd, .tutorial kbd { background: rgba(255, 2
 .rotate-note span { opacity: 0.7; }
 .rotate-icon { font-size: 54px; animation: tilt 1.6s ease-in-out infinite; }
 @keyframes tilt { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
-@media (orientation: portrait) { .is-touch .rotate-note { display: grid; } }
-@media (max-height: 500px) {
+/* phone upright: turn the game (canvas and all UI) a quarter clockwise, so it plays in landscape */
+html.rotated #game, html.rotated #ui {
+  width: 100vh !important; height: 100vw !important; inset: auto !important; left: 0; top: 0;
+  transform-origin: top left; transform: rotate(90deg) translateY(-100%);
+}
+@media (max-height: 500px), (max-width: 500px) {
   .title-inner { top: 50%; }
   .wordmark { font-size: 56px; }
   .tagline { font-size: 14px; margin: 10px 0 6px; }
@@ -370,3 +374,6 @@ kbd, .goal kbd, .help kbd, .welcome kbd, .tutorial kbd { background: rgba(255, 2
 .is-touch .touch .t-top button { padding: 6px 9px; font-size: 11px; }
 .is-touch .goal { top: 44px; }
 .is-touch .goal-arrow { font-size: 11px; }
+html.rotated .panel-card, html.rotated .map-card { max-height: calc(100vw - 24px) !important; }
+html.rotated .map-card canvas { width: min(420px, calc(100vw - 110px)) !important; }
+html.rotated .panel-card { width: min(680px, calc(100vh - 32px)) !important; }

@@ -292,10 +292,6 @@ const touch = TOUCH ? new TouchControls(uiRoot, controls) : null;
 if (touch) {
   controls.touch = touch;
   document.body.classList.add("is-touch");
-  const rotate = document.createElement("div");
-  rotate.className = "rotate-note";
-  rotate.innerHTML = `<div><div class="rotate-icon">📱↻</div><b>Turn your phone sideways</b><span>Tanda plays in landscape</span></div>`;
-  uiRoot.appendChild(rotate);
   // tapping a hotbar slot picks it
   uiRoot.addEventListener("touchstart", (e) => {
     const slot = (e.target as HTMLElement).closest(".slot");
@@ -628,7 +624,8 @@ function useRight(): Outcome {
   const soilY = isCropBlock(id) ? target.y - 1 : target.y;
   const at = { x: target.x, y: soilY, z: target.z };
   if (slot.kind === "tool" && slot.tool === "hoe") {
-    const shift = controls.held.has("ShiftLeft") || controls.held.has("ShiftRight") || ploughNext;
+    // (on a phone, Use with the hoe ploughs a whole row whenever your bulls and plough are there)
+    const shift = controls.held.has("ShiftLeft") || controls.held.has("ShiftRight") || ploughNext || TOUCH;
     ploughNext = false;
     if (shift && game.save.inv.plough && game.save.bulls && farmyard.distTo(body.pos, farmyard.pos.x, farmyard.pos.z) < 10) {
       // plough the row ahead, in the direction you're facing
@@ -873,13 +870,19 @@ const rig = new CameraRig(camera, (x, z) => hf.at(x, z), (x, y, z) => {
   const id = get(x, y, z);
   return !!id && !TERRAIN.has(id) && block(id).solid && block(id).opaque;
 });
+/** On a phone held upright, the whole game is turned sideways (it always plays in landscape). */
+const rotated = () => TOUCH && window.innerHeight > window.innerWidth;
 function resize() {
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
-  post.setSize(window.innerWidth, window.innerHeight);
-  camera.aspect = window.innerWidth / window.innerHeight;
+  const turn = rotated();
+  document.documentElement.classList.toggle("rotated", turn);
+  const w = turn ? window.innerHeight : window.innerWidth, h = turn ? window.innerWidth : window.innerHeight;
+  renderer.setSize(w, h, false);
+  post.setSize(w, h);
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
 window.addEventListener("resize", resize);
+window.addEventListener("orientationchange", () => setTimeout(resize, 200));
 resize();
 
 // frame timing for the 60 fps check

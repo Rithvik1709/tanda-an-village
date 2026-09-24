@@ -3,6 +3,23 @@ import { complete, current, deadlineAt, MISSIONS, progress } from "../../shared/
 import type { Action, Result } from "../../shared/rules";
 import { DAY_MS } from "../../shared/time";
 
+/** On phones, key names in the text become the on-screen buttons. */
+const TOUCH_UI = typeof matchMedia !== "undefined" && (matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1);
+export const forDevice = (t: string) =>
+  !TOUCH_UI
+    ? t
+    : t
+        .replace(/\(press E near (him|her)\)/g, "(tap Talk near $1)")
+        .replace(/\bE at the\b/g, "tap Talk at the")
+        .replace(/\(E\)/g, "(tap Talk)")
+        .replace(/, E\)/g, ", tap Talk)")
+        .replace(/load the cart with R/g, "tap Cart by your cart")
+        .replace(/\(F near the bulls\)/g, "(tap Feed near the bulls)")
+        .replace(/then F near the bulls/g, "then tap Feed near the bulls")
+        .replace(/Shift \+ right-click with the hoe/g, "tap Use with the hoe, your bulls nearby")
+        .replace(/press E/gi, "tap Talk")
+        .replace(/Press <kbd>H<\/kbd> any time for the controls/g, "Tap ? any time for help");
+
 const seen = (id: string) => { try { return localStorage.getItem(`tanda.mission.${id}`) === "1"; } catch { return false; } };
 const markSeen = (id: string) => { try { localStorage.setItem(`tanda.mission.${id}`, "1"); } catch { /* ignore */ } };
 import type { Save } from "../../shared/save";
@@ -70,7 +87,14 @@ export class Guide {
     this.help.hidden = true;
     this.help.innerHTML = `<div class="panel-card"><button class="x" data-close>✕</button><h2>How to play</h2>
       <p class="lede">You farm a field in Ukhali Tanda. Grow crops, sell them, and use the money for bulls, a cart and more land.</p>
-      <div class="help-grid">
+      <div class="help-grid">${TOUCH_UI ? `
+        <div><b>Move</b><span>Left thumb on the circle to walk (push to the edge to run). Drag the right side of the screen to look.</span></div>
+        <div><b>Use</b><span>Look at the soil and tap <b>Use</b>: plough, sow, water, fill the can. Pick tools and seeds on the bar below.</span></div>
+        <div><b>Harvest</b><span>Look at a ripe crop and tap <b>Harvest</b>.</span></div>
+        <div><b>Talk &amp; trade</b><span>Tap <b>Talk</b> near a stall or person.</span></div>
+        <div><b>Bulls &amp; cart</b><span><b>Feed</b> near your bulls · <b>Cart</b> by your cart to ride to the mandi.</span></div>
+        <div><b>Other</b><span><b>Map</b> · <b>View</b> (first/third person) · <b>Torch</b> at night · 🏆 leaderboard</span></div>
+      </div><div hidden>` : ""}
         <div><b>Move</b><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump · mouse look</span></div>
         <div><b>Pick a tool</b><span><kbd>1</kbd> hand · <kbd>2</kbd> hoe · <kbd>3</kbd> watering can · <kbd>4</kbd><kbd>5</kbd><kbd>6</kbd> seeds (or mouse wheel)</span></div>
         <div><b>Use it</b><span><b>Right-click</b> the soil: plough, sow, water · <b>Left-click</b> a ripe crop: harvest</span></div>
@@ -119,7 +143,7 @@ export class Guide {
       <ol class="steps"><li><b>Grow</b>: plough the soil, sow seeds, water them from the well.</li>
       <li><b>Sell</b>: take the harvest to Ganpat Seth in the square, or by bullock cart to the town mandi for more.</li>
       <li><b>Grow bigger</b>: buy bulls, a cart and more land, and rise from small farmer to <b>Bada Kisan</b>.</li></ol>
-      <p class="hint">The <b>goal card</b> (top left) and the <b>golden marker</b> show you what to do next. Press <kbd>H</kbd> any time for the controls.</p>
+      <p class="hint">${forDevice("The <b>goal card</b> (top left) and the <b>golden marker</b> show you what to do next. Press <kbd>H</kbd> any time for the controls.")}</p>
       <div class="big-acts"><button data-go>Let's farm</button></div></div>`;
     this.welcome.querySelector("[data-go]")!.addEventListener("click", () => {
       try {
@@ -218,7 +242,7 @@ export class Guide {
       const deadline = left !== null ? `<div class="goal-deadline">⏳ ${left >= 1 ? `${Math.floor(left)} day${Math.floor(left) === 1 ? "" : "s"} ${Math.round((left % 1) * 24)} h` : `${Math.round(left * 24)} hours`} left</div>` : "";
       const missed = save.missions.flags.missed && m.deadlineDays ? `<div class="goal-missed">You missed the last deadline — here's another chance.</div>` : "";
       html = `<div class="goal-head">Mission ${save.missions.i + 1} of ${MISSIONS.length} · ${m.who}</div><b>${m.title} <small>${m.local}</small></b>${deadline}${missed}
-        <ul class="objectives">${ps.map((o) => `<li class="${o.got >= o.need ? "done" : o === next ? "now" : ""}"><i>${o.got >= o.need ? "✓" : ""}</i>${o.text}${o.need > 1 ? ` <em>${o.got}/${o.need}</em>` : ""}</li>`).join("")}</ul>
+        <ul class="objectives">${ps.map((o) => `<li class="${o.got >= o.need ? "done" : o === next ? "now" : ""}"><i>${o.got >= o.need ? "✓" : ""}</i>${forDevice(o.text)}${o.need > 1 ? ` <em>${o.got}/${o.need}</em>` : ""}</li>`).join("")}</ul>
         <small>Reward: ${m.reward.text} · <kbd>H</kbd> controls</small>`;
       this.target = next ? whereFor(m.id, next.id, c, save) : null;
     }

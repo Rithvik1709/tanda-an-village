@@ -4,6 +4,10 @@ import type { Controls } from "./controls";
  * Phone and tablet controls (landscape): a joystick on the left to walk, drag anywhere on the right
  * to look, and thumb buttons for the actions a mouse and keyboard would do.
  */
+/** Is the game turned sideways (phone upright)? Screen deltas then map to game axes: x = dy, y = −dx. */
+const turned = () => document.documentElement.classList.contains("rotated");
+const toGame = (dx: number, dy: number) => (turned() ? { x: dy, y: -dx } : { x: dx, y: dy });
+
 export const isTouch = () => matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1;
 
 export class TouchControls {
@@ -62,7 +66,8 @@ export class TouchControls {
       for (const t of Array.from(e.changedTouches)) {
         if (t.identifier === this.stickId) this.onStick(t.clientX, t.clientY);
         if (t.identifier === this.lookId) {
-          this.c.look((t.clientX - this.last.x) * 1.7, (t.clientY - this.last.y) * 1.7);
+          const d = toGame(t.clientX - this.last.x, t.clientY - this.last.y);
+          this.c.look(d.x * 1.7, d.y * 1.7);
           this.last = { x: t.clientX, y: t.clientY };
         }
       }
@@ -100,7 +105,8 @@ export class TouchControls {
 
   private onStick(x: number, y: number) {
     const R = 52;
-    let dx = x - this.stickOrigin.x, dy = y - this.stickOrigin.y;
+    const g = toGame(x - this.stickOrigin.x, y - this.stickOrigin.y);
+    let dx = g.x, dy = g.y;
     const d = Math.hypot(dx, dy);
     if (d > R) {
       dx *= R / d;
