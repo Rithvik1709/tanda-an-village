@@ -1,0 +1,4 @@
+:root { color-scheme: light; --ink: #2a2530; --cream: #f4ecd8; --accent: #10717c; --warm: #e0703a; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #bcd4de; font-family: ui-sans-serif, system-ui, sans-serif; }
+#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+#ui { position: fixed; inset: 0; pointer-events: none; }
