@@ -45,7 +45,8 @@ export type Structure =
   | { kind: "hanuman"; x0: number; z0: number; y: number } // a small open shrine, facing west
   | { kind: "school"; x0: number; z0: number; w: number; d: number; y: number } // the ZP school, verandah facing west
   | { kind: "pir"; x: number; z: number; y: number } // the pir: a roof on four posts, open on all sides
-  | { kind: "tank"; x: number; z: number; y: number } // the village's overhead water tank, on the tekdi top
+  | { kind: "tank"; x: number; z: number; y: number }
+  | { kind: "statue"; x: number; z: number; y: number; facing: number } // Vasantrao Naik, in bronze, in the chowk // the village's overhead water tank, on the tekdi top
   | { kind: "plate"; x: number; z: number; y: number; facing: number; lines: string[]; color?: string };
 /** A tree: where it stands, how tall, how wide, and the trunk/root columns it occupies in the voxels. */
 export type Tree = { kind: "neem" | "banyan"; x: number; y: number; z: number; h: number; r: number; trunks: [number, number, number, number][] };
@@ -412,6 +413,15 @@ export function generateWorld(seed = WORLD_SEED): World {
   // the chowk: Ganpat's and Sitabai's stalls on its north side, the Naik's kacheri to the west
   const trader = stall(98, 109, 5, 4, B.SAFFRON);
   const seedShop = stall(106, 109, 5, 4, B.BLUE_WOOD);
+  // in front of Sitabai's, a small statue of Vasantrao Naik — the Banjara farmer's son who became
+  // Maharashtra's longest-serving Chief Minister and the father of its Green Revolution
+  {
+    const x = seedShop.x + 2, z = seedShop.z + 2;
+    const y = height[col(x, z)];
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) set(x + dx, y + 1, z + dz, B.COBBLE); // the pedestal, solid
+    set(x, y + 2, z, B.COBBLE);
+    structures.push({ kind: "statue", x, z, y: y + 1, facing: 0 }); // facing the chowk
+  }
   const landOffice = house(89, 111, 6, 5, B.WHITEWASH, B.ROOF_TILE, "E");
   const bank = house(114, 125, 7, 6, B.BRICK, B.ROOF_TILE, "W");
   plate(trader.x, trader.z - 1.2, trader.y, 0, ["गणपत शेठ · व्यापारी", "Ganpat Seth, Trader"]);

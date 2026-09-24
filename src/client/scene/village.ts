@@ -107,6 +107,7 @@ export class Village {
       else if (s.kind === "school") this.school(s, M);
       else if (s.kind === "pir") this.pir(s, M);
       else if (s.kind === "tank") this.tank(s, M);
+      else if (s.kind === "statue") this.statue(s, M);
       else if (s.kind === "plate") this.plate(s);
     }
     for (const p of plots) this.fence(p, M, groundAt);
@@ -388,6 +389,72 @@ export class Village {
     this.group.add(f);
     this.flagCloth.push(f);
     this.lamps.push(new THREE.Vector3(cx, y + 2.5, cz));
+  }
+
+  /** Vasantrao Naik in bronze on a stone pedestal, with his name plaque and a marigold garland. */
+  private statue(s: Extract<Structure, { kind: "statue" }>, M: Record<string, () => THREE.Material>) {
+    const cx = s.x + 0.5, cz = s.z + 0.5, y = s.y - 1;
+    const bronze = () => new THREE.MeshStandardMaterial({ color: "#7a5a32", metalness: 0.75, roughness: 0.38 });
+    const pedestal = () => new THREE.MeshStandardMaterial({ color: "#d9d2c2", roughness: 0.6 });
+    this.box("ped", pedestal, 2.4, 0.4, 2.4, cx, y + 0.2, cz);
+    this.box("ped", pedestal, 1.6, 1.4, 1.6, cx, y + 1.1, cz);
+    this.box("ped", pedestal, 1.8, 0.14, 1.8, cx, y + 1.86, cz);
+    // the figure: a man in dhoti, kurta and a sleeveless jacket, spectacles, one hand raised in greeting
+    const at = (x: number, yy: number, z: number) => new THREE.Matrix4().makeTranslation(cx + x, y + 1.93 + yy, cz + z);
+    const B = (g: THREE.BufferGeometry, x: number, yy: number, z: number) => this.put("bronze", bronze, g, at(x, yy, z));
+    B(new THREE.CylinderGeometry(0.19, 0.25, 0.85, 18), 0, 0.43, 0); // dhoti
+    B(new THREE.CylinderGeometry(0.19, 0.2, 0.62, 18), 0, 1.1, 0); // kurta
+    // the sleeveless jacket: a thin shell over the chest, open at the front
+    B(new THREE.CylinderGeometry(0.212, 0.222, 0.5, 18, 1, true, Math.PI * 0.62, Math.PI * 1.76), 0, 1.16, 0);
+    for (let i = 0; i < 3; i++) B(new THREE.SphereGeometry(0.014, 6, 4), 0.05, 1.3 - i * 0.1, 0.2); // buttons
+    B(new THREE.CylinderGeometry(0.075, 0.09, 0.08, 12), 0, 1.44, 0); // collar
+    B(new THREE.CylinderGeometry(0.058, 0.066, 0.08, 10), 0, 1.5, 0); // neck
+    B(new THREE.SphereGeometry(0.12, 18, 14).scale(0.9, 1.1, 0.98), 0, 1.64, 0); // head
+    B(new THREE.SphereGeometry(0.125, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.45).scale(0.92, 0.9, 1.02), 0, 1.66, -0.01); // hair, combed back
+    B(new THREE.SphereGeometry(0.028, 8, 6).scale(0.8, 1, 1.2), 0, 1.62, 0.12); // nose
+    for (const sx of [-1, 1]) {
+      B(new THREE.SphereGeometry(0.026, 8, 6), sx * 0.112, 1.64, 0); // ears
+      B(new THREE.TorusGeometry(0.032, 0.007, 6, 14), sx * 0.043, 1.665, 0.112); // spectacles
+    }
+    B(new THREE.BoxGeometry(0.03, 0.007, 0.01), 0, 1.668, 0.115); // their bridge
+    B(new THREE.CapsuleGeometry(0.055, 0.42, 4, 8).rotateZ(0.1), -0.27, 1.06, 0); // left arm at his side
+    B(new THREE.CapsuleGeometry(0.055, 0.26, 4, 8).rotateZ(-0.5), 0.3, 1.26, 0.03); // right arm, raised in greeting
+    B(new THREE.CapsuleGeometry(0.05, 0.24, 4, 8).rotateZ(0.15), 0.41, 1.52, 0.06);
+    B(new THREE.SphereGeometry(0.055, 8, 6).scale(0.7, 1.2, 0.5), 0.43, 1.7, 0.07); // the open palm
+    // a fresh marigold garland round his neck (people garland him on Krushi Din, 1 July)
+    for (let i = 0; i < 22; i++) {
+      const t = i / 21, a = Math.PI * (1.05 + t * 0.9);
+      this.put("marigold", M.marigold, new THREE.SphereGeometry(0.036, 6, 5), at(Math.cos(a) * -0.19, 1.42 - Math.sin(t * Math.PI) * 0.26, -Math.sin(a) * 0.14 + 0.06));
+    }
+    // the plaque on the pedestal, facing the chowk
+    const c = document.createElement("canvas");
+    c.width = 512;
+    c.height = 320;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "#2c2418";
+    g.fillRect(0, 0, 512, 320);
+    g.strokeStyle = "#c9a040";
+    g.lineWidth = 8;
+    g.strokeRect(10, 10, 492, 300);
+    g.textAlign = "center";
+    g.fillStyle = "#e8c874";
+    g.font = "800 46px 'Noto Sans Devanagari', 'Kohinoor Devanagari', system-ui";
+    g.fillText("वसंतराव नाईक", 256, 82);
+    g.font = "600 30px 'Noto Sans Devanagari', system-ui";
+    g.fillText("हरितक्रांतीचे प्रणेते", 256, 132);
+    g.font = "700 30px system-ui";
+    g.fillText("Vasantrao Naik", 256, 196);
+    g.font = "500 22px system-ui";
+    g.fillText("1913 – 1979 · Chief Minister of Maharashtra", 256, 238);
+    g.fillText("1963 – 1975 · Father of the Green Revolution", 256, 272);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const plaque = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.81), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0.2 }));
+    const f = s.facing;
+    plaque.position.set(cx + Math.sin(f) * 0.81, y + 1.1, cz + Math.cos(f) * 0.81);
+    plaque.rotation.y = f;
+    this.group.add(plaque);
   }
 
   /** The overhead water tank: a concrete bowl on eight columns with a ladder, "Ukhali Tanda" painted round it. */

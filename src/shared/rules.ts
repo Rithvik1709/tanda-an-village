@@ -672,6 +672,7 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       if (p.progress < 1) return fail(`Not ripe yet — ${Math.floor(p.progress * 100)}% grown.`);
       const n = yieldOf(p, cell.q) + (inv.sickle ? 1 : 0);
       bump(save, `harvest:${p.crop}`);
+      bump(save, `harvestN:${p.crop}`, n);
       if (carried(save) + n > CARRY) return fail(`Your sacks are full (${CARRY}) — sell, load the cart, or store it in the godown.`);
       give(p.crop, n);
       cell.q = Math.max(0.45, cell.q - 0.04);

@@ -13,6 +13,7 @@ export type MissionState = {
   i: number; // current mission index (MISSIONS.length when the story is done)
   startedAt: number;
   base: Record<string, number>; // counters when this mission began
+  prevBase?: Record<string, number>; // counters when the PREVIOUS mission began — work done then counts too
   c: Record<string, number>; // lifetime event counters
   flags: Record<string, boolean>;
   choice?: string; // the choice made in the current mission, if it has one
@@ -35,7 +36,11 @@ export type Mission = {
   choices?: { id: string; label: string; effect: string }[];
 };
 
-export const since = (s: Save, key: string) => (s.missions.c[key] ?? 0) - (s.missions.base[key] ?? 0);
+/**
+ * Progress on a counter for the current mission. Anything done since the previous mission began
+ * counts, so a player who got ahead (harvested onions while still on mission 1) isn't made to redo it.
+ */
+export const since = (s: Save, key: string) => (s.missions.c[key] ?? 0) - ((s.missions.prevBase ?? {})[key] ?? 0);
 const starter = (w: World) => w.plots.find((p) => p.starter)!;
 const cellsIn = (s: Save, w: World, plotId: number) => {
   const p = w.plots[plotId];
@@ -63,7 +68,7 @@ export const MISSIONS: Mission[] = [
     story: "Onions, eh? Grow them and bring them to me. But a clever farmer checks the prices first — they change every day, and I don't always pay the best.",
     done: "Not bad for a city kid! Here — my old sickle. It'll bring in more from every plant.",
     objectives: [
-      { id: "harvest", text: "Harvest 6 onions", need: 6, have: (s) => since(s, "harvest:onion") },
+      { id: "harvest", text: "Harvest 6 onions", need: 6, have: (s) => Math.max(since(s, "harvestN:onion"), since(s, "harvest:onion")) }, // (older saves only counted harvests, not onions)
       { id: "prices", text: "Check today's prices at Ganpat's stall (Prices tab)", need: 1, have: (s) => since(s, "visit:prices") },
       { id: "sell", text: "Sell 6 onions", need: 6, have: (s) => since(s, "sell:onion") },
     ],
@@ -182,6 +187,8 @@ export const bump = (s: Save, key: string, n = 1) => (s.missions.c[key] = (s.mis
 
 /** Start the next mission: fresh baseline. */
 export function begin(s: Save, i: number, now: number) {
+  // restarting the same mission (a missed deadline) keeps the counting window; moving on shifts it
+  if (s.missions.i !== i) s.missions.prevBase = { ...s.missions.base };
   s.missions.i = i;
   s.missions.startedAt = now;
   s.missions.base = { ...s.missions.c };

@@ -294,13 +294,13 @@ const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: N
   {
     kind: "trader",
     at: { ...world.landmarks.trader, x: world.landmarks.trader.x + 0.5, z: world.landmarks.trader.z - 0.5 },
-    npc: new Npc({ kurta: "#f1ead8", dhoti: "#e8e0cc", hat: "#f6f2e8" }, 102.5, world.landmarks.trader.y, 86.3, 0),
+    npc: new Npc({ kurta: "#f1ead8", dhoti: "#e8e0cc", hat: "#f6f2e8" }, world.landmarks.trader.x - 0.5, world.landmarks.trader.y, world.landmarks.trader.z - 2.6, 0),
     label: "Sell to Ganpat Seth, the trader",
   },
   {
     kind: "shop",
     at: { ...world.landmarks.seedShop, x: world.landmarks.seedShop.x + 0.5, z: world.landmarks.seedShop.z - 0.5 },
-    npc: new Npc({ kurta: "", dhoti: "#a8262c", hat: "#d04a2a", woman: true }, 102.5, world.landmarks.seedShop.y, 102.3, 0),
+    npc: new Npc({ kurta: "", dhoti: "#a8262c", hat: "#d04a2a", woman: true }, world.landmarks.seedShop.x - 0.5, world.landmarks.seedShop.y, world.landmarks.seedShop.z - 2.6, 0),
     label: "Buy seeds & tools from Sitabai",
   },
   {
