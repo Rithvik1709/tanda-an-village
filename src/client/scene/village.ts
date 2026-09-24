@@ -416,26 +416,46 @@ export class Village {
     g.fillRect(0, 0, 2048, 26);
     g.fillRect(0, 230, 2048, 26);
     g.textAlign = "center";
-    // the name four times round, so it reads from every side of the village
+    // the name four times round, so it reads from every side of the village — each fitted to its panel
     for (let i = 0; i < 4; i++) {
       const en = i % 2 === 1;
+      const text = en ? "UKHALI TANDA" : "उखळी तांडा";
+      let size = en ? 70 : 84;
+      const face = (px: number) => (en ? `800 ${px}px system-ui` : `800 ${px}px 'Noto Sans Devanagari', 'Kohinoor Devanagari', system-ui`);
+      g.font = face(size);
+      while (g.measureText(text).width > 400 && size > 30) g.font = face(--size);
       g.fillStyle = en ? "#1d4ed8" : "#b91c1c";
-      g.font = en ? "800 84px system-ui" : "800 96px 'Noto Sans Devanagari', 'Kohinoor Devanagari', system-ui";
-      g.fillText(en ? "UKHALI TANDA" : "उखळी तांडा", 256 + i * 512, 162);
+      g.fillText(text, 256 + i * 512, 150);
+      g.fillStyle = "#1d4ed8"; // a small dot between the names
+      g.beginPath();
+      g.arc(512 * (i + 1) % 2048, 128, 9, 0, Math.PI * 2);
+      g.fill();
     }
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
-    const drum = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, 2.8, 32, 1, true), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
-    drum.position.set(cx, y + H + 3, cz);
+    const lidMat = new THREE.MeshStandardMaterial({ color: "#d9d4c7", roughness: 0.9 });
+    const top = y + H + 1.6, dh = 2.8;
+    // a closed drum: painted side, solid concrete top and bottom
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, dh, 48, 1, false), [new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }), lidMat, lidMat]);
+    drum.position.set(cx, top + dh / 2, cz);
     drum.castShadow = true;
     this.group.add(drum);
-    this.put("tankC", concrete, new THREE.SphereGeometry(3.45, 24, 8, 0, Math.PI * 2, 0, Math.PI / 5).scale(1, 0.6, 1), new THREE.Matrix4().makeTranslation(cx, y + H + 3.4, cz));
-    // the ladder up one column, and a railing round the top
-    for (let k = 0; k < H + 1; k += 0.5) this.box("dark", M.dark, 0.5, 0.04, 0.04, cx + 2.8, y + k, cz);
-    for (const dz of [-0.25, 0.25]) this.box("dark", M.dark, 0.04, H + 1.5, 0.04, cx + 2.8, y + (H + 1.5) / 2, cz + dz);
-    const rail = new THREE.TorusGeometry(3.45, 0.04, 4, 32).rotateX(Math.PI / 2);
-    this.put("dark", M.dark, rail, new THREE.Matrix4().makeTranslation(cx, y + H + 4.9, cz));
+    // a shallow domed roof sitting on the rim, with a small inspection hatch and vent
+    const dome = new THREE.SphereGeometry(3.6, 32, 10, 0, Math.PI * 2, 0, Math.PI / 6);
+    dome.translate(0, -3.6 * Math.cos(Math.PI / 6), 0);
+    this.put("tankC", concrete, dome, new THREE.Matrix4().makeTranslation(cx, top + dh + 0.02, cz));
+    this.box("tankC", concrete, 0.7, 0.3, 0.7, cx + 1.2, top + dh + 0.4, cz);
+    this.put("dark", M.dark, new THREE.CylinderGeometry(0.08, 0.08, 0.6, 8), new THREE.Matrix4().makeTranslation(cx - 0.6, top + dh + 0.7, cz + 0.4));
+    // the ladder up one column, and a railing on posts round the rim
+    for (let k = 0; k < H + 1.6; k += 0.5) this.box("dark", M.dark, 0.5, 0.04, 0.04, cx + 2.8, y + k, cz);
+    for (const dz of [-0.25, 0.25]) this.box("dark", M.dark, 0.04, H + 1.6, 0.04, cx + 2.8, y + (H + 1.6) / 2, cz + dz);
+    const rail = new THREE.TorusGeometry(3.3, 0.035, 4, 48).rotateX(Math.PI / 2);
+    this.put("dark", M.dark, rail, new THREE.Matrix4().makeTranslation(cx, top + dh + 0.75, cz));
+    for (let i = 0; i < 16; i++) {
+      const ang = (i / 16) * Math.PI * 2;
+      this.box("dark", M.dark, 0.04, 0.75, 0.04, cx + Math.cos(ang) * 3.3, top + dh + 0.38, cz + Math.sin(ang) * 3.3);
+    }
     this.lamps.push(new THREE.Vector3(cx, y + H + 5.5, cz));
   }
 
