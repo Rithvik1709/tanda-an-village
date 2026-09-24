@@ -16,6 +16,9 @@ import { type Body, type Box, boxHits, type Hit, MOVE, PLAYER, raycast, step } f
 import { Hud } from "./ui/hud";
 import { Npc } from "./engine/npc";
 import { type PanelKind, Panels } from "./ui/panels";
+import { MapView } from "./ui/map";
+import { Signs } from "./engine/signs";
+import { askingPrice, forSale } from "../shared/land";
 
 type Hooks = {
   ready: boolean;
@@ -90,18 +93,25 @@ outline.visible = false;
 scene.add(outline);
 
 // ---- the village people you trade with ----
+const lo = world.landmarks.landOffice; // its door, on the house's east wall
 const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: Npc; label: string }[] = [
   {
     kind: "trader",
-    at: world.landmarks.trader,
+    at: { ...world.landmarks.trader, x: world.landmarks.trader.x + 0.5, z: world.landmarks.trader.z - 0.5 },
     npc: new Npc({ kurta: "#f1ead8", dhoti: "#e8e0cc", hat: "#f6f2e8" }, 102.5, world.landmarks.trader.y, 86.3, 0),
     label: "Sell to Ganpat Seth, the trader",
   },
   {
     kind: "shop",
-    at: world.landmarks.seedShop,
+    at: { ...world.landmarks.seedShop, x: world.landmarks.seedShop.x + 0.5, z: world.landmarks.seedShop.z - 0.5 },
     npc: new Npc({ kurta: "#4f7fae", dhoti: "#e8e0cc", hat: "#e8892c", hatTall: true }, 102.5, world.landmarks.seedShop.y, 102.3, 0),
     label: "Buy seeds & tools from Sakharam",
+  },
+  {
+    kind: "land",
+    at: { x: lo.x + 3, y: lo.y, z: lo.z + 0.5 },
+    npc: new Npc({ kurta: "#f4f0e4", dhoti: "#3a3a44", hat: "#f6f2e8", skin: "#9a6440" }, lo.x + 1.6, lo.y, lo.z + 0.5, Math.PI / 2),
+    label: "Buy & sell land at the Talathi's office",
   },
 ];
 for (const s of STALLS) scene.add(s.npc.group);
@@ -114,12 +124,49 @@ const panels = new Panels(document.getElementById("ui")!, {
     return r;
   },
   toast: (m, k) => hud.toast(m, k),
+  world,
+  showMap: () => showMap(),
 });
 panels.onClose = () => hud.setPlaying(false);
 
+// ---- the map (M) and the for-sale boards at plot gates ----
+const map = new MapView(document.getElementById("ui")!, world);
+map.onClose = () => hud.setPlaying(!!panels.open);
+function showMap() {
+  map.show(game.save, clock(game.now()).day, { x: body.pos.x, z: body.pos.z, yaw: controls.yaw });
+  hud.setPlaying(true);
+  document.exitPointerLock?.();
+}
+const signs = new Signs();
+scene.add(signs.group);
+function refreshSigns() {
+  const day = clock(game.now()).day;
+  const want = new Map<number, { lines: string[]; color: string }>();
+  for (const p of world.plots) {
+    const listing = game.save.listings[p.id];
+    if (listing) want.set(p.id, { lines: ["Listed · विक्री", p.name, `₹${listing.price.toLocaleString("en-IN")}`], color: "#2c5fa0" });
+    else if (!game.save.plots.includes(p.id) && forSale(p, day)) want.set(p.id, { lines: ["FOR SALE · विक्री", p.name, `₹${askingPrice(p, day).toLocaleString("en-IN")}`], color: "#b0452a" });
+  }
+  signs.set(world.plots, want);
+}
+
+/** A small toast when you walk onto a different plot. */
+let lastPlot = -2;
+function checkPlotEntry() {
+  const id = world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)] ?? -1;
+  if (id === lastPlot) return;
+  const first = lastPlot === -2;
+  lastPlot = id;
+  if (id < 0 || first) return;
+  const p = world.plots[id];
+  const day = clock(game.now()).day;
+  const mine = game.save.plots.includes(id);
+  hud.toast(mine ? `${p.name} · your land` : forSale(p, day) ? `${p.name} · for sale, ₹${askingPrice(p, day).toLocaleString("en-IN")}` : `${p.name} · a neighbour's field`);
+}
+
 /** The stall the player is standing at, if any (within a few steps of its counter). */
 function nearStall() {
-  return STALLS.find((s) => Math.hypot(body.pos.x - (s.at.x + 0.5), body.pos.z - (s.at.z - 0.5)) < 3.4 && Math.abs(body.pos.y - s.at.y) < 2);
+  return STALLS.find((s) => Math.hypot(body.pos.x - s.at.x, body.pos.z - s.at.z) < 3.4 && Math.abs(body.pos.y - s.at.y) < 2);
 }
 function openStall(kind: PanelKind, tab?: string) {
   panels.show(kind, tab);
@@ -237,11 +284,16 @@ controls.onScroll = (d) => {
 };
 controls.onToggleDebug = () => hud.toggleDebug();
 controls.onInteract = () => {
+  if (map.open) return map.close();
   if (panels.open) return panels.close();
   const s = nearStall();
   if (s) openStall(s.kind);
 };
-controls.onEscape = () => panels.close();
+controls.onEscape = () => {
+  panels.close();
+  map.close();
+};
+controls.onMap = () => (map.open ? map.close() : showMap());
 // the pause panel sits over the canvas: a click on it (outside the account box) also starts play
 document.querySelector(".play-prompt")!.addEventListener("click", (e) => {
   if (!(e.target as HTMLElement).closest(".account")) canvas.requestPointerLock?.();
@@ -251,7 +303,8 @@ controls.onLockChange = (locked) => {
     mode = "play";
     panels.close();
   }
-  hud.setPlaying(locked || !!panels.open);
+  if (locked) map.close();
+  hud.setPlaying(locked || !!panels.open || map.open);
 };
 
 // the land beyond the map: a wide fogged plain with an exact square hole where the world is,
@@ -313,6 +366,8 @@ renderer.setAnimationLoop(() => {
     game.tick();
     refreshStatus();
     hud.setTip(mode === "play" ? tipFor(target) : "");
+    refreshSigns();
+    if (mode === "play") checkPlotEntry();
     const st = mode === "play" && !panels.open ? nearStall() : undefined;
     hud.setHint(st ? `<kbd>E</kbd> ${st.label}` : "");
   }
@@ -447,11 +502,19 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
             await worldRenderer.flush();
             return game.skew;
           },
+          grant: async (money: number) => {
+            await net.skip(0, money);
+            refreshStatus();
+          },
         }
       : {}),
     toggleDebug: () => hud.toggleDebug(),
     openStall: (kind: PanelKind, tab?: string) => openStall(kind, tab),
     closePanel: () => panels.close(),
+    showMap: () => showMap(),
+    closeMap: () => map.close(),
+    land: () => ({ owned: [...game.save.plots], listings: structuredClone(game.save.listings) }),
+    act: (a: import("../shared/rules").Action) => game.act(a),
     nearStall: () => nearStall()?.kind ?? null,
     money: () => game.save.money,
     ledger: () => game.save.ledger,

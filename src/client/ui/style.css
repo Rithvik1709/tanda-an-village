@@ -85,3 +85,23 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .panel-foot { margin-top: 10px; font-size: 11px; opacity: 0.5; text-align: center; }
 .panel-card tr.section td { padding-top: 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; border-top: 0; }
 .dot { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18); }
+.bar { display: inline-block; width: 46px; height: 6px; border-radius: 3px; background: #e6dcc4; overflow: hidden; vertical-align: middle; }
+.bar i { display: block; height: 100%; background: #10717c; }
+.listed { color: #2c5fa0; }
+.panel-card button.link { border: 0; background: none; color: #10717c; font: 600 13px system-ui; cursor: pointer; text-decoration: underline; padding: 0; }
+.plot-card { padding: 10px 12px; margin-bottom: 10px; border-radius: 10px; background: #fbf6ea; border: 1px solid #eadfc4; font-size: 14px; }
+.plot-card .plot-head { display: flex; justify-content: space-between; margin-bottom: 2px; }
+.plot-card small { opacity: 0.6; }
+.plot-card .acts { margin-top: 8px; display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+.plot-card input { width: 110px; font: 600 14px system-ui; padding: 5px 8px; border-radius: 7px; border: 1px solid #d9c49a; background: #fff; }
+.plot-card button { font: 600 13px system-ui; padding: 6px 12px; border-radius: 7px; border: 0; background: #10717c; color: #fff; cursor: pointer; }
+.plot-card button.ghost { background: none; color: #b0452a; }
+.offer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding: 7px 10px; border-radius: 8px; background: #d9ecc8; }
+.mapview { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: auto; background: rgba(20,14,10,0.35); }
+.map-card { position: relative; padding: 14px 18px; border-radius: 14px; background: #f6eedb; color: #2a2530; border: 3px solid #d9c49a; box-shadow: 0 20px 60px rgba(0,0,0,0.35); max-height: calc(100vh - 40px); overflow: auto; }
+.map-card h2 { margin: 0 0 8px; font-size: 20px; }
+.map-card h2 small { font-size: 12px; font-weight: 500; opacity: 0.6; margin-left: 6px; }
+.map-card canvas { display: block; width: min(576px, calc(100vh - 150px), calc(100vw - 70px)); height: auto; border-radius: 8px; image-rendering: pixelated; }
+.map-card .x { position: absolute; right: 12px; top: 10px; border: 0; background: none; font-size: 18px; cursor: pointer; opacity: 0.6; }
+.map-legend { display: flex; gap: 14px; margin-top: 8px; font-size: 12px; font-weight: 600; flex-wrap: wrap; }
+.map-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; border: 1px solid rgba(0,0,0,0.3); }

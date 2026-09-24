@@ -26,6 +26,7 @@ export type Plot = {
   water: number; // 0..1 water access (river / well distance)
   road: number; // 0..1 road access
   starter?: boolean;
+  gate?: { x: number; z: number; side: "N" | "S" | "E" | "W" }; // the fence opening, facing the road
 };
 
 export type Landmark = { x: number; y: number; z: number; label: string };
@@ -207,6 +208,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       (gateSide === "S" && z === p.z1 && Math.abs(x - midX) <= 1) ||
       (gateSide === "W" && x === p.x0 && Math.abs(z - midZ) <= 1) ||
       (gateSide === "E" && x === p.x1 && Math.abs(z - midZ) <= 1);
+    p.gate = { x: gateSide === "W" ? p.x0 : gateSide === "E" ? p.x1 : midX, z: gateSide === "N" ? p.z0 : gateSide === "S" ? p.z1 : midZ, side: gateSide };
     for (let x = p.x0; x <= p.x1; x++)
       for (const z of [p.z0, p.z1]) {
         set(x, p.y, z, B.GRASS);

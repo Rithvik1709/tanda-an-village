@@ -17,6 +17,7 @@ export class Controls {
   onToggleDebug: () => void = () => {};
   onInteract: () => void = () => {};
   onEscape: () => void = () => {};
+  onMap: () => void = () => {};
   onLockChange: (locked: boolean) => void = () => {};
 
   constructor(el: HTMLElement) {
@@ -53,6 +54,7 @@ export class Controls {
       if (/^Digit[1-9]$/.test(e.code)) this.onSelect(Number(e.code.slice(5)) - 1);
       if (e.code === "KeyE" && !e.repeat) this.onInteract();
       if (e.code === "Escape") this.onEscape();
+      if (e.code === "KeyM" && !e.repeat) this.onMap();
       if (this.locked) {
         this.held.add(e.code);
         if (e.code === "Space") e.preventDefault();

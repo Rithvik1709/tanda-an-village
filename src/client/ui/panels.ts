@@ -3,14 +3,23 @@ import { buyerPrice, LEDGER_DAYS, news, SHOP } from "../../shared/economy";
 import { block } from "../../shared/blocks";
 import type { Action, Result } from "../../shared/rules";
 import type { Save } from "../../shared/save";
+import { askingPrice, forSale, offersFor, valuePlot } from "../../shared/land";
 import { clock } from "../../shared/time";
+import type { World } from "../../shared/world";
 
 /*
  * The trader's and shopkeeper's panels. They only ever call `act` — the same actions the server
  * re-checks — and re-render from the save after each one.
  */
-export type PanelKind = "trader" | "shop";
-type Ctx = { save: () => Save; now: () => number; act: (a: Action) => Result; toast: (m: string, k?: "ok" | "bad") => void };
+export type PanelKind = "trader" | "shop" | "land";
+type Ctx = {
+  save: () => Save;
+  now: () => number;
+  act: (a: Action) => Result;
+  toast: (m: string, k?: "ok" | "bad") => void;
+  world: World;
+  showMap: () => void;
+};
 
 const CROP_COLOR: Record<CropId, string> = { jowar: "#e0b060", onion: "#e07a9a", sugarcane: "#9ccf5a" };
 const rs = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 1 })}`;
@@ -32,7 +41,7 @@ export class Panels {
 
   show(kind: PanelKind, tab?: string) {
     this.open = kind;
-    this.tab = tab ?? (kind === "trader" ? "sell" : "buy");
+    this.tab = tab ?? (kind === "trader" ? "sell" : kind === "land" ? "plots" : "buy");
     this.el.hidden = false;
     this.render();
   }
@@ -49,6 +58,7 @@ export class Panels {
     if (!t) return;
     const [what, a, b] = t.dataset.do!.split(":");
     if (what === "close") return this.close();
+    if (what === "map") return this.ctx.showMap();
     if (what === "tab") {
       this.tab = a;
       return this.render();
@@ -60,6 +70,12 @@ export class Panels {
       const n = b === "all" ? have : Math.min(Number(b), have);
       if (n < 1) return this.ctx.toast(`No ${CROPS[a as CropId].name.toLowerCase()} to sell yet.`, "bad");
       r = this.ctx.act({ t: "sell", item: a as CropId, n, where: "village" });
+    } else if (what === "buyPlot") r = this.ctx.act({ t: "buyPlot", plot: Number(a) });
+    else if (what === "delist") r = this.ctx.act({ t: "delist", plot: Number(a) });
+    else if (what === "accept") r = this.ctx.act({ t: "acceptOffer", plot: Number(a), day: Number(b) });
+    else if (what === "list") {
+      const input = this.el.querySelector(`input[data-price="${a}"]`) as HTMLInputElement | null;
+      r = this.ctx.act({ t: "listPlot", plot: Number(a), price: Math.round(Number(input?.value.replace(/[^0-9]/g, "")) || 0) });
     } else if (what === "buy") r = this.ctx.act({ t: "buy", item: t.dataset.item!, n: Number(t.dataset.n ?? 1) });
     if (r) this.ctx.toast(r.ok ? (r.msg ?? "Done") : r.error, r.ok ? "ok" : "bad");
     this.render();
@@ -70,12 +86,16 @@ export class Panels {
     if (!this.open) return;
     const s = this.ctx.save();
     const day = clock(this.ctx.now()).day;
-    const tabs = this.open === "trader" ? [["sell", "Sell"], ["prices", "Prices"], ["ledger", "Ledger"]] : [["buy", "Buy"], ["ledger", "Ledger"]];
+    const tabs =
+      this.open === "trader" ? [["sell", "Sell"], ["prices", "Prices"], ["ledger", "Ledger"]] : this.open === "land" ? [["plots", "Plots"], ["mine", "Your land"]] : [["buy", "Buy"], ["ledger", "Ledger"]];
     const who =
       this.open === "trader"
         ? `<h2>Ganpat Seth <small>village trader · व्यापारी</small></h2><p class="lede">"I pay fair, and I pay today. For more, you'd have to cart it to the town mandi."</p>`
-        : `<h2>Sakharam's seeds &amp; tools <small>बी-बियाणे</small></h2><p class="lede">"Good seed, good harvest. Tell me what you're growing."</p>`;
-    const body = this.tab === "sell" ? this.sell(s, day) : this.tab === "prices" ? this.prices(day) : this.tab === "ledger" ? this.ledger(s, day) : this.buy(s);
+        : this.open === "land"
+          ? `<h2>Talathi's land office <small>तलाठी कार्यालय</small></h2><p class="lede">"Land is the long game, beta. Buy good soil near water, and it pays you back every season."</p>`
+          : `<h2>Sakharam's seeds &amp; tools <small>बी-बियाणे</small></h2><p class="lede">"Good seed, good harvest. Tell me what you're growing."</p>`;
+    const body =
+      this.tab === "sell" ? this.sell(s, day) : this.tab === "prices" ? this.prices(day) : this.tab === "ledger" ? this.ledger(s, day) : this.tab === "plots" ? this.plots(s, day) : this.tab === "mine" ? this.mine(s, day) : this.buy(s);
     this.el.innerHTML = `
       <div class="panel-card">
         <button class="x" data-do="close" title="Close (E)">✕</button>
@@ -148,6 +168,50 @@ export class Panels {
       <tfoot><tr><td>Last ${LEDGER_DAYS} days</td><td class="num up">+${rs(inc)}</td><td class="num down">−${rs(cost)}</td><td class="num"><b>${inc - cost >= 0 ? "+" : "−"}${rs(Math.abs(inc - cost))}</b></td></tr></tfoot></table>`;
   }
 
+  private plots(s: Save, day: number) {
+    const w = this.ctx.world;
+    const bar = (v: number) => `<span class="bar"><i style="width:${Math.round(v * 100)}%"></i></span>`;
+    const rows = w.plots
+      .map((p) => {
+        const mine = s.plots.includes(p.id);
+        const sale = !mine && forSale(p, day);
+        const price = askingPrice(p, day);
+        const status = mine ? (s.listings[p.id] ? `<b class="listed">listed ₹${s.listings[p.id].price.toLocaleString("en-IN")}</b>` : `<b class="up">yours</b>`) : sale ? rs(price) : `<span class="flat">not for sale</span>`;
+        const act = sale ? `<button data-do="buyPlot:${p.id}" ${s.money >= price ? "" : "disabled"}>Buy</button>` : "";
+        return { sort: mine ? 0 : sale ? 1 : 2, price, html: `<tr><td><b>${p.name}</b><br><small>${p.x1 - p.x0 + 1} × ${p.z1 - p.z0 + 1} · ${soilName(w, p)}</small></td>
+          <td>${bar(p.soil)}</td><td>${bar(p.water)}</td><td>${bar(p.road)}</td><td class="num">${status}</td><td class="acts">${act}</td></tr>` };
+      })
+      .sort((a, b) => a.sort - b.sort || a.price - b.price)
+      .map((r) => r.html)
+      .join("");
+    return `<p class="hint">The village puts a few plots on the market each week. Prices follow soil, water from the river or wells, and how close the road is. <button class="link" data-do="map">Open the map (M)</button></p>
+      <table class="plots"><thead><tr><th>Plot</th><th>Soil</th><th>Water</th><th>Road</th><th class="num">Price</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  private mine(s: Save, day: number) {
+    const w = this.ctx.world;
+    const now = this.ctx.now();
+    return s.plots
+      .map((id) => {
+        const p = w.plots[id];
+        const v = valuePlot(w, s, p, now, day);
+        const listing = s.listings[id];
+        const parts = `land ${rs(v.land)} · tilled ${rs(v.tilled)} · buildings ${rs(v.buildings)} · standing crops ${rs(v.crops)}`;
+        let action: string;
+        if (listing) {
+          const offers = offersFor(p, listing, day, v.total);
+          const list = offers.length
+            ? offers.map((o) => `<div class="offer"><span><b>${o.buyer}</b> offers <b>${rs(o.amount)}</b> <small>(${o.expires - day <= 0 ? "last day" : `${o.expires - day} more day${o.expires - day > 1 ? "s" : ""}`})</small></span><button data-do="accept:${id}:${o.day}">Accept</button></div>`).join("")
+            : `<p class="hint">Listed at ${rs(listing.price)}. No offers yet — buyers come by over the next game days. A price near the value brings them faster.</p>`;
+          action = `${list}<div class="acts"><button class="ghost" data-do="delist:${id}">Take it off the market</button></div>`;
+        } else {
+          action = `<div class="acts list-row">Ask <span class="rupee">₹</span><input data-price="${id}" value="${Math.round((v.total * 1.05) / 100) * 100}" inputmode="numeric"><button data-do="list:${id}">List for sale</button></div>`;
+        }
+        return `<div class="plot-card"><div class="plot-head"><b>${p.name}</b><span>worth about <b>${rs(v.total)}</b></span></div><small>${parts}</small>${action}</div>`;
+      })
+      .join("");
+  }
+
   private buy(s: Save) {
     const section = (i: { id: string }) => (i.id.startsWith("seed:") ? "Seeds" : i.id.startsWith("block:") ? "Building" : "Tools");
     let last = "";
@@ -163,6 +227,11 @@ export class Panels {
     }).join("");
     return `<table><thead><tr><th>Item</th><th class="num">You have</th><th class="num">Price</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   }
+}
+
+function soilName(w: World, p: { x0: number; z0: number; y: number }) {
+  const id = w.voxels[p.x0 + 3 + 192 * (p.z0 + 3 + 192 * p.y)];
+  return id === 24 ? "red soil" : "black soil";
 }
 
 const BLOCK_COLORS: Record<string, string> = { Planks: "#b58a58", Brick: "#b5563a", Whitewash: "#ece4d4", Thatch: "#c9a45c", Cobblestone: "#9a958c", Fence: "#7a5c3c", "Roof tiles": "#b8553a", "Hay bale": "#d9b35a" };

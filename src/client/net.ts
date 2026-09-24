@@ -142,9 +142,9 @@ export class Net {
   }
 
   /** Dev only: fast-forward the server's clock for this save. */
-  async skip(ms: number) {
+  async skip(ms: number, money = 0) {
     await this.flush();
-    const r = await this.call<{ save: Save; serverNow: number }>("dev", { skipMs: ms });
+    const r = await this.call<{ save: Save; serverNow: number }>("dev", { skipMs: ms, money });
     if (r.status !== 200 || !this.game) throw new Error(`dev ${r.status}`);
     this.game.skew = r.data.serverNow - Date.now();
     this.game.replaceSave(r.data.save);

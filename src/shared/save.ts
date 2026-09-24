@@ -1,12 +1,13 @@
 import type { Planting } from "./crops";
 import { CAN_MAX } from "./crops";
+import type { Listing } from "./land";
 import type { World } from "./world";
 
 /*
  * The save: everything that differs from the seeded world, plus the player's money and goods.
  * Stored as JSON by the server. Keys of `edits` and `farm` are voxel indices (x + W*(z + D*y)).
  */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export type FarmCell = {
   baseQ: number; // the soil's natural quality, 0..1
@@ -28,6 +29,7 @@ export type Save = {
   farm: Record<string, FarmCell>; // voxel index of the tilled soil block
   stats: { planted: number; harvested: number; produce: number; earned: number; spent: number };
   ledger: LedgerEntry[]; // the last LEDGER_DAYS game days of buying and selling
+  listings: Record<string, Listing>; // plot id → your asking price, while it's on the market
 };
 
 export type LedgerEntry = { day: number; kind: "sell" | "buy"; item: string; n: number; amount: number; where?: string };
@@ -51,6 +53,7 @@ export function newSave(id: string, world: World, now: number): Save {
     farm: {},
     stats: { planted: 0, harvested: 0, produce: 0, earned: 0, spent: 0 },
     ledger: [],
+    listings: {},
   };
 }
 
@@ -63,6 +66,10 @@ export function migrate(s: Save): Save {
     s.stats = { ...s.stats, earned: 0, spent: 0 };
     s.ledger = [];
     s.version = 2;
+  }
+  if (s.version === 2) {
+    s.listings = {}; // v3: the land market
+    s.version = 3;
   }
   return s;
 }

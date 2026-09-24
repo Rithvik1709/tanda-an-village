@@ -1,6 +1,7 @@
 import { B, block, isCropBlock } from "./blocks";
 import { advance, CAN_MAX, CROPS, type CropId, isCrop, stageOf, WET_MS, yieldOf } from "./crops";
 import { type Buyer, buyerPrice, LEDGER_DAYS, shopItem } from "./economy";
+import { askingPrice, clearPlot, forSale, offersFor, valuePlot } from "./land";
 import { hash2 } from "./rng";
 import type { LedgerEntry, Save } from "./save";
 import { clock, DAY_MS } from "./time";
@@ -21,7 +22,11 @@ export type Action =
   | { t: "refill"; x: number; y: number; z: number }
   | { t: "harvest"; x: number; y: number; z: number }
   | { t: "sell"; item: CropId; n: number; where: Buyer }
-  | { t: "buy"; item: string; n: number };
+  | { t: "buy"; item: string; n: number }
+  | { t: "buyPlot"; plot: number }
+  | { t: "listPlot"; plot: number; price: number }
+  | { t: "delist"; plot: number }
+  | { t: "acceptOffer"; plot: number; day: number };
 
 export type Result = { ok: true; msg?: string; gained?: Record<string, number> } | { ok: false; error: string };
 
@@ -66,7 +71,58 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
-const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy"]);
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer"]);
+
+/** Buying, listing and selling land at the land office. */
+function land(world: World, save: Save, a: Extract<Action, { t: "buyPlot" | "listPlot" | "delist" | "acceptOffer" }>, now: number): Result {
+  const p = Number.isInteger(a.plot) ? world.plots[a.plot] : undefined;
+  if (!p) return fail("No such plot.");
+  const day = clock(now).day;
+  const mine = save.plots.includes(p.id);
+  const key = String(p.id);
+  switch (a.t) {
+    case "buyPlot": {
+      if (mine) return fail("You already own it.");
+      if (!forSale(p, day)) return fail(`${p.name} isn't for sale this week.`);
+      const price = askingPrice(p, day);
+      if (save.money < price) return fail(`${p.name} costs ₹${price.toLocaleString("en-IN")} — you have ₹${save.money.toLocaleString("en-IN")}.`);
+      save.money -= price;
+      save.stats.spent += price;
+      save.plots.push(p.id);
+      clearPlot(save, p); // anything left from a past owner goes with the old deed
+      record(save, { day, kind: "buy", item: `plot:${p.id}`, n: 1, amount: price });
+      return { ok: true, msg: `${p.name} is yours!` };
+    }
+    case "listPlot": {
+      if (!mine) return fail("That isn't your land.");
+      if (save.plots.length - Object.keys(save.listings).length <= 1 && !save.listings[key]) return fail("Keep at least one field to farm.");
+      const value = valuePlot(world, save, p, now, day).total;
+      if (!Number.isInteger(a.price) || a.price < 100 || a.price > value * 10) return fail("Pick a sensible price.");
+      const nonce = Math.floor(hash2(day, p.id, save.stats.planted + save.ledger.length) * 1e9);
+      save.listings[key] = { price: a.price, listedDay: day, nonce };
+      return { ok: true, msg: `${p.name} listed for ₹${a.price.toLocaleString("en-IN")}` };
+    }
+    case "delist": {
+      if (!save.listings[key]) return fail("It isn't listed.");
+      delete save.listings[key];
+      return { ok: true, msg: `${p.name} taken off the market` };
+    }
+    case "acceptOffer": {
+      const listing = save.listings[key];
+      if (!listing || !mine) return fail("It isn't listed.");
+      const value = valuePlot(world, save, p, now, day).total;
+      const offer = offersFor(p, listing, day, value).find((o) => o.day === a.day);
+      if (!offer) return fail("That offer is gone.");
+      save.money += offer.amount;
+      save.stats.earned += offer.amount;
+      save.plots = save.plots.filter((id) => id !== p.id);
+      delete save.listings[key];
+      clearPlot(save, p);
+      record(save, { day, kind: "sell", item: `plot:${p.id}`, n: 1, amount: offer.amount, where: offer.buyer });
+      return { ok: true, msg: `Sold ${p.name} to ${offer.buyer} for ₹${offer.amount.toLocaleString("en-IN")}` };
+    }
+  }
+}
 const qty = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 9999;
 
 /** Watering can capacity: the brass can holds twice as much. */
@@ -109,8 +165,8 @@ function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: numbe
 
 export function apply(world: World, save: Save, a: Action, now: number): Result {
   if (!a || typeof a !== "object" || !KNOWN.has(a.t)) return fail("Unknown action.");
-  if (a.t === "sell" || a.t === "buy") {
-    const r = trade(save, a, now);
+  if (a.t === "sell" || a.t === "buy" || a.t === "buyPlot" || a.t === "listPlot" || a.t === "delist" || a.t === "acceptOffer") {
+    const r = a.t === "sell" || a.t === "buy" ? trade(save, a, now) : land(world, save, a, now);
     if (r.ok) save.updatedAt = now;
     return r;
   }
