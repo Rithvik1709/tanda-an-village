@@ -555,12 +555,14 @@ export class Village {
     this.box("stone", M.stone, w + 0.5, 0.35, d + 0.5, x0 + w / 2, y + 0.12, cz);
     // plastered back and end walls, both floors
     this.box("plaster", M.plaster, 0.3, H1 + slab + H2, d, x0 + 0.15, g0 + (H1 + slab + H2) / 2, cz);
+    // (no two faces share a plane anywhere below: coplanar faces flicker as the camera moves)
     for (const ez of [z0 + 0.15, z0 + d - 0.15]) {
-      this.box("plaster", M.plaster, inner - x0, H1, 0.3, (x0 + inner) / 2, g0 + H1 / 2, ez);
-      this.box("plaster", M.plaster, w, H2, 0.3, x0 + w / 2, g1 + H2 / 2, ez);
+      const a = x0 + 0.3, b = inner - 0.18;
+      this.box("plaster", M.plaster, b - a, H1, 0.3, (a + b) / 2, g0 + H1 / 2, ez);
+      this.box("plaster", M.plaster, fx - a, H2, 0.3, (a + fx) / 2, g1 + H2 / 2, ez);
     }
     // downstairs: the wooden front wall, a door and two small windows for each of the three homes
-    this.box("oldWood", M.oldWood, 0.18, H1, d - 0.3, inner - 0.09, g0 + H1 / 2, cz);
+    this.box("oldWood", M.oldWood, 0.18, H1, d, inner - 0.09, g0 + H1 / 2, cz);
     const unit = d / 3;
     for (let i = 0; i < 3; i++) {
       const uz = z0 + unit * i + unit / 2;
@@ -570,7 +572,7 @@ export class Village {
       this.box("wood", M.wood, 0.12, 0.14, 1.3, inner + 0.03, g0 + 2.25, uz);
       for (const k of [-1, 1]) {
         this.box("dark", M.dark, 0.05, 0.8, 0.7, inner + 0.01, g0 + 1.45, uz + k * 1.55);
-        this.put("lattice", M.lattice, new THREE.PlaneGeometry(0.7, 0.8).rotateY(Math.PI / 2), new THREE.Matrix4().makeTranslation(inner + 0.05, g0 + 1.45, uz + k * 1.55));
+        this.put("lattice", M.lattice, new THREE.PlaneGeometry(0.7, 0.8).rotateY(Math.PI / 2), new THREE.Matrix4().makeTranslation(inner + 0.1, g0 + 1.45, uz + k * 1.55));
       }
       // a toran over each door, and the bulb
       this.box("toran", M.toran, 0.1, 0.2, 1.2, inner + 0.08, g0 + 2.45, uz);
@@ -578,8 +580,8 @@ export class Village {
     }
     // the wedding painting by the middle door (शुभविवाह, Ganesh, a kalash)
     this.box("cream2", M.cream2, 0.04, 0.9, 1.0, inner + 0.03, g0 + 1.0, cz + 1.25);
-    this.box("sindoor", M.sindoor, 0.05, 0.12, 0.5, inner + 0.04, g0 + 1.25, cz + 1.25);
-    this.box("marigold", M.marigold, 0.05, 0.3, 0.2, inner + 0.04, g0 + 0.8, cz + 1.25);
+    this.box("sindoor", M.sindoor, 0.05, 0.12, 0.5, inner + 0.1, g0 + 1.25, cz + 1.25);
+    this.box("marigold", M.marigold, 0.05, 0.3, 0.2, inner + 0.1, g0 + 0.8, cz + 1.25);
     // verandah posts, and the wooden stair up to the balcony at the north end
     const bays = 6, bay = (d - 0.4) / bays;
     const posts = Array.from({ length: bays + 1 }, (_, i) => z0 + 0.2 + i * bay);
@@ -594,21 +596,21 @@ export class Village {
     }
     for (let i = 1; i < 11; i++) this.box("wood", M.wood, 0.78, 0.06, 0.22, inner + 0.7, g0 + i * (H1 / 11), z0 + 0.35 + 2.75 - i * (2.6 / 11));
     // the floor between, with the painted frieze of scallops along its edge
-    this.box("oldWood", M.oldWood, w + 0.3, slab, d, x0 + w / 2 + 0.15, g0 + H1 + slab / 2, cz);
-    this.box("teal", M.teal, 0.06, 0.5, d, fx + 0.18, g0 + H1 - 0.05, cz);
+    this.box("oldWood", M.oldWood, w + 0.1, slab, d - 0.02, x0 + w / 2 + 0.05, g0 + H1 + slab / 2, cz);
+    this.box("teal", M.teal, 0.06, 0.5, d, fx + 0.16, g0 + H1 - 0.05, cz);
     const colours = ["pink", "cream2", "teal", "lav", "cream2"];
     for (let i = 0, zz = z0 + 0.25; zz < z0 + d - 0.2; i++, zz += 0.5) {
       const k = colours[i % colours.length];
-      this.put(k, M[k], new THREE.CircleGeometry(0.24, 12, Math.PI, Math.PI).rotateY(Math.PI / 2), new THREE.Matrix4().makeTranslation(fx + 0.22, g0 + H1 + 0.12, zz));
+      this.put(k, M[k], new THREE.CircleGeometry(0.24, 12, Math.PI, Math.PI).rotateY(Math.PI / 2), new THREE.Matrix4().makeTranslation(fx + 0.25, g0 + H1 + 0.12, zz));
     }
-    this.box("cream2", M.cream2, 0.05, 0.08, d, fx + 0.22, g0 + H1 + 0.17, cz);
+    this.box("cream2", M.cream2, 0.05, 0.08, d, fx + 0.3, g0 + H1 + 0.17, cz);
     // upstairs: wooden walls with lattice windows, set back behind the balcony
-    this.box("oldWood", M.oldWood, 0.16, H2, d - 0.3, inner + 0.3, g1 + H2 / 2, cz);
+    this.box("oldWood", M.oldWood, 0.16, H2, d - 0.62, inner + 0.3, g1 + H2 / 2, cz);
     for (let i = 0; i < 3; i++) {
       const uz = z0 + unit * i + unit / 2;
       this.box("wood", M.wood, 0.06, 2.0, 1.0, inner + 0.4, g1 + 1.0, uz - 0.9);
       this.box("dark", M.dark, 0.05, 1.1, 1.0, inner + 0.4, g1 + 1.35, uz + 0.8);
-      this.put("lattice", M.lattice, new THREE.PlaneGeometry(1.0, 1.1).rotateY(Math.PI / 2), new THREE.Matrix4().makeTranslation(inner + 0.44, g1 + 1.35, uz + 0.8));
+      this.put("lattice", M.lattice, new THREE.PlaneGeometry(1.0, 1.1).rotateY(Math.PI / 2), new THREE.Matrix4().makeTranslation(inner + 0.5, g1 + 1.35, uz + 0.8));
     }
     // the balcony: carved green posts, railings with lattice panels, and cusped arches between the posts
     for (const pz of posts) {
@@ -646,7 +648,8 @@ export class Village {
     }
     for (const ez of [z0 + 0.15, z0 + d - 0.15]) {
       const tri = new THREE.Shape([new THREE.Vector2(x0, 0), new THREE.Vector2(fx, 0), new THREE.Vector2(ridgeX, rise)]);
-      this.put("plaster", M.plaster, new THREE.ShapeGeometry(tri), new THREE.Matrix4().makeTranslation(0, top + 0.05, ez));
+      if (!M.gable) M.gable = () => mat(TEX.plaster(), { side: THREE.DoubleSide });
+      this.put("gable", M.gable, new THREE.ShapeGeometry(tri), new THREE.Matrix4().makeTranslation(0, top + 0.05, ez));
     }
     // the name board over the frieze: राठोड भुवन · Rathod Bhuvan
     const c = document.createElement("canvas");
@@ -669,7 +672,7 @@ export class Village {
     tex.anisotropy = 8;
     const board = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.65), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
     board.rotation.y = Math.PI / 2;
-    board.position.set(fx + 0.36, g0 + H1 + 0.02, cz);
+    board.position.set(fx + 0.4, g0 + H1 + 0.02, cz);
     this.group.add(board);
     // the aangan: a tulsi vrindavan in front of the house
     const tx = fx + 3, tz = cz;

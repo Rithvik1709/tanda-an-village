@@ -47,6 +47,8 @@ export function sunDirection(h: number): THREE.Vector3 {
   return new THREE.Vector3(Math.cos(a), Math.sin(a), 0.35).normalize();
 }
 
+const UP = new THREE.Vector3(0, 1, 0);
+
 export class Sky {
   readonly dome: THREE.Mesh;
   readonly hemi: THREE.HemisphereLight;
@@ -161,12 +163,23 @@ export class Sky {
     this.cloudOffset += dt * 0.6;
     this.clouds.position.set(focus.x + Math.sin(this.cloudOffset * 0.01) * 30, 0, focus.z + this.cloudOffset * 0.2 % 60);
     this.clouds.rotation.y = this.cloudOffset * 0.0015;
-    // keep the shadow box centred on the player, snapped to shadow texels so edges don't crawl
-    const snap = 90 / 2048;
-    const fx = Math.round(focus.x / snap) * snap, fz = Math.round(focus.z / snap) * snap;
-    this.sun.position.set(fx, focus.y, fz).addScaledVector(dir, 120);
-    this.sun.target.position.set(fx, focus.y, fz);
+    // Keep the shadow box centred on the player without shadows shimmering: the sun's shadow angle
+    // moves in small steps (every 0.05 h, ~1¼ s) instead of every frame, and the box is snapped to
+    // whole shadow texels in the light's own view, so fine detail (lattices, fences) holds still.
+    const sd = sunDirection(Math.round(hour * 20) / 20);
+    const texel = 90 / this.sun.shadow.mapSize.x;
+    const right = this.tmpR.crossVectors(UP, sd);
+    if (right.lengthSq() < 1e-6) right.set(1, 0, 0); // the sun straight overhead
+    right.normalize();
+    const upL = this.tmpU.crossVectors(sd, right);
+    const u = Math.round(focus.dot(right) / texel) * texel, v = Math.round(focus.dot(upL) / texel) * texel, w = focus.dot(sd);
+    const c = this.tmpC.copy(right).multiplyScalar(u).addScaledVector(upL, v).addScaledVector(sd, w);
+    this.sun.target.position.copy(c);
+    this.sun.position.copy(c).addScaledVector(sd, 120);
   }
+  private tmpR = new THREE.Vector3();
+  private tmpU = new THREE.Vector3();
+  private tmpC = new THREE.Vector3();
 }
 
 /** The current sky colours, for the water's reflection. */
