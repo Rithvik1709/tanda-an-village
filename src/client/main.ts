@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { B, block, isCropBlock } from "../shared/blocks";
+import { B, block, BLOCKS, isCropBlock } from "../shared/blocks";
 import { advance, CROPS, msToRipe } from "../shared/crops";
 import { canCapacity, type Result } from "../shared/rules";
 import { newSave } from "../shared/save";
@@ -18,6 +18,7 @@ import { buildTerrain } from "./scene/terrain";
 import { Water } from "./scene/water";
 import { Grass } from "./scene/grass";
 import { Trees } from "./scene/trees";
+import { Village } from "./scene/village";
 import { Post } from "./scene/post";
 import { FARMER, Figure } from "./scene/figure";
 import { Walker } from "./player/walker";
@@ -110,6 +111,8 @@ const body = Object.defineProperty(walker, "inWater", { get: () => walker.wading
 // the living landscape: modelled trees, and grass wherever the ground is grassy and open
 const trees = new Trees(world.trees, (x, z) => hf.at(x, z));
 scene.add(trees.group);
+const village = new Village(world.structures, world.plots, (x, z) => hf.at(x, z));
+scene.add(village.group);
 const grass = new Grass(
   hf,
   (x, z) => {
@@ -613,6 +616,7 @@ renderer.setAnimationLoop(() => {
   const sc = skyColors(hour);
   water.update(now / 1000, sunDirection(hour), sc.sun, sc.top, sc.horizon);
   trees.update(now / 1000);
+  village.update(dt);
   const grassAt = mode === "play" ? new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z) : camera.position;
   grass.update(now / 1000, grassAt, mode === "title" ? 90 : Math.min(90, settings.renderDistance * 0.55), sunDirection(hour), sc.sun, sc.top);
   if (mode !== "title") applyRenderDistance();
@@ -813,4 +817,5 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     plots: world.plots.length,
   });
 });
-worker.postMessage({ type: "init", seed: WORLD_SEED, skipTerrain: [...TERRAIN, B.WATER, B.LEAVES, B.BANYAN_LEAVES, B.TALL_GRASS, B.MARIGOLD], modelTrees: true });
+// the voxels remain for collision and the rules; the mesher now only draws growing crops
+worker.postMessage({ type: "init", seed: WORLD_SEED, skipTerrain: BLOCKS.map((b) => b.id).filter((id) => !isCropBlock(id)), modelTrees: true });

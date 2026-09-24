@@ -30,6 +30,13 @@ export type Plot = {
 };
 
 export type Landmark = { x: number; y: number; z: number; label: string };
+/** A building or fixture, recorded so the client can model it (the voxels stay for collision). */
+export type Structure =
+  | { kind: "house"; x0: number; z0: number; w: number; d: number; y: number; walls: "whitewash" | "brick"; roof: "tile" | "thatch"; door: "N" | "S" | "E" | "W" }
+  | { kind: "stall"; x0: number; z0: number; w: number; d: number; y: number; awning: "saffron" | "blue" }
+  | { kind: "temple"; x0: number; z0: number; y: number }
+  | { kind: "well"; x: number; z: number; y: number }
+  | { kind: "hay"; x: number; z: number; y: number };
 /** A tree: where it stands, how tall, how wide, and the trunk/root columns it occupies in the voxels. */
 export type Tree = { kind: "neem" | "banyan"; x: number; y: number; z: number; h: number; r: number; trunks: [number, number, number, number][] };
 
@@ -39,6 +46,7 @@ export type World = {
   plots: Plot[];
   plotMap: Int16Array; // per column: plot id or -1
   trees: Tree[];
+  structures: Structure[];
   landmarks: Record<"spawn" | "temple" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat", Landmark>;
 };
 
@@ -234,8 +242,10 @@ export function generateWorld(seed = WORLD_SEED): World {
   }
 
   /* ---------- 6. buildings ---------- */
+  const structures: Structure[] = [];
   const house = (x0: number, z0: number, w: number, d: number, walls: number, roof: number, doorSide: "N" | "S" | "E" | "W") => {
     const y0 = height[col(x0, z0)] + 1;
+    structures.push({ kind: "house", x0, z0, w, d, y: y0, walls: walls === B.BRICK ? "brick" : "whitewash", roof: roof === B.THATCH ? "thatch" : "tile", door: doorSide });
     const x1 = x0 + w - 1;
     const z1 = z0 + d - 1;
     flatten(x0 - 1, z0 - 1, x1 + 1, z1 + 1, y0 - 1, B.DIRT);
@@ -273,6 +283,7 @@ export function generateWorld(seed = WORLD_SEED): World {
 
   const stall = (x0: number, z0: number, w: number, d: number, awning: number) => {
     const y0 = height[col(x0, z0)] + 1;
+    structures.push({ kind: "stall", x0, z0, w, d, y: y0, awning: awning === B.SAFFRON ? "saffron" : "blue" });
     for (const [x, z] of [
       [x0, z0],
       [x0 + w - 1, z0],
@@ -294,6 +305,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     const x0 = 84;
     const z0 = 84;
     const y0 = SQUARE.y + 1;
+    structures.push({ kind: "temple", x0, z0, y: y0 });
     for (let z = z0; z < z0 + 9; z++) for (let x = x0; x < x0 + 9; x++) set(x, y0, z, B.COBBLE);
     for (let s = 0; s < 6; s++) {
       const a = x0 + 1 + Math.floor(s / 2);
@@ -320,6 +332,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     const cx = 91;
     const cz = 95;
     const y0 = SQUARE.y;
+    structures.push({ kind: "well", x: cx, z: cz, y: y0 + 1 });
     for (let z = cz - 1; z <= cz + 1; z++)
       for (let x = cx - 1; x <= cx + 1; x++) {
         for (let y = y0 - 5; y <= y0; y++) set(x, y, z, x === cx && z === cz ? (y < y0 ? B.WATER : B.AIR) : B.COBBLE);
@@ -359,8 +372,10 @@ export function generateWorld(seed = WORLD_SEED): World {
       [187, 92],
       [186, 93],
       [178, 99],
-    ])
+    ]) {
       set(x, 16, z, B.HAY);
+      structures.push({ kind: "hay", x, z, y: 16 });
+    }
     return { x: cx, y: 16, z: 96 };
   })();
 
@@ -463,6 +478,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     plots,
     plotMap,
     trees,
+    structures,
     landmarks: {
       spawn: { x: 96.5, y: SQUARE.y + 1, z: 90.5, label: "Village square" },
       temple: lm(temple, "Temple"),
