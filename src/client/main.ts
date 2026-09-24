@@ -309,6 +309,10 @@ const NEIGHBOURS = [
 for (const n of NEIGHBOURS) scene.add(n.group);
 const infra = new Infrastructure((x, z) => hf.at(x, z), (x, z) => world.plotMap[Math.floor(x) + W * Math.floor(z)] >= 0 || !!block(get(Math.floor(x), Math.floor(hf.at(x, z) + 0.05), Math.floor(z))).solid, PUMPS);
 scene.add(infra.group);
+for (const p of infra.poleSpots) {
+  const x = Math.floor(p.x), z = Math.floor(p.z), g = Math.floor(hf.at(p.x, p.z) + 0.05);
+  for (let k = 0; k < 3; k++) if (vox[idx(x, g + k, z)] === B.AIR) vox[idx(x, g + k, z)] = B.LOG;
+}
 const nav = new Nav(vox, (x, z) => hf.at(x, z));
 const villagers = new Villagers(world, (x, z) => hf.at(x, z), nav);
 // stall keepers and the neighbours by the well stand still; everyone else keeps clear of them
@@ -780,6 +784,7 @@ renderer.setAnimationLoop(() => {
     playerBody.pos.x = body.pos.x;
     playerBody.pos.z = body.pos.z;
     const people = villagers.bodies();
+    villagers.others = [...people, ...fixedBodies, playerBody];
     separate([...people, ...fixedBodies, playerBody], nav);
     for (const v of people) v.place((x, z) => hf.at(x, z));
     if (!walker.blockedAt(playerBody.pos.x, playerBody.pos.z)) {

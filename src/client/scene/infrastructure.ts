@@ -32,6 +32,8 @@ export class Infrastructure {
   readonly group = new THREE.Group();
   /** Street lamps (on some poles) — the night-light pool uses these like the house bulbs. */
   readonly lamps: THREE.Vector3[] = [];
+  /** Where the poles stand (so nobody walks through them). */
+  readonly poleSpots: { x: number; z: number }[] = [];
   private water: THREE.ShaderMaterial[] = [];
   private splashes: THREE.Points[] = [];
   private lampMat = new THREE.MeshStandardMaterial({ color: "#fff1d0", emissive: new THREE.Color("#ffc070"), emissiveIntensity: 0 });
@@ -62,6 +64,7 @@ export class Infrastructure {
           if (x < 1 || z < 1 || x > 191 || z > 191 || this.blocked(x, z)) continue;
           const y = this.ground(x, z);
           pts.push(new THREE.Vector3(x, y, z));
+          this.poleSpots.push({ x, z });
         }
         carry = (carry - len) % step;
         if (carry < 0) carry += step;

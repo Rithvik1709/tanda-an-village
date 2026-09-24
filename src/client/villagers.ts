@@ -22,6 +22,13 @@ type Role =
   | { kind: "walker"; route: Pt[] }
   | { kind: "child"; center: Pt; r: number };
 
+/** Moving but sliding sideways a lot (not getting closer)? count toward "stuck". */
+function turnPenalty(stuck: number, dx: number, dz: number, goal: Pt, pos: Pt) {
+  const gx = goal.x - pos.x, gz = goal.z - pos.z;
+  const toward = (dx * gx + dz * gz) / (Math.hypot(gx, gz) || 1);
+  return toward < -0.2 ? stuck + 0.02 : Math.max(0, stuck - 0.05);
+}
+
 class Villager {
   place(ground: (x: number, z: number) => number) {
     this.fig.root.position.set(this.pos.x, ground(this.pos.x, this.pos.z), this.pos.z);
@@ -37,6 +44,8 @@ class Villager {
   private speed = 0.95; // an easy village pace (you walk at 3.4)
   private path: Pt[] = [];
   private stuck = 0;
+  movedF = 0;
+  blockedF = 0;
 
   constructor(look: Look, public role: Role, start: Pt, private scale = 1) {
     this.fig = new Figure(look);
@@ -47,28 +56,56 @@ class Villager {
     if (role.kind === "child") this.speed = 1.8;
   }
 
-  update(dt: number, t: number, day: boolean, world: World, ground: (x: number, z: number) => number, rnd: () => number, nav: Nav) {
+  update(dt: number, t: number, day: boolean, world: World, ground: (x: number, z: number) => number, rnd: () => number, nav: Nav, others: { pos: Pt }[]) {
     const r = this.role;
     const fig = this.fig;
     let moving = false;
     const step = (p: Pt, speed: number) => {
-      const dx = p.x - this.pos.x, dz = p.z - this.pos.z;
+      let dx = p.x - this.pos.x, dz = p.z - this.pos.z;
       const d = Math.hypot(dx, dz);
       if (d < 0.2) return true;
+      dx /= d;
+      dz /= d;
+      // someone in the way? veer to your right to pass them, as people do on a lane
+      for (const o of others) {
+        if (o === this) continue;
+        const ox = o.pos.x - this.pos.x, oz = o.pos.z - this.pos.z;
+        const od = Math.hypot(ox, oz);
+        if (od > 1.6 || od < 1e-4) continue;
+        const ahead = (ox * dx + oz * dz) / od;
+        if (ahead < 0.3) continue;
+        const w = (1 - od / 1.6) * ahead;
+        const rx = dz, rz = -dx; // right-hand side
+        dx += rx * w;
+        dz += rz * w;
+        const l = Math.hypot(dx, dz) || 1;
+        dx /= l;
+        dz /= l;
+      }
       const k = Math.min(d, speed * dt);
-      const nx = this.pos.x + (dx / d) * k, nz = this.pos.z + (dz / d) * k;
-      if (nav.isBlocked(nx, nz)) {
-        // pressed against something (another walker pushed us): give up on this path after a moment
-        this.stuck += dt;
-        if (this.stuck > 2) {
-          this.path = [];
-          this.stuck = 0;
-          return true;
-        }
-      } else {
+      // blocked straight ahead (a wall, a well ring, a fence post)? turn and try the nearest open way
+      let moved = false;
+      for (const turn of [0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6]) {
+        const c = Math.cos(turn), sn = Math.sin(turn);
+        const tx = dx * c - dz * sn, tz = dx * sn + dz * c;
+        const nx = this.pos.x + tx * k, nz = this.pos.z + tz * k;
+        if (nav.isBlocked(nx, nz)) continue;
         this.pos.x = nx;
         this.pos.z = nz;
+        dx = tx;
+        dz = tz;
+        moved = true;
+        break;
+      }
+      if (moved) this.stuck = turnPenalty(this.stuck, dx, dz, p, this.pos);
+      else this.stuck += dt;
+      if (moved) this.movedF++;
+      else this.blockedF++;
+      if (this.stuck > 1.2) {
+        // boxed in: find a fresh way round
+        this.path = [];
         this.stuck = 0;
+        return true;
       }
       const want = Math.atan2(dx, dz);
       this.heading += Math.atan2(Math.sin(want - this.heading), Math.cos(want - this.heading)) * Math.min(1, dt * 6);
@@ -212,8 +249,12 @@ export class Villagers {
   }
 
   debug() {
-    return { worked: this.worked, visible: this.people.filter((p) => p.fig.root.visible).length, plants: this.fields.group.children.map((c) => (c as THREE.InstancedMesh).count).filter(Boolean) };
+    const walking = this.people.filter((p) => p.movedF + p.blockedF > 0);
+    return { blockedShare: walking.reduce((a, p) => a + p.blockedF, 0) / Math.max(1, walking.reduce((a, p) => a + p.movedF + p.blockedF, 0)), worstStuck: Math.max(...walking.map((p) => p.blockedF / (p.movedF + p.blockedF))), walkers: walking.length, worked: this.worked, visible: this.people.filter((p) => p.fig.root.visible).length, plants: this.fields.group.children.map((c) => (c as THREE.InstancedMesh).count).filter(Boolean) };
   }
+
+  /** Everyone a walker should steer round: other villagers, the player, the stall keepers. */
+  others: { pos: Pt }[] = [];
 
   update(dt: number, t: number, hour: number, save: Save, day: number, now: number, _near: THREE.Vector3) {
     this.refreshFields(save, day, now);
@@ -226,7 +267,7 @@ export class Villagers {
         if (!v.fig.root.visible) continue;
       }
       // people far away don't need animating every frame
-      v.update(dt, t, daytime, this.world, this.ground, this.rnd, this.nav);
+      v.update(dt, t, daytime, this.world, this.ground, this.rnd, this.nav, this.others);
     }
   }
 }
