@@ -83,13 +83,13 @@ another device. Google sign-in is a v2 item.
 - [x] README with how to run.
 
 ### M1 · World you can see
-- [ ] Block registry (≥ 20 blocks: grass, black soil, tilled soil, wet soil, dirt, stone, sand, water, wood, leaves, planks, thatch, whitewash, brick, gravel road, fence…).
-- [ ] Procedural texture atlas drawn on a canvas (pixel-art style, warm palette), no external images.
-- [ ] Seeded terrain: gentle hills, river, black-soil plains, roads; unit test: same seed → same world.
-- [ ] Chunk mesher with face culling (in a web worker), transparent pass for water/leaves.
-- [ ] Sky, sun, hemisphere light, fog, toon-ish lighting; day–night cycle with golden hour.
-- [ ] Trees (neem / banyan-like), village buildings as generated structures.
-- [ ] *Done when:* screenshots at noon and sunset look warm and readable, 60 fps on the test machine.
+- [x] Block registry (≥ 20 blocks: grass, black soil, tilled soil, wet soil, dirt, stone, sand, water, wood, leaves, planks, thatch, whitewash, brick, gravel road, fence…).
+- [x] Procedural texture atlas drawn on a canvas (pixel-art style, warm palette), no external images.
+- [x] Seeded terrain: gentle hills, river, black-soil plains, roads; unit test: same seed → same world.
+- [x] Chunk mesher with face culling (in a web worker), transparent pass for water/leaves.
+- [x] Sky, sun, hemisphere light, fog, toon-ish lighting; day–night cycle with golden hour.
+- [x] Trees (neem / banyan-like), village buildings as generated structures.
+- [x] *Done when:* screenshots at noon and sunset look warm and readable, 60 fps on the test machine.
 
 ### M2 · Walking and building
 - [ ] First-person controls with pointer lock, WASD, jump, sprint; AABB collision with blocks.
@@ -154,3 +154,4 @@ Multiplayer shared district, Google sign-in, more crops and buildings, processin
 _(one line per loop iteration: date · task · how it was verified · commit)_
 
 - 2026-09-24 · M0 scaffold · `tsc` clean, vitest 1/1, `vite build` ok, `/api/health` → FileStore ok, headless Chrome screenshot shows a lit WebGL cube, no page errors
+- 2026-09-24 · M1 world · 27 blocks, canvas atlas, seeded world (6 vitest: determinism, 16 non-overlapping plots, one starter, river water, spawn), worker mesher with AO (0.8 ms/chunk, whole world 0.1–0.3 s), sky + day–night; screenshots at noon / golden hour / 5 views looked at and fixed (market pit, river framing, map edge ring, soil and sunset tone); 60 fps (16.6 ms median, p95 17.6 ms, 270 draw calls worst view)
