@@ -1,7 +1,8 @@
 import { B, block, isCropBlock } from "./blocks";
 import { advance, CAN_MAX, CROPS, type CropId, isCrop, stageOf, WET_MS, yieldOf } from "./crops";
+import { type Buyer, buyerPrice, LEDGER_DAYS, shopItem } from "./economy";
 import { hash2 } from "./rng";
-import type { Save } from "./save";
+import type { LedgerEntry, Save } from "./save";
 import { clock, DAY_MS } from "./time";
 import { D, H, idx, W, type World } from "./world";
 
@@ -18,7 +19,9 @@ export type Action =
   | { t: "plant"; x: number; y: number; z: number; crop: CropId }
   | { t: "water"; x: number; y: number; z: number }
   | { t: "refill"; x: number; y: number; z: number }
-  | { t: "harvest"; x: number; y: number; z: number };
+  | { t: "harvest"; x: number; y: number; z: number }
+  | { t: "sell"; item: CropId; n: number; where: Buyer }
+  | { t: "buy"; item: string; n: number };
 
 export type Result = { ok: true; msg?: string; gained?: Record<string, number> } | { ok: false; error: string };
 
@@ -63,10 +66,54 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
-const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest"]);
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy"]);
+const qty = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 9999;
+
+/** Watering can capacity: the brass can holds twice as much. */
+export const canCapacity = (save: Save) => (save.inv.bigcan ? 32 : CAN_MAX);
+
+function record(save: Save, e: LedgerEntry) {
+  save.ledger.push(e);
+  const oldest = e.day - LEDGER_DAYS + 1;
+  if (save.ledger[0]?.day < oldest) save.ledger = save.ledger.filter((l) => l.day >= oldest);
+  if (save.ledger.length > 400) save.ledger = save.ledger.slice(-400);
+}
+
+/** Buying and selling: no position needed (the client only opens these panels at the stalls). */
+function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: number): Result {
+  if (!qty(a.n)) return fail("Pick how many.");
+  const day = clock(now).day;
+  if (a.t === "sell") {
+    if (!isCrop(a.item)) return fail("The trader doesn't buy that.");
+    if (a.where !== "village") return fail("You can only sell here at the village stall."); // the town trip arrives with the cart
+    if ((save.inv[a.item] ?? 0) < a.n) return fail(`You don't have ${a.n} ${CROPS[a.item].name.toLowerCase()}.`);
+    const amount = Math.round(buyerPrice(a.item, day, a.where) * a.n);
+    save.inv[a.item] -= a.n;
+    if (!save.inv[a.item]) delete save.inv[a.item];
+    save.money += amount;
+    save.stats.earned += amount;
+    record(save, { day, kind: "sell", item: a.item, n: a.n, amount, where: a.where });
+    return { ok: true, msg: `Sold ${a.n} ${CROPS[a.item].name.toLowerCase()} for ₹${amount}`, gained: { money: amount } };
+  }
+  const item = shopItem(a.item);
+  if (!item) return fail("The shop doesn't sell that.");
+  if (item.max && (save.inv[item.id] ?? 0) + a.n > item.max) return fail(`You already have the ${item.name.toLowerCase()}.`);
+  const amount = item.price * a.n;
+  if (save.money < amount) return fail(`That costs ₹${amount} — you have ₹${save.money}.`);
+  save.money -= amount;
+  save.inv[item.id] = (save.inv[item.id] ?? 0) + a.n;
+  save.stats.spent += amount;
+  record(save, { day, kind: "buy", item: item.id, n: a.n, amount });
+  return { ok: true, msg: `Bought ${a.n} × ${item.name.toLowerCase()} for ₹${amount}` };
+}
 
 export function apply(world: World, save: Save, a: Action, now: number): Result {
   if (!a || typeof a !== "object" || !KNOWN.has(a.t)) return fail("Unknown action.");
+  if (a.t === "sell" || a.t === "buy") {
+    const r = trade(save, a, now);
+    if (r.ok) save.updatedAt = now;
+    return r;
+  }
   if (!inside(a.x, a.y, a.z)) return fail("That's outside the world.");
   const { x, y, z } = a;
   const k = key(x, y, z);
@@ -90,7 +137,7 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
         for (let dz = -2; dz <= 2 && !near; dz++)
           for (let dx = -2; dx <= 2 && !near; dx++) near = !!block(blockAt(world, save, x + dx, y + dy, z + dz, now)).liquid;
       if (!near) return fail("Fill the can at the river or the well.");
-      inv.water = CAN_MAX;
+      inv.water = canCapacity(save);
       r = { ok: true, msg: "Can filled" };
       break;
     }
@@ -107,6 +154,9 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       }
       if (save.farm[k]) delete save.farm[k];
       save.edits[k] = B.AIR;
+      // what you dig, you keep: building blocks come back whole, soil comes back as dirt
+      const back = BUILDING_BLOCKS.includes(here) ? here : block(here).farmable || here === B.TILLED || here === B.TILLED_WET ? B.DIRT : null;
+      if (back !== null) give(`block:${back}`, 1);
       const above = blockAt(world, save, x, y + 1, z, now);
       if (y + 1 < H && block(above).shape === "cross") save.edits[key(x, y + 1, z)] = B.AIR;
       r = { ok: true };
@@ -119,6 +169,8 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       if (!BUILDING_BLOCKS.includes(a.b)) return fail("You can't place that.");
       if (y > plot.y + 10) return fail("Too high to build.");
       if (here !== B.AIR && !block(here).liquid && !(block(here).shape === "cross" && !isCropBlock(here))) return fail("Something is already there.");
+      if (!has(`block:${a.b}`)) return fail(`No ${block(a.b).name.toLowerCase()} left — the seed & tool shop sells more.`);
+      take(`block:${a.b}`);
       save.edits[k] = a.b;
       r = { ok: true };
       break;

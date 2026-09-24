@@ -17,6 +17,7 @@ export class Hud {
   private counts: HTMLElement[] = [];
   private labelTimer = 0;
   private banner: HTMLElement;
+  private hint!: HTMLElement;
   private account: HTMLElement;
   debugOn = false;
   /** Called with a recovery code the player typed; resolves to an error message or null. */
@@ -37,6 +38,8 @@ export class Hud {
     this.prompt.innerHTML = `<b>Click to play</b><span>WASD move · Space jump · Shift run · Left click dig / harvest · Right click use · 1–9 / wheel pick · F3 info</span>`;
     this.account = el("div", "account", this.prompt);
     this.banner = el("div", "banner", this.root);
+    this.hint = el("div", "interact", this.root);
+    this.hint.hidden = true;
     this.banner.hidden = true;
     hotbar.slots.forEach((s, i) => {
       const cell = el("div", "slot", this.bar);
@@ -57,12 +60,15 @@ export class Hud {
 
   /** Hotbar badges and the goods chip from the inventory. */
   setInventory(inv: Record<string, number>, canMax: number) {
+    const water = this.hotbar.slots.findIndex((s) => s.kind === "tool" && s.tool === "can");
+    if (water >= 0) this.counts[water].title = `${inv.water ?? 0} / ${canMax}`;
     this.hotbar.slots.forEach((s, i) => {
       const c = this.counts[i];
       if (s.kind === "seed") c.textContent = String(inv[`seed:${s.crop}`] ?? 0);
+      else if (s.kind === "block") c.textContent = String(inv[`block:${s.block}`] ?? 0);
       else if (s.kind === "tool" && s.tool === "can") c.innerHTML = `<i style="width:${Math.round(((inv.water ?? 0) / canMax) * 100)}%"></i>`;
       c.className = s.kind === "tool" && s.tool === "can" ? "water" : "count";
-      c.parentElement!.classList.toggle("empty", s.kind === "seed" && !(inv[`seed:${s.crop}`] > 0));
+      c.parentElement!.classList.toggle("empty", (s.kind === "seed" && !(inv[`seed:${s.crop}`] > 0)) || (s.kind === "block" && !(inv[`block:${s.block}`] > 0)));
     });
     this.goods.innerHTML = CROP_IDS.map((id) => `<span><b>${inv[id] ?? 0}</b> ${CROPS[id].name}</span>`).join("");
   }
@@ -97,6 +103,11 @@ export class Hud {
   private fade(t: HTMLElement) {
     t.classList.add("gone");
     setTimeout(() => t.remove(), 500);
+  }
+
+  setHint(html: string) {
+    if (this.hint.innerHTML !== html) this.hint.innerHTML = html;
+    this.hint.hidden = !html;
   }
 
   setBanner(text: string) {

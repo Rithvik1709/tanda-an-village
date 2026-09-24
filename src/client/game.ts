@@ -34,7 +34,7 @@ export class Game {
   act(a: Action): Result {
     const r = apply(this.world, this.save, a, this.now());
     if (r.ok) {
-      for (const dy of [-1, 0, 1]) this.sync(a.x, a.y + dy, a.z);
+      if ("x" in a) for (const dy of [-1, 0, 1]) this.sync(a.x, a.y + dy, a.z);
       this.onAct(a);
       this.listeners.forEach((f) => f());
     }

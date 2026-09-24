@@ -34,6 +34,17 @@ describe("crop growth", () => {
     const dry = advance(p0(), 0, days * DAY_MS);
     expect(dry.progress).toBeCloseTo(DRY_RATE, 5);
   });
+  it("reaches exactly 1 when ripe, whatever the speed (no floating-point 0.9999…)", () => {
+    for (const speed of [0.61, 0.7777, 0.913, 1.0351, 1.2]) {
+      for (const crop of ["jowar", "onion", "sugarcane"] as const) {
+        const p = { ...p0(), crop, speed };
+        expect(advance(p, 0, 1e12).progress).toBe(1);
+        expect(advance(p, Infinity, 1e12).progress).toBe(1);
+        expect(advance(p, DAY_MS * 0.37, 1e12).progress).toBe(1);
+      }
+    }
+  });
+
   it("splits a wet spell and a dry spell exactly, however often it is sampled", () => {
     const wetUntil = DAY_MS * 0.5;
     const once = advance(p0(), wetUntil, DAY_MS);

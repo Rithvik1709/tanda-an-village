@@ -86,7 +86,7 @@ describe("saves", () => {
     await act(post({ actions: [{ t: "till", ...at() }, { t: "plant", ...at(), crop: "onion" }] }, p.token));
     await dev(post({ skipMs: 10 * 24 * 3600e3 / 144 * 20 }, p.token)); // 20 game days
     const r = await (await act(post({ actions: [{ t: "harvest", ...at() }] }, p.token))).json();
-    expect(r.results[0].ok).toBe(true);
+    expect(r.results[0]).toEqual({ ok: true });
     expect(r.save.inv.onion).toBeGreaterThan(0);
     expect((await act(post({ actions: Array(300).fill({ t: "water", ...at() }) }, p.token))).status).toBe(400);
   });

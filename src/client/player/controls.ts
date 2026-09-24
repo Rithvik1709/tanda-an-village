@@ -15,6 +15,8 @@ export class Controls {
   onSelect: (slot: number) => void = () => {};
   onScroll: (dir: number) => void = () => {};
   onToggleDebug: () => void = () => {};
+  onInteract: () => void = () => {};
+  onEscape: () => void = () => {};
   onLockChange: (locked: boolean) => void = () => {};
 
   constructor(el: HTMLElement) {
@@ -49,6 +51,8 @@ export class Controls {
         return;
       }
       if (/^Digit[1-9]$/.test(e.code)) this.onSelect(Number(e.code.slice(5)) - 1);
+      if (e.code === "KeyE" && !e.repeat) this.onInteract();
+      if (e.code === "Escape") this.onEscape();
       if (this.locked) {
         this.held.add(e.code);
         if (e.code === "Space") e.preventDefault();

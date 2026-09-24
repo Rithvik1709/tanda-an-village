@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { B, block, isCropBlock } from "../shared/blocks";
-import { advance, CAN_MAX, CROPS, msToRipe } from "../shared/crops";
-import type { Result } from "../shared/rules";
+import { advance, CROPS, msToRipe } from "../shared/crops";
+import { canCapacity, type Result } from "../shared/rules";
 import { newSave } from "../shared/save";
 import { clock, fmtHour, SEASON_DAYS, SEASON_NAMES } from "../shared/time";
 import { D, generateWorld, H, idx, W, WORLD_SEED } from "../shared/world";
@@ -14,6 +14,8 @@ import { Controls } from "./player/controls";
 import { Hotbar } from "./player/hotbar";
 import { type Body, type Box, boxHits, type Hit, MOVE, PLAYER, raycast, step } from "./player/physics";
 import { Hud } from "./ui/hud";
+import { Npc } from "./engine/npc";
+import { type PanelKind, Panels } from "./ui/panels";
 
 type Hooks = {
   ready: boolean;
@@ -86,6 +88,45 @@ const outline = new THREE.LineSegments(
 );
 outline.visible = false;
 scene.add(outline);
+
+// ---- the village people you trade with ----
+const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: Npc; label: string }[] = [
+  {
+    kind: "trader",
+    at: world.landmarks.trader,
+    npc: new Npc({ kurta: "#f1ead8", dhoti: "#e8e0cc", hat: "#f6f2e8" }, 102.5, world.landmarks.trader.y, 86.3, 0),
+    label: "Sell to Ganpat Seth, the trader",
+  },
+  {
+    kind: "shop",
+    at: world.landmarks.seedShop,
+    npc: new Npc({ kurta: "#4f7fae", dhoti: "#e8e0cc", hat: "#e8892c", hatTall: true }, 102.5, world.landmarks.seedShop.y, 102.3, 0),
+    label: "Buy seeds & tools from Sakharam",
+  },
+];
+for (const s of STALLS) scene.add(s.npc.group);
+const panels = new Panels(document.getElementById("ui")!, {
+  save: () => game.save,
+  now: () => game.now(),
+  act: (a) => {
+    const r = game.act(a);
+    if (r.ok) sfxQueue.push(a.t === "sell" ? "cash" : "buy");
+    return r;
+  },
+  toast: (m, k) => hud.toast(m, k),
+});
+panels.onClose = () => hud.setPlaying(false);
+
+/** The stall the player is standing at, if any (within a few steps of its counter). */
+function nearStall() {
+  return STALLS.find((s) => Math.hypot(body.pos.x - (s.at.x + 0.5), body.pos.z - (s.at.z - 0.5)) < 3.4 && Math.abs(body.pos.y - s.at.y) < 2);
+}
+function openStall(kind: PanelKind, tab?: string) {
+  panels.show(kind, tab);
+  hud.setPlaying(true); // hide the click-to-play panel under it
+  hud.setHint("");
+  document.exitPointerLock?.();
+}
 
 function lookDir() {
   const cp = Math.cos(controls.pitch);
@@ -175,7 +216,8 @@ function tipFor(t: Hit | null): string {
 
 function refreshStatus() {
   const s = game.save;
-  hud.setInventory(s.inv, CAN_MAX);
+  hud.setInventory(s.inv, canCapacity(s));
+  panels.render();
   const c = clock(game.now());
   const saved = { saved: "✓ saved", saving: "saving…", offline: "offline — retrying" }[net.status];
   hud.setInfo(`<span class="money">₹${s.money.toLocaleString("en-IN")}</span><span class="sync ${net.status}">${saved}</span><span>${fmtHour(hourOverride ?? c.hour)}</span><span>${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}</span>`);
@@ -194,13 +236,22 @@ controls.onScroll = (d) => {
   hud.refresh();
 };
 controls.onToggleDebug = () => hud.toggleDebug();
+controls.onInteract = () => {
+  if (panels.open) return panels.close();
+  const s = nearStall();
+  if (s) openStall(s.kind);
+};
+controls.onEscape = () => panels.close();
 // the pause panel sits over the canvas: a click on it (outside the account box) also starts play
 document.querySelector(".play-prompt")!.addEventListener("click", (e) => {
   if (!(e.target as HTMLElement).closest(".account")) canvas.requestPointerLock?.();
 });
 controls.onLockChange = (locked) => {
-  if (locked) mode = "play";
-  hud.setPlaying(locked);
+  if (locked) {
+    mode = "play";
+    panels.close();
+  }
+  hud.setPlaying(locked || !!panels.open);
 };
 
 // the land beyond the map: a wide fogged plain with an exact square hole where the world is,
@@ -262,7 +313,10 @@ renderer.setAnimationLoop(() => {
     game.tick();
     refreshStatus();
     hud.setTip(mode === "play" ? tipFor(target) : "");
+    const st = mode === "play" && !panels.open ? nearStall() : undefined;
+    hud.setHint(st ? `<kbd>E</kbd> ${st.label}` : "");
   }
+  for (const s of STALLS) s.npc.update(dt, camera.position);
   worldRenderer.flush();
   const hour = hourOverride ?? clock(game.now()).hour;
   sky.update(hour, dt, camera.position);
@@ -396,6 +450,11 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
         }
       : {}),
     toggleDebug: () => hud.toggleDebug(),
+    openStall: (kind: PanelKind, tab?: string) => openStall(kind, tab),
+    closePanel: () => panels.close(),
+    nearStall: () => nearStall()?.kind ?? null,
+    money: () => game.save.money,
+    ledger: () => game.save.ledger,
     editMs: () => worldRenderer.lastEditMs,
     stats: () => {
       const sorted = [...frameTimes].sort((a, b) => a - b);

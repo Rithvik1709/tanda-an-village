@@ -71,14 +71,14 @@ export function advance(p: Planting, wetUntil: number, now: number): Planting {
   if (wetEnd > t) {
     const need = (1 - progress) / r;
     const used = Math.min(wetEnd - t, need);
-    progress += used * r;
+    progress = used >= need ? 1 : progress + used * r; // exactly 1 when it ripens (no 0.9999…)
     wetMs += used;
     t += used;
   }
   if (progress < 1 && now > t) {
     const need = (1 - progress) / (r * DRY_RATE);
     const used = Math.min(now - t, need);
-    progress += used * r * DRY_RATE;
+    progress = used >= need ? 1 : progress + used * r * DRY_RATE;
     dryMs += used;
   }
   return { ...p, progress: Math.min(1, progress), wetMs, dryMs, updatedAt: now };
