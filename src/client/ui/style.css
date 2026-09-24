@@ -231,3 +231,142 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .resume-chip { position: absolute; left: 50%; top: calc(50% + 40px); transform: translateX(-50%); padding: 7px 16px; border-radius: 20px; background: rgba(30,24,20,0.7); font-weight: 700; font-size: 14px; pointer-events: none; }
 .sleep-fade { position: absolute; inset: 0; background: #06070d; color: #e8dcc0; display: grid; place-items: center; font: italic 22px Georgia, serif; opacity: 0; transition: opacity 1.2s; pointer-events: none; z-index: 60; }
 .sleep-fade.on { opacity: 1; }
+
+/* =====================================================================================
+ * ONE LOOK FOR EVERYTHING — the title screen's style carried into every card and panel:
+ * dark warm glass, cream text, gold accents, serif headings, rust-red buttons.
+ * (Placed last so it wins over the older light-cream panel styles above.)
+ * ===================================================================================== */
+:root {
+  --glass: rgba(28, 19, 12, 0.82);
+  --glass-2: rgba(255, 236, 200, 0.07);
+  --line: rgba(255, 222, 170, 0.16);
+  --ink: #f6ead2;
+  --ink-2: rgba(246, 234, 210, 0.68);
+  --gold: #f0c36a;
+  --gold-2: #ffd98a;
+  --rust: #c25a36;
+  --rust-hi: #d4683f;
+  --good: #9ed67a;
+  --bad: #ff9e84;
+  --serif: Georgia, "Times New Roman", serif;
+}
+.panel { background: rgba(10, 6, 3, 0.42); backdrop-filter: blur(2px); }
+.panel-card, .map-card, .about-card, .goal, .tutorial {
+  background: var(--glass) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 240, 210, 0.06) !important;
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+.panel-card h2, .map-card h2, .about-card h3 { font-family: var(--serif); font-weight: 800; color: #fff4dc; letter-spacing: -0.01em; }
+.panel-card h2 small, .map-card h2 small, .dialogue h2 small, .goal b small { color: var(--gold) !important; opacity: 0.85; font-family: system-ui; }
+.panel-card .lede, .dialogue .dlg-text { color: var(--ink-2) !important; }
+.dialogue .dlg-text { color: var(--ink) !important; font-family: var(--serif); font-size: 18px !important; }
+.dialogue .dlg-who, .goal .goal-head, .about-card .eyebrow { color: var(--gold) !important; }
+.panel-card .x, .map-card .x, .about-card .x { color: var(--ink); opacity: 0.7; }
+.panel-foot, .panel-card .hint, .panel-card .empty, .panel-card td small, .panel-card th, .goal small, .map-credit { color: var(--ink-2) !important; opacity: 1 !important; }
+/* tables */
+.panel-card td { border-top: 1px solid var(--line) !important; }
+.panel-card tr.section td { color: var(--gold) !important; }
+.panel-card .up, .prem { color: var(--good) !important; }
+.panel-card .down { color: var(--bad) !important; }
+.tabs { border-bottom: 1px solid var(--line) !important; }
+.tabs button { color: var(--ink-2) !important; }
+.tabs button.on { background: var(--glass-2) !important; color: var(--ink) !important; box-shadow: inset 0 -2px 0 var(--gold); }
+.tabs .wallet, .info .money { color: var(--gold-2) !important; }
+/* buttons: rust primary, glass secondary — exactly like the title screen */
+.big-acts button, .panel-card .acts button, .plot-card button, .order-card button, .name-form button, .dialogue .big-acts button {
+  background: var(--rust) !important; color: #fff6e8 !important; border: 0 !important; border-radius: 11px !important;
+  box-shadow: 0 8px 22px rgba(120, 40, 10, 0.35); transition: background 0.15s, transform 0.15s;
+}
+.big-acts button:hover, .panel-card .acts button:hover, .plot-card button:hover, .order-card button:hover, .name-form button:hover { background: var(--rust-hi) !important; transform: translateY(-1px); }
+.big-acts button:disabled, .panel-card .acts button:disabled, .order-card button:disabled { background: rgba(255, 236, 200, 0.12) !important; color: var(--ink-2) !important; box-shadow: none; transform: none; }
+.big-acts button.ghost, .plot-card button.ghost, .panel-card button.link { background: transparent !important; color: var(--gold-2) !important; box-shadow: none; border: 1px solid var(--line) !important; }
+/* inputs */
+.panel-card input, .plot-card input, .name-form input, .account input, .title-restore input {
+  background: rgba(0, 0, 0, 0.3) !important; color: var(--ink) !important; border: 1px solid var(--line) !important; border-radius: 10px !important;
+}
+.settings-card label b { color: var(--gold) !important; }
+.settings-card input[type="range"] { accent-color: var(--rust); }
+/* inner cards and callouts */
+.plot-card, .board-me, .order-card, .title-card, .chart, .offer { background: var(--glass-2) !important; color: var(--ink) !important; border: 1px solid var(--line) !important; }
+.title-card .progress { background: rgba(255, 236, 200, 0.12) !important; }
+.title-card .progress i { background: var(--gold) !important; }
+.news.glut { background: rgba(255, 120, 90, 0.14) !important; color: var(--bad) !important; }
+.news.shortage { background: rgba(140, 220, 110, 0.12) !important; color: var(--good) !important; }
+.board-table tr.you td { background: rgba(240, 195, 106, 0.12) !important; }
+.board-table td.rank { color: var(--gold) !important; }
+.bar { background: rgba(255, 236, 200, 0.12) !important; }
+.bar i { background: var(--gold) !important; }
+.chart .grid { stroke: rgba(255, 236, 200, 0.12) !important; }
+.chart .axis { fill: var(--ink-2) !important; }
+kbd, .goal kbd, .help kbd, .welcome kbd, .tutorial kbd { background: rgba(255, 236, 200, 0.14) !important; color: var(--gold-2) !important; border: 1px solid var(--line); }
+/* the goal card */
+.goal { border-left: 3px solid var(--gold) !important; }
+.goal b { color: #fff4dc; font-family: var(--serif); }
+.goal ul.objectives li i { border-color: var(--gold) !important; color: var(--good) !important; }
+.goal ul.objectives em { color: var(--gold-2) !important; }
+.goal-deadline, .goal-missed { color: var(--bad) !important; }
+/* HUD chips, toasts, hints, pause panel — same glass */
+.chip, .toast, .interact, .tip, .slot-label, .hotbar, .play-prompt, .resume-chip, .goal-arrow, .banner {
+  background: rgba(28, 19, 12, 0.72) !important; border: 1px solid var(--line); backdrop-filter: blur(10px);
+}
+.play-prompt { border-radius: 18px; padding: 18px 22px !important; }
+.play-prompt b { font-family: var(--serif); font-size: 22px; color: #fff4dc; }
+.play-prompt .pause-buttons button, .account button { background: rgba(255, 236, 200, 0.12) !important; color: var(--ink) !important; border: 1px solid var(--line) !important; }
+.account code { color: var(--gold-2) !important; }
+.slot.on { border-color: var(--gold) !important; background: rgba(240, 195, 106, 0.16) !important; }
+.toast.ok { color: var(--good) !important; }
+.toast.bad { color: var(--bad) !important; }
+.goal-arrow { color: var(--gold-2) !important; }
+
+/* ---- touch (phones & tablets, landscape) ---- */
+.touch { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.ui-title .touch { display: none; }
+.touch .t-look { position: absolute; left: 40%; right: 0; top: 0; bottom: 0; pointer-events: auto; touch-action: none; }
+.touch .t-stick { position: absolute; left: calc(env(safe-area-inset-left) + 34px); bottom: 34px; width: 132px; height: 132px; border-radius: 50%; background: rgba(28,19,12,0.45); border: 1px solid var(--line); pointer-events: auto; touch-action: none; display: grid; place-items: center; }
+.touch .t-knob { width: 58px; height: 58px; border-radius: 50%; background: rgba(246,234,210,0.85); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+.touch .t-buttons { position: absolute; right: calc(env(safe-area-inset-right) + 26px); bottom: 26px; display: grid; grid-template-columns: auto auto; gap: 12px; align-items: end; pointer-events: auto; }
+.touch button { font: 800 14px system-ui; color: #fff6e8; border: 1px solid var(--line); background: rgba(28,19,12,0.6); border-radius: 50%; backdrop-filter: blur(8px); touch-action: none; }
+.touch button.down { background: var(--rust); }
+.touch .t-big { width: 86px; height: 86px; background: rgba(194,90,54,0.85); grid-column: 2; grid-row: 1 / span 2; }
+.touch .t-mid { width: 70px; height: 70px; grid-column: 1; grid-row: 2; }
+.touch .t-sm { width: 56px; height: 56px; }
+.touch .t-buttons .t-sm:first-of-type { grid-column: 1; grid-row: 1; }
+.touch .t-buttons .t-sm:last-of-type { grid-column: 2; grid-row: 3; justify-self: center; width: 60px; height: 44px; border-radius: 22px; }
+.touch .t-top { position: absolute; right: calc(env(safe-area-inset-right) + 12px); top: 56px; display: flex; gap: 6px; pointer-events: auto; }
+.touch .t-top button { border-radius: 10px; padding: 7px 10px; font-size: 12px; }
+.is-touch .play-prompt, .is-touch .title-keys, .is-touch .crosshair + .tip { }
+.is-touch .play-prompt { display: none !important; }
+.is-touch .goal { width: 250px; top: 50px; padding: 9px 11px; }
+.is-touch .goal span, .is-touch .goal small { display: none; }
+.is-touch .goal ul.objectives li { font-size: 12px; }
+.is-touch .hotbar { bottom: 8px; transform: translateX(-50%) scale(0.82); transform-origin: bottom center; }
+.is-touch .interact kbd { display: none; }
+.is-touch .title-keys { display: none; }
+.is-touch .goods { display: none; }
+.rotate-note { display: none; position: fixed; inset: 0; z-index: 100; background: #120c07; color: var(--ink); place-items: center; text-align: center; pointer-events: auto; }
+.rotate-note b { display: block; font: 800 24px var(--serif); margin-top: 12px; }
+.rotate-note span { opacity: 0.7; }
+.rotate-icon { font-size: 54px; animation: tilt 1.6s ease-in-out infinite; }
+@keyframes tilt { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+@media (orientation: portrait) { .is-touch .rotate-note { display: grid; } }
+@media (max-height: 500px) {
+  .title-inner { top: 50%; }
+  .wordmark { font-size: 56px; }
+  .tagline { font-size: 14px; margin: 10px 0 6px; }
+  .eyebrow { display: none; }
+  .title-buttons { margin-top: 10px; gap: 8px; }
+  .title-buttons button.primary { padding: 10px 24px; font-size: 16px; }
+  .panel-card { max-height: calc(100vh - 30px) !important; padding: 12px 16px !important; }
+  .panel { padding-bottom: 0; }
+}
+.is-touch .info { font-size: 12px; gap: 8px; padding: 5px 10px; white-space: nowrap; top: 8px; }
+.is-touch .info .sync { display: none; }
+.is-touch .bulls-chip { display: none; }
+.is-touch .touch .t-top { top: 44px; }
+.is-touch .touch .t-top button { padding: 6px 9px; font-size: 11px; }
+.is-touch .goal { top: 44px; }
+.is-touch .goal-arrow { font-size: 11px; }

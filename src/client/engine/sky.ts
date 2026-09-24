@@ -128,7 +128,8 @@ export class Sky {
 
     // soft shadows from the sun, in a box that follows the player
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    const phone = matchMedia("(pointer: coarse)").matches;
+    this.sun.shadow.mapSize.set(phone ? 1024 : 2048, phone ? 1024 : 2048);
     const sc = this.sun.shadow.camera;
     sc.left = -45;
     sc.right = 45;

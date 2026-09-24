@@ -13,7 +13,8 @@ import type { Heightfield } from "./heightfield";
  * Tiles near the player are drawn at full density, farther ones thinner, then not at all.
  */
 const TILE = 16;
-const PER_CELL = 34; // blades per block of grassy ground, near the player
+// blades per block of grassy ground, near the player (fewer on phones)
+const PER_CELL = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches ? 16 : 34;
 
 export class Grass {
   readonly group = new THREE.Group();

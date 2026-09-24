@@ -43,7 +43,8 @@ import { Audio, renderRms, SOUNDS } from "./audio";
 import { Guide } from "./ui/guide";
 import { Leaderboard } from "./ui/leaderboard";
 import { current } from "../shared/missions";
-import { isTouchOnly, loadSettings, SettingsPanel, showMobileNote, TitleScreen, Tutorial } from "./ui/screens";
+import { loadSettings, SettingsPanel, TitleScreen, Tutorial } from "./ui/screens";
+import { isTouch, TouchControls } from "./player/touch";
 
 type Hooks = {
   ready: boolean;
@@ -73,7 +74,9 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPrefere
 renderer.shadowMap.enabled = true;
 renderer.info.autoReset = false; // the composer renders in passes; count a whole frame
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const TOUCH = isTouch();
+// phones: fewer pixels and a smaller shadow map keep it smooth
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, TOUCH ? 1.5 : 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 900);
@@ -203,6 +206,7 @@ function releaseMouse() {
 }
 function resumePlay() {
   if (titleScreen.open || mode !== "play") return;
+  if (TOUCH) return hud.setPlaying(true);
   const p = canvas.requestPointerLock?.() as Promise<void> | undefined;
   // browsers refuse a re-lock right after a release; then a small "click to continue" chip is enough
   if (p?.catch) p.catch(() => hud.setResume(true));
@@ -251,6 +255,11 @@ function enterGame(lock: boolean) {
   mode = "play";
   audio.unlock();
   hud.setPlaying(false);
+  if (TOUCH) {
+    hud.setPlaying(true); // no "click to play" on a phone
+    document.documentElement.requestFullscreen?.().then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape")).catch(() => {});
+    return;
+  }
   if (lock) canvas.requestPointerLock?.();
 }
 titleScreen.onPlay = () => {
@@ -278,7 +287,23 @@ settingsPanel.show = () => {
   hud.setPlaying(true); // the pause panel steps aside
   releaseMouse();
 };
-if (isTouchOnly()) showMobileNote(uiRoot, () => {});
+// phones and tablets: touch controls, landscape only
+const touch = TOUCH ? new TouchControls(uiRoot, controls) : null;
+if (touch) {
+  controls.touch = touch;
+  document.body.classList.add("is-touch");
+  const rotate = document.createElement("div");
+  rotate.className = "rotate-note";
+  rotate.innerHTML = `<div><div class="rotate-icon">📱↻</div><b>Turn your phone sideways</b><span>Tanda plays in landscape</span></div>`;
+  uiRoot.appendChild(rotate);
+  // tapping a hotbar slot picks it
+  uiRoot.addEventListener("touchstart", (e) => {
+    const slot = (e.target as HTMLElement).closest(".slot");
+    if (!slot) return;
+    const i = [...slot.parentElement!.children].indexOf(slot);
+    controls.onSelect(i);
+  });
+}
 let target: Hit | null = null;
 
 const outline = new THREE.LineSegments(
@@ -802,7 +827,7 @@ controls.onLockChange = (locked) => {
     softRelease = false;
     hud.setPlaying(true);
     if (!busy) hud.setResume(true);
-  } else hud.setPlaying(titleScreen.open); // you pressed Esc: the pause panel
+  } else hud.setPlaying(titleScreen.open || TOUCH); // you pressed Esc: the pause panel
 };
 // the pause panel gets a Settings button
 {

@@ -6,7 +6,8 @@ import type { Save } from "../../shared/save";
  */
 export type Settings = { sensitivity: number; renderDistance: number; volume: number };
 const KEY = "bailgaadi.settings";
-export const DEFAULTS: Settings = { sensitivity: 0.0022, renderDistance: 128, volume: 0.8 };
+const touchDevice = typeof matchMedia !== "undefined" && (matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1);
+export const DEFAULTS: Settings = { sensitivity: 0.0022, renderDistance: touchDevice ? 90 : 128, volume: 0.8 };
 
 export function loadSettings(): Settings {
   try {
@@ -211,18 +212,4 @@ export class Tutorial {
     }
     this.el.innerHTML = `<div class="tut-head">Getting started · ${i + 1} of ${steps.length}<button data-skip title="Hide these tips">skip</button></div>${steps[i][1]}`;
   }
-}
-
-/** Phones and tablets: say so kindly instead of showing controls that can't work. */
-export function isTouchOnly() {
-  return (matchMedia("(pointer: coarse)").matches && !matchMedia("(pointer: fine)").matches) || innerWidth < 640;
-}
-export function showMobileNote(parent: HTMLElement, onAnyway: () => void) {
-  const n = el("div", "mobile-note", parent, `<div class="panel-card"><h2>Tanda is a computer game</h2>
-    <p>It's played with a keyboard and mouse. Open <b>tanda.gajananrathod.in</b> on a laptop or desktop to farm.</p>
-    <div class="big-acts"><button data-anyway>Just look around</button></div></div>`);
-  n.querySelector("[data-anyway]")!.addEventListener("click", () => {
-    n.remove();
-    onAnyway();
-  });
 }

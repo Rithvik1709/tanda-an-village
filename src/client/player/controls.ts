@@ -28,7 +28,7 @@ export class Controls {
 
   constructor(el: HTMLElement) {
     el.addEventListener("click", () => {
-      if (!this.locked) el.requestPointerLock?.()?.catch?.(() => {});
+      if (!this.locked && !this.touch) el.requestPointerLock?.()?.catch?.(() => {});
     });
     document.addEventListener("pointerlockchange", () => {
       this.locked = document.pointerLockElement === el;
@@ -81,8 +81,13 @@ export class Controls {
     this.pitch = Math.max(-1.55, Math.min(1.55, this.pitch - dy * this.sensitivity));
   }
 
+  /** Analog input from touch controls (added to the keys). */
+  touch: { move: { forward: number; right: number }; run: boolean } | null = null;
+
   input(): Input {
     const h = this.held;
+    const t = this.touch;
+    if (t && (t.move.forward || t.move.right)) return { forward: t.move.forward, right: t.move.right, jump: h.has("Space"), sprint: t.run };
     return {
       forward: (h.has("KeyW") || h.has("ArrowUp") ? 1 : 0) - (h.has("KeyS") || h.has("ArrowDown") ? 1 : 0),
       right: (h.has("KeyD") || h.has("ArrowRight") ? 1 : 0) - (h.has("KeyA") || h.has("ArrowLeft") ? 1 : 0),
