@@ -41,7 +41,11 @@ export type Structure =
   | { kind: "stall"; x0: number; z0: number; w: number; d: number; y: number; awning: "saffron" | "blue" }
   | { kind: "temple"; x0: number; z0: number; y: number }
   | { kind: "well"; x: number; z: number; y: number }
-  | { kind: "hay"; x: number; z: number; y: number };
+  | { kind: "hay"; x: number; z: number; y: number }
+  | { kind: "hanuman"; x0: number; z0: number; y: number } // a small open shrine, facing west
+  | { kind: "school"; x0: number; z0: number; w: number; d: number; y: number } // the ZP school, verandah facing west
+  | { kind: "pir"; x: number; z: number; y: number } // the pir: a roof on four posts, open on all sides
+  | { kind: "plate"; x: number; z: number; y: number; facing: number; lines: string[]; color?: string };
 /** A tree: where it stands, how tall, how wide, and the trunk/root columns it occupies in the voxels. */
 export type Tree = { kind: "neem" | "banyan"; x: number; y: number; z: number; h: number; r: number; trunks: [number, number, number, number][] };
 
@@ -54,7 +58,7 @@ export type World = {
   chowk: { x0: number; z0: number; x1: number; z1: number; y: number };
   trees: Tree[];
   structures: Structure[];
-  landmarks: Record<"spawn" | "temple" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat", Landmark>;
+  landmarks: Record<"spawn" | "temple" | "hanuman" | "school" | "pir" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat", Landmark>;
 };
 
 export const idx = (x: number, y: number, z: number) => x + W * (z + D * y);
@@ -70,6 +74,13 @@ export function riverCenter(z: number) {
 }
 export function riverHalfWidth(z: number) {
   return 3.5 + 1.2 * Math.sin(z / 17 + 0.7);
+}
+
+/** Distance from a column to the tekdi's spine. */
+function ridgeDist(x: number, z: number) {
+  const ax = 146, az = 60, bx = 160, bz = 97;
+  const t = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / ((bx - ax) ** 2 + (bz - az) ** 2)));
+  return Math.hypot(x - (ax + (bx - ax) * t), z - (az + (bz - az) * t));
 }
 
 export function generateWorld(seed = WORLD_SEED): World {
@@ -92,8 +103,12 @@ export function generateWorld(seed = WORLD_SEED): World {
       let h = 15 + Math.round((n - 0.5) * 3);
       const sc = scrub(x, z);
       h += Math.round(sc * (2 + 3 * fbm(x / 18, z / 18, seed + 7, 3)));
+      // the tekdi: a rocky ridge running north–south beside the temple, east of the village
+      const rd = ridgeDist(x, z);
+      const ridge = Math.exp(-((rd / 10) ** 2)) * (8 + 4 * fbm(x / 11, z / 11, seed + 13, 3));
+      h += Math.round(ridge);
       height[col(x, z)] = Math.max(12, Math.min(H - 10, h));
-      top[col(x, z)] = sc > 0.35 && fbm(x / 7, z / 7, seed + 5, 2) > 0.45 ? B.RED_SOIL : B.GRASS;
+      top[col(x, z)] = ridge > 7 && fbm(x / 5, z / 5, seed + 17, 2) > 0.5 ? B.STONE : (sc > 0.35 || ridge > 3) && fbm(x / 7, z / 7, seed + 5, 2) > 0.45 ? B.RED_SOIL : B.GRASS;
     }
 
   /* ---------- 2. the village ground, and the real roads of Ukhali (from OpenStreetMap) ---------- */
@@ -318,8 +333,8 @@ export function generateWorld(seed = WORLD_SEED): World {
       const b = x0 + 7 - Math.floor(s / 2);
       for (let z = a; z <= b; z++) for (let x = a; x <= b; x++) set(x, y0 + 1 + s, z + (z0 - x0), s < 2 && x > a && x < b && z > a && z < b ? B.AIR : B.WHITEWASH);
     }
-    set(x0 + 4, y0 + 1, z0 + 8, B.AIR);
-    set(x0 + 4, y0 + 2, z0 + 8, B.AIR);
+    // the sanctum door stays open
+    for (const dx of [3, 4, 5]) for (const dy of [1, 2]) set(x0 + dx, y0 + dy, z0 + 7, B.AIR);
     set(x0 + 4, y0 + 7, z0 + 4, B.SAFFRON);
     set(x0 + 4, y0 + 8, z0 + 4, B.LOG);
     set(x0 + 4, y0 + 9, z0 + 4, B.SAFFRON);
@@ -327,12 +342,69 @@ export function generateWorld(seed = WORLD_SEED): World {
     for (let z = z0; z < z0 + 9; z++) for (let x = x0; x < x0 + 9; x++) reserved[col(x, z)] = 1;
     return { x: x0 + 4, y: y0, z: z0 + 10 };
   })(113, 95); // the Sevalal Maharaj mandir, north-east of the chowk
+  // level a building's ground in the voxels too (the columns were written before the buildings)
+  const pad = (x0: number, z0: number, x1: number, z1: number, y: number) => {
+    flatten(x0, z0, x1, z1, y, B.DIRT);
+    for (let z = z0; z <= z1; z++)
+      for (let x = x0; x <= x1; x++) {
+        for (let k = y - 4; k <= y; k++) set(x, k, z, B.DIRT);
+        for (let k = y + 1; k < y + 12; k++) if (get(x, k, z) !== B.LOG) set(x, k, z, B.AIR);
+      }
+  };
+  const plate = (x: number, z: number, y: number, facing: number, lines: string[], color?: string) => structures.push({ kind: "plate", x, z, y, facing, lines, color });
+  plate(temple.x - 3.2, temple.z + 0.3, temple.y, 0.35, ["संत सेवालाल महाराज मंदिर", "Sant Sevalal Maharaj Mandir"], "#c2410c");
+  const wallRing = (x0: number, z0: number, w: number, d: number, y0: number, h: number, b: number, door?: { side: "W" | "S"; at: number; wide: number }) => {
+    for (let y = y0; y < y0 + h; y++)
+      for (let z = z0; z < z0 + d; z++)
+        for (let x = x0; x < x0 + w; x++) {
+          if (x !== x0 && x !== x0 + w - 1 && z !== z0 && z !== z0 + d - 1) continue;
+          if (door && y < y0 + 2 && ((door.side === "W" && x === x0 && Math.abs(z - door.at) < door.wide) || (door.side === "S" && z === z0 + d - 1 && Math.abs(x - door.at) < door.wide))) continue;
+          set(x, y, z, b);
+        }
+  };
+  // the Hanuman mandir: a small shrine by the Sevalal mandir, its door open to the west
+  const hanuman = (() => {
+    const x0 = 124, z0 = 86;
+    const y0 = height[col(x0 + 2, z0 + 2)] + 1;
+    pad(x0 - 1, z0 - 1, x0 + 5, z0 + 5, y0 - 1);
+    wallRing(x0, z0, 5, 5, y0, 3, B.SAFFRON, { side: "W", at: z0 + 2, wide: 1 });
+    structures.push({ kind: "hanuman", x0, z0, y: y0 });
+    plate(x0 - 1.2, z0 + 4.2, y0, -Math.PI / 2, ["श्री हनुमान मंदिर", "Shri Hanuman Mandir"], "#c2410c");
+    return { x: x0 - 1, y: y0, z: z0 + 2.5 };
+  })();
+  // the Zilla Parishad school: a long classroom block with a verandah, a compound wall and a flag
+  const school = (() => {
+    const x0 = 124, z0 = 97, w = 9, d = 6;
+    const y0 = height[col(x0 + 4, z0 + 3)] + 1;
+    pad(x0 - 4, z0 - 2, x0 + w + 1, z0 + d + 3, y0 - 1);
+    wallRing(x0, z0, w, d, y0, 3, B.WHITEWASH, { side: "W", at: z0 + 3, wide: 1 });
+    structures.push({ kind: "school", x0, z0, w, d, y: y0 });
+    plate(x0 - 1.4, z0 + 3, y0 + 1.6, -Math.PI / 2, ["जिल्हा परिषद प्राथमिक शाळा", "उखळी तांडा, ता. जि. जालना", "Z.P. Primary School, Ukhali Tanda"], "#1d4ed8");
+    return { x: x0 - 2, y: y0, z: z0 + 3 };
+  })();
+  // the pir on the front of the tekdi: a roof on four posts over the mazar, a tree beside it
+  const pir = (() => {
+    const x = 137, z = 84;
+    let y = 0;
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) y = Math.max(y, height[col(x + dx, z + dz)]);
+    pad(x - 3, z - 3, x + 3, z + 3, y);
+    for (const [dx, dz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) for (let k = 1; k <= 3; k++) set(x + dx, y + k, z + dz, B.LOG);
+    set(x, y + 1, z, B.COBBLE); // the mazar
+    structures.push({ kind: "pir", x, z, y: y + 1 });
+    plate(x - 3.2, z + 2.2, y + 1, -Math.PI / 2, ["पीर बाबा", "Pir Baba"], "#15803d");
+    return { x: x - 3, y: y + 1, z };
+  })();
+  plate(school.x + 0.2, school.z + 4, school.y, -Math.PI / 2, ["→ शाळा · मंदिर · पीर", "School · Mandir · Pir"]);
 
   // the chowk: Ganpat's and Sitabai's stalls on its north side, the Naik's kacheri to the west
   const trader = stall(98, 109, 5, 4, B.SAFFRON);
   const seedShop = stall(106, 109, 5, 4, B.BLUE_WOOD);
   const landOffice = house(89, 111, 6, 5, B.WHITEWASH, B.ROOF_TILE, "E");
   const bank = house(114, 125, 7, 6, B.BRICK, B.ROOF_TILE, "W");
+  plate(trader.x, trader.z - 1.2, trader.y, 0, ["गणपत शेठ · व्यापारी", "Ganpat Seth, Trader"]);
+  plate(seedShop.x, seedShop.z - 1.2, seedShop.y, 0, ["सीताबाई बी-बियाणे", "Sitabai Seeds & Tools"]);
+  plate(landOffice.x + 0.3, landOffice.z + 1.8, landOffice.y + 1.4, Math.PI / 2, ["नायक कचेरी", "Naik's Kacheri"]);
+  plate(bank.x - 0.3, bank.z - 1.8, bank.y + 1.4, -Math.PI / 2, ["सहकारी बँक, उखळी तांडा", "Sahakari Bank"], "#15803d");
 
   // wells: the village well by the chowk, and the round vihir out in the fields
   const makeWell = (cx: number, cz: number) => {
@@ -405,8 +477,10 @@ export function generateWorld(seed = WORLD_SEED): World {
       set(x, 16, z, B.HAY);
       structures.push({ kind: "hay", x, z, y: 16 });
     }
+    plate(16, 33.5, 16, 0, ["जालना बाजार समिती", "Jalna Mandi"], "#7c2d12");
     return { x: 15, y: 16, z: 23 };
   })();
+  plate(84.5, 77, height[col(84, 77)] + 1, Math.PI * 0.85, ["उखळी तांडा", "Ukhali Tanda · ता. जि. जालना"], "#7c2d12");
   void houses;
 
   /* ---------- 7. trees: neem everywhere, a few great banyans ---------- */
@@ -482,6 +556,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       const z = gz + Math.floor(treeRng() * 5);
       if (canTree(x, z, 2)) neem(x, z);
     }
+  neem(pir.x + 6, pir.z + 2); // the pir's tree
   // neem trees along the lanes and the main road, as the satellite shows
   for (const r of UKHALI_ROADS)
     for (let i = 1; i < r.p.length; i++) {
@@ -521,6 +596,9 @@ export function generateWorld(seed = WORLD_SEED): World {
     landmarks: {
       spawn: { x: 109.5, y: SQUARE.y + 1, z: 116.5, label: "The chowk" },
       temple: lm(temple, "Sevalal Maharaj mandir"),
+      hanuman: lm(hanuman, "Hanuman mandir"),
+      school: lm(school, "Z.P. school"),
+      pir: lm(pir, "Pir Baba"),
       trader: lm(trader, "Trader"),
       seedShop: lm(seedShop, "Seed & tool shop"),
       landOffice: lm(landOffice, "Naik's kacheri"),

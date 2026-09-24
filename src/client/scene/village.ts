@@ -84,6 +84,18 @@ export class Village {
       whiteFlag: () => new THREE.MeshStandardMaterial({ color: "#f6f4ec", roughness: 0.9, side: THREE.DoubleSide }),
       basket: () => mat(TEX.thatch(), { color: "#c09050", roughness: 1 }),
       sprouts: () => new THREE.MeshStandardMaterial({ color: "#8cc84a", roughness: 0.8 }),
+      sindoor: () => new THREE.MeshStandardMaterial({ color: "#d9480f", roughness: 0.55 }),
+      saffronWall: () => mat(TEX.plaster(), { color: "#f0a060" }),
+      marble: () => new THREE.MeshStandardMaterial({ color: "#f7f3ea", roughness: 0.35 }),
+      cream: () => mat(TEX.plaster(), { color: "#f4e3a8" }),
+      green: () => new THREE.MeshStandardMaterial({ color: "#15803d", roughness: 0.8, side: THREE.DoubleSide }),
+      flagS: () => new THREE.MeshStandardMaterial({ color: "#ff9933", roughness: 0.8, side: THREE.DoubleSide }),
+      flagW: () => new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.8, side: THREE.DoubleSide }),
+      flagG: () => new THREE.MeshStandardMaterial({ color: "#138808", roughness: 0.8, side: THREE.DoubleSide }),
+      navy: () => new THREE.MeshStandardMaterial({ color: "#1e3a8a", roughness: 0.6 }),
+      board: () => new THREE.MeshStandardMaterial({ color: "#1f2d24", roughness: 0.9 }),
+      diya: () => new THREE.MeshStandardMaterial({ color: "#ffd27a", emissive: new THREE.Color("#ffb347"), emissiveIntensity: 3 }),
+      marigold: () => new THREE.MeshStandardMaterial({ color: "#f59e0b", roughness: 0.8 }),
     };
     for (const s of structures) {
       if (s.kind === "house") this.house(s, M);
@@ -91,6 +103,10 @@ export class Village {
       else if (s.kind === "temple") this.temple(s, M);
       else if (s.kind === "well") this.well(s, M);
       else if (s.kind === "hay") this.hay(s, M);
+      else if (s.kind === "hanuman") this.hanuman(s, M);
+      else if (s.kind === "school") this.school(s, M);
+      else if (s.kind === "pir") this.pir(s, M);
+      else if (s.kind === "plate") this.plate(s);
     }
     for (const p of plots) this.fence(p, M, groundAt);
     for (const b of this.buckets.values()) {
@@ -182,10 +198,17 @@ export class Village {
     const cx = s.x0 + 4.5, cz = s.z0 + 4.5, y = s.y;
     this.box("stone", M.stone, 9, 0.5, 9, cx, y - 0.25, cz);
     this.box("stone", M.stone, 7.4, 0.4, 7.4, cx, y + 0.2, cz);
-    this.box("whiteStone", M.whiteStone, 5, 3, 5, cx, y + 1.9, cz);
-    // the sanctum door facing south, onto the square
-    this.box("dark", M.dark, 1.2, 2, 0.1, cx, y + 1.4, cz + 2.52);
-    this.box("gold", M.gold, 1.5, 0.12, 0.12, cx, y + 2.45, cz + 2.56);
+    // the sanctum: walls with an open doorway facing south, onto the chowk
+    this.shrineWalls(M, "whiteStone", cx, cz, y + 0.4, 5, 5, 3, "S", 1.5);
+    this.box("gold", M.gold, 1.7, 0.14, 0.14, cx, y + 2.65, cz + 2.56);
+    // the door leaves, swung open
+    this.box("wood", M.wood, 0.08, 2.1, 0.75, cx - 0.78, y + 1.45, cz + 2.9);
+    this.box("wood", M.wood, 0.08, 2.1, 0.75, cx + 0.78, y + 1.45, cz + 2.9);
+    // inside: Sant Sevalal Maharaj on a marble pedestal — white dhoti and angarkha, white pheta, a staff
+    this.box("marble", M.marble, 1.4, 0.7, 1.0, cx, y + 0.75, cz - 1.2);
+    this.idol(M, cx, y + 1.1, cz - 1.2, "sevalal");
+    for (const dx of [-0.5, 0.5]) this.put("diya", M.diya, new THREE.SphereGeometry(0.06, 8, 6), new THREE.Matrix4().makeTranslation(cx + dx, y + 1.13, cz - 0.62));
+    this.lamps.push(new THREE.Vector3(cx, y + 1.5, cz - 0.4));
     // the shikhara: a ribbed, curving tower
     const prof: THREE.Vector2[] = [];
     for (let i = 0; i <= 14; i++) {
@@ -240,6 +263,168 @@ export class Village {
     // a bell by the door
     this.box("wood", M.wood, 0.06, 0.6, 0.06, cx + 1.2, y + 2.9, cz + 2.7);
     this.put("gold", M.gold, new THREE.ConeGeometry(0.15, 0.25, 10, 1, true), new THREE.Matrix4().makeTranslation(cx + 1.2, y + 2.5, cz + 2.7));
+  }
+
+  /** Four walls with an open doorway on one side (N/S/E/W), for shrines you can look into. */
+  private shrineWalls(M: Record<string, () => THREE.Material>, key: string, cx: number, cz: number, y: number, w: number, d: number, h: number, door: "N" | "S" | "E" | "W", doorW: number) {
+    const t = 0.25;
+    const side = (sx: number, sz: number, len: number, along: "x" | "z", hasDoor: boolean) => {
+      if (!hasDoor) return this.box(key, M[key], along === "x" ? len : t, h, along === "x" ? t : len, sx, y + h / 2, sz);
+      const part = (len - doorW) / 2;
+      for (const k of [-1, 1]) {
+        const off = k * (doorW / 2 + part / 2);
+        this.box(key, M[key], along === "x" ? part : t, h, along === "x" ? t : part, sx + (along === "x" ? off : 0), y + h / 2, sz + (along === "z" ? off : 0));
+      }
+      this.box(key, M[key], along === "x" ? doorW : t, h - 2.1, along === "x" ? t : doorW, sx, y + 2.1 + (h - 2.1) / 2, sz); // the lintel
+    };
+    side(cx, cz - d / 2, w, "x", door === "N");
+    side(cx, cz + d / 2, w, "x", door === "S");
+    side(cx - w / 2, cz, d, "z", door === "W");
+    side(cx + w / 2, cz, d, "z", door === "E");
+    this.box("stone", M.stone, w - 0.1, 0.06, d - 0.1, cx, y + 0.03, cz); // floor
+  }
+
+  /** A small idol: Sevalal Maharaj in white with a pheta and staff, or Hanuman in sindoor with his gada. */
+  private idol(M: Record<string, () => THREE.Material>, x: number, y: number, z: number, who: "sevalal" | "hanuman", faceX = false) {
+    const at = (dx: number, dy: number, dz: number) => new THREE.Matrix4().makeTranslation(x + (faceX ? dz : dx), y + dy, z + (faceX ? dx : dz));
+    if (who === "sevalal") {
+      this.put("marble", M.marble, new THREE.CylinderGeometry(0.22, 0.3, 0.7, 12), at(0, 0.35, 0)); // robe
+      this.put("marble", M.marble, new THREE.CylinderGeometry(0.16, 0.2, 0.35, 12), at(0, 0.85, 0)); // chest
+      this.put("gold", M.gold, new THREE.SphereGeometry(0.13, 12, 10), at(0, 1.13, 0)); // face (gilt, as shrine idols often are)
+      this.put("marble", M.marble, new THREE.TorusGeometry(0.11, 0.06, 6, 12).rotateX(Math.PI / 2), at(0, 1.25, 0)); // white pheta
+      this.put("marble", M.marble, new THREE.SphereGeometry(0.1, 10, 8), at(0, 1.3, 0));
+      this.put("wood", M.wood, new THREE.CylinderGeometry(0.02, 0.02, 1.2, 6), at(0.3, 0.6, 0.05)); // his staff
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        this.put("marigold", M.marigold, new THREE.SphereGeometry(0.04, 6, 5), at(Math.cos(a) * 0.18, 0.95 - Math.abs(Math.sin(a)) * 0.15, Math.sin(a) * 0.1 + 0.12));
+      }
+    } else {
+      this.put("sindoor", M.sindoor, new THREE.CylinderGeometry(0.2, 0.26, 0.6, 12), at(0, 0.3, 0)); // legs
+      this.put("sindoor", M.sindoor, new THREE.SphereGeometry(0.24, 12, 10).scale(1, 1.2, 0.9), at(0, 0.8, 0)); // the broad chest
+      this.put("sindoor", M.sindoor, new THREE.SphereGeometry(0.15, 12, 10), at(0, 1.15, 0.02)); // head
+      this.put("gold", M.gold, new THREE.ConeGeometry(0.1, 0.22, 10), at(0, 1.35, 0)); // mukut
+      this.put("gold", M.gold, new THREE.SphereGeometry(0.13, 10, 8), at(0.33, 1.02, 0.05)); // the gada's head
+      this.put("gold", M.gold, new THREE.CylinderGeometry(0.03, 0.03, 0.6, 6), at(0.33, 0.7, 0.05));
+      this.put("marigold", M.marigold, new THREE.TorusGeometry(0.2, 0.035, 5, 14).rotateX(Math.PI / 2.4), at(0, 0.9, 0.08));
+    }
+  }
+
+  private hanuman(s: Extract<Structure, { kind: "hanuman" }>, M: Record<string, () => THREE.Material>) {
+    const cx = s.x0 + 2.5, cz = s.z0 + 2.5, y = s.y;
+    this.box("stone", M.stone, 6, 0.4, 6, cx, y - 0.2, cz);
+    this.shrineWalls(M, "saffronWall", cx, cz, y, 4.6, 4.6, 2.8, "W", 1.4);
+    this.box("wood", M.wood, 0.7, 2.0, 0.07, cx - 2.6, y + 1.0, cz - 1.05); // door leaves, open
+    this.box("wood", M.wood, 0.7, 2.0, 0.07, cx - 2.6, y + 1.0, cz + 1.05);
+    this.box("stone", M.stone, 1.0, 0.5, 1.2, cx + 1.1, y + 0.25, cz);
+    this.idol(M, cx + 1.1, y + 0.5, cz, "hanuman", true);
+    this.put("diya", M.diya, new THREE.SphereGeometry(0.06, 8, 6), new THREE.Matrix4().makeTranslation(cx + 0.45, y + 0.55, cz));
+    this.lamps.push(new THREE.Vector3(cx, y + 1.4, cz));
+    // a small shikhara and the saffron flag
+    const tower = new THREE.ConeGeometry(2.0, 2.6, 8);
+    this.put("saffronWall", M.saffronWall, tower, new THREE.Matrix4().makeTranslation(cx, y + 4.1, cz));
+    this.put("gold", M.gold, new THREE.SphereGeometry(0.16, 10, 8), new THREE.Matrix4().makeTranslation(cx, y + 5.5, cz));
+    this.box("wood", M.wood, 0.05, 1.6, 0.05, cx, y + 6.2, cz);
+    const f = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.5, 6, 2), M.saffron());
+    f.geometry.translate(0.4, 0, 0);
+    f.position.set(cx + 0.03, y + 6.75, cz);
+    this.group.add(f);
+    this.flagCloth.push(f);
+  }
+
+  private school(s: Extract<Structure, { kind: "school" }>, M: Record<string, () => THREE.Material>) {
+    const { x0, z0, w, d, y } = s;
+    const cx = x0 + w / 2, cz = z0 + d / 2, H = 3;
+    this.box("stone", M.stone, w + 0.4, 0.35, d + 0.4, cx, y + 0.12, cz);
+    this.box("cream", M.cream, w, H, d, cx, y + 0.3 + H / 2, cz);
+    this.box("navy", M.navy, w + 0.02, 0.4, d + 0.02, cx, y + 0.55, cz); // the blue dado band
+    // classroom doors and barred windows on the verandah side (west)
+    for (let i = 0; i < 3; i++) {
+      const z = z0 + 1 + i * 2;
+      this.box("navy", M.navy, 0.08, 2.0, 0.9, x0 - 0.02, y + 1.3, z);
+      this.box("dark", M.dark, 0.1, 1.9, 0.75, x0 - 0.04, y + 1.25, z);
+      this.box("navy", M.navy, 0.08, 0.9, 0.8, x0 - 0.02, y + 1.8, z + 1);
+    }
+    const roof = new THREE.BoxGeometry(w + 2.6, 0.18, d + 1.2);
+    this.put("tiles", M.tiles, roof, new THREE.Matrix4().makeTranslation(cx - 0.7, y + 0.3 + H + 0.1, cz));
+    for (let i = 0; i < 4; i++) this.box("cream", M.cream, 0.25, H, 0.25, x0 - 1.8, y + 0.3 + H / 2, z0 + 0.4 + i * ((d - 0.8) / 3)); // verandah pillars
+    // the blackboard-green name band on the wall, and the tricolour on its pole in the yard
+    this.box("board", M.board, 0.06, 0.55, d - 0.6, x0 - 0.05, y + 2.9, cz);
+    const px = x0 - 3.2, pz = z0 + d + 1.5;
+    this.box("stone", M.stone, 0.9, 0.3, 0.9, px, y + 0.15, pz);
+    this.box("marble", M.marble, 0.06, 5, 0.06, px, y + 2.8, pz);
+    ["flagS", "flagW", "flagG"].forEach((k, i) => {
+      const band = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.24, 6, 1), M[k]());
+      band.geometry.translate(0.55, 0, 0);
+      band.position.set(px + 0.03, y + 5.05 - i * 0.24, pz);
+      this.group.add(band);
+      this.flagCloth.push(band);
+    });
+    // a low compound wall with a gate on the west
+    for (const [x, z, lw, ld] of [[cx - 0.5, z0 - 1.6, w + 4, 0.25], [cx - 0.5, z0 + d + 2.6, w + 4, 0.25], [x0 + w + 1.4, cz + 0.5, 0.25, d + 4.2]] as const) this.box("cream", M.cream, lw, 0.9, ld, x, y + 0.45, z);
+  }
+
+  private pir(s: Extract<Structure, { kind: "pir" }>, M: Record<string, () => THREE.Material>) {
+    const { x, z, y } = s;
+    const cx = x + 0.5, cz = z + 0.5;
+    this.box("stone", M.stone, 5, 0.4, 5, cx, y - 0.2, cz);
+    for (const [dx, dz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) this.box("marble", M.marble, 0.3, 2.8, 0.3, cx + dx, y + 1.4, cz + dz);
+    // a flat roof with a little dome, open on all four sides
+    this.box("marble", M.marble, 5.2, 0.25, 5.2, cx, y + 2.9, cz);
+    this.put("marble", M.marble, new THREE.SphereGeometry(0.8, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.Matrix4().makeTranslation(cx, y + 3.0, cz));
+    this.put("gold", M.gold, new THREE.ConeGeometry(0.08, 0.4, 8), new THREE.Matrix4().makeTranslation(cx, y + 3.95, cz));
+    // the mazar under it, covered in a green chadar with a gold edge, and a few flowers
+    this.box("marble", M.marble, 1.1, 0.4, 2.0, cx, y + 0.2, cz);
+    const chadar = new THREE.CylinderGeometry(0.5, 0.5, 1.9, 12, 1, false, 0, Math.PI);
+    chadar.rotateZ(Math.PI / 2).rotateY(Math.PI / 2);
+    this.put("green", M.green, chadar, new THREE.Matrix4().makeTranslation(cx, y + 0.4, cz));
+    this.box("gold", M.gold, 1.02, 0.04, 1.92, cx, y + 0.42, cz);
+    for (let i = 0; i < 6; i++) this.put("marigold", M.marigold, new THREE.SphereGeometry(0.05, 6, 5), new THREE.Matrix4().makeTranslation(cx + (i % 2 ? 0.15 : -0.15), y + 0.9, cz - 0.6 + i * 0.25));
+    // a green flag on a tall pole
+    this.box("wood", M.wood, 0.05, 3.4, 0.05, cx + 2.4, y + 1.7, cz - 2.4);
+    const f = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.5, 6, 2), M.green());
+    f.geometry.translate(0.4, 0, 0);
+    f.position.set(cx + 2.43, y + 3.1, cz - 2.4);
+    this.group.add(f);
+    this.flagCloth.push(f);
+    this.lamps.push(new THREE.Vector3(cx, y + 2.5, cz));
+  }
+
+  /** A painted name board on two posts (Devanagari over English). */
+  private plate(s: Extract<Structure, { kind: "plate" }>) {
+    const c = document.createElement("canvas");
+    c.width = 512;
+    c.height = 128 + (s.lines.length - 2) * 48;
+    const g = c.getContext("2d")!;
+    g.fillStyle = s.color ?? "#1e3a8a";
+    g.fillRect(0, 0, c.width, c.height);
+    g.strokeStyle = "#f5e6c8";
+    g.lineWidth = 6;
+    g.strokeRect(8, 8, c.width - 16, c.height - 16);
+    g.fillStyle = "#fff8e6";
+    g.textAlign = "center";
+    s.lines.forEach((l, i) => {
+      g.font = i === 0 ? "700 44px 'Noto Sans Devanagari', 'Kohinoor Devanagari', system-ui" : "600 30px system-ui";
+      g.fillText(l, c.width / 2, i === 0 ? 60 : 60 + i * 44);
+    });
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const w = 2.2, h = (w * c.height) / c.width;
+    const grp = new THREE.Group();
+    const face = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 });
+    const edge = new THREE.MeshStandardMaterial({ color: "#3a2a1a" });
+    const board = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.05), [edge, edge, edge, edge, face, face]);
+    board.position.y = 1.5 + h / 2;
+    board.castShadow = true;
+    grp.add(board);
+    for (const px of [-w / 2 + 0.1, w / 2 - 0.1]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.5 + h, 0.08), edge);
+      post.position.set(px, (1.5 + h) / 2, -0.06);
+      grp.add(post);
+    }
+    grp.position.set(s.x, s.y, s.z);
+    grp.rotation.y = s.facing;
+    this.group.add(grp);
   }
 
   private well(s: Extract<Structure, { kind: "well" }>, M: Record<string, () => THREE.Material>) {

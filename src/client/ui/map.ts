@@ -92,6 +92,9 @@ export class MapView {
       [L.seedShop, "Seed shop", 6, 8, "left"],
       [L.landOffice, "Naik (land)", -6, 8, "right"],
       [L.bank, "Bank", 6, -6, "left"],
+      [L.hanuman, "Hanuman mandir", 6, -4, "left"],
+      [L.school, "Z.P. school", 6, 8, "left"],
+      [L.pir, "Pir Baba", 6, 4, "left"],
       [L.market, "Town mandi (to Jalna)", 6, -10, "left"],
       [L.ghat, "Vihir", 8, 4, "left"],
     ];
