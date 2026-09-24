@@ -2,6 +2,7 @@ import { B, block, isCropBlock } from "./blocks";
 import { advance, CAN_MAX, CROPS, type CropId, isCrop, stageOf, WET_MS, yieldOf } from "./crops";
 import { type Buyer, buyerPrice, LEDGER_DAYS, shopItem } from "./economy";
 import { askingPrice, clearPlot, forSale, offersFor, valuePlot } from "./land";
+import { BULL_NAMES, bullsNow, CART_CAPACITY, FEED, MIN_MOOD, newBulls, PLOUGH_COST, PLOUGH_ROW, TRIP_COST, TRIP_MS } from "./bulls";
 import { hash2 } from "./rng";
 import type { LedgerEntry, Save } from "./save";
 import { clock, DAY_MS } from "./time";
@@ -26,7 +27,11 @@ export type Action =
   | { t: "buyPlot"; plot: number }
   | { t: "listPlot"; plot: number; price: number }
   | { t: "delist"; plot: number }
-  | { t: "acceptOffer"; plot: number; day: number };
+  | { t: "acceptOffer"; plot: number; day: number }
+  | { t: "feed" }
+  | { t: "plough"; x: number; y: number; z: number; dir: "x+" | "x-" | "z+" | "z-" }
+  | { t: "startTrip"; load: Record<string, number> }
+  | { t: "sellTown" };
 
 export type Result = { ok: true; msg?: string; gained?: Record<string, number> } | { ok: false; error: string };
 
@@ -71,7 +76,63 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
-const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer"]);
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown"]);
+
+/** Bulls and the cart: feeding, and the trip to the town mandi. (Ploughing is with the farm actions.) */
+function livestock(save: Save, a: Extract<Action, { t: "feed" | "startTrip" | "sellTown" }>, now: number): Result {
+  if (!save.bulls) return fail("You don't have bulls yet — Sakharam sells a fine pair.");
+  const b = bullsNow(save.bulls, now);
+  save.bulls = b;
+  const day = clock(now).day;
+  if (a.t === "feed") {
+    if (!(save.inv.fodder > 0)) return fail("No fodder — buy kadba at the seed shop.");
+    save.inv.fodder--;
+    if (!save.inv.fodder) delete save.inv.fodder;
+    save.bulls = { ...b, stamina: Math.min(100, b.stamina + FEED.stamina), mood: Math.min(100, b.mood + FEED.mood), fedAt: now };
+    return { ok: true, msg: `${BULL_NAMES.join(" & ")} munch happily` };
+  }
+  if (a.t === "startTrip") {
+    if (!save.inv.cart) return fail("You need a bullock cart.");
+    if (save.trip) return fail("The cart is already on the road.");
+    if (b.mood < MIN_MOOD) return fail("The bulls are sulking — feed them first.");
+    if (b.stamina < TRIP_COST) return fail("The bulls are too tired for the road. Let them rest or feed them.");
+    const load: Record<string, number> = {};
+    let total = 0;
+    for (const [item, n] of Object.entries(a.load ?? {})) {
+      if (!isCrop(item) || !qty(n)) return fail("Only produce goes in the cart.");
+      if ((save.inv[item] ?? 0) < n) return fail(`You don't have ${n} ${CROPS[item].name.toLowerCase()}.`);
+      load[item] = n;
+      total += n;
+    }
+    if (!total) return fail("Load something first.");
+    if (total > CART_CAPACITY) return fail(`The cart holds ${CART_CAPACITY}.`);
+    for (const [item, n] of Object.entries(load)) {
+      save.inv[item] -= n;
+      if (!save.inv[item]) delete save.inv[item];
+    }
+    save.bulls = { ...b, stamina: b.stamina - TRIP_COST };
+    save.trip = { startedAt: now, load };
+    return { ok: true, msg: `Loaded ${total} — off to the town mandi!` };
+  }
+  // sellTown
+  const trip = save.trip;
+  if (!trip) return fail("Nothing on the cart.");
+  if (now - trip.startedAt < TRIP_MS) return fail("You're still on the road.");
+  let total = 0;
+  const lines: string[] = [];
+  for (const [item, n] of Object.entries(trip.load)) {
+    const crop = item as CropId;
+    const amount = Math.round(buyerPrice(crop, day, "town") * n);
+    const village = Math.round(buyerPrice(crop, day, "village") * n);
+    save.money += amount;
+    save.stats.earned += amount;
+    total += amount;
+    record(save, { day, kind: "sell", item, n, amount, where: "town", premium: amount - village });
+    lines.push(`${n} ${CROPS[crop].name.toLowerCase()}`);
+  }
+  save.trip = null;
+  return { ok: true, msg: `Sold ${lines.join(", ")} at the town mandi for ₹${total.toLocaleString("en-IN")}`, gained: { money: total } };
+}
 
 /** Buying, listing and selling land at the land office. */
 function land(world: World, save: Save, a: Extract<Action, { t: "buyPlot" | "listPlot" | "delist" | "acceptOffer" }>, now: number): Result {
@@ -158,6 +219,7 @@ function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: numbe
   if (save.money < amount) return fail(`That costs ₹${amount} — you have ₹${save.money}.`);
   save.money -= amount;
   save.inv[item.id] = (save.inv[item.id] ?? 0) + a.n;
+  if (item.id === "bulls") save.bulls = newBulls(now);
   save.stats.spent += amount;
   record(save, { day, kind: "buy", item: item.id, n: a.n, amount });
   return { ok: true, msg: `Bought ${a.n} × ${item.name.toLowerCase()} for ₹${amount}` };
@@ -165,6 +227,11 @@ function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: numbe
 
 export function apply(world: World, save: Save, a: Action, now: number): Result {
   if (!a || typeof a !== "object" || !KNOWN.has(a.t)) return fail("Unknown action.");
+  if (a.t === "feed" || a.t === "startTrip" || a.t === "sellTown") {
+    const r = livestock(save, a, now);
+    if (r.ok) save.updatedAt = now;
+    return r;
+  }
   if (a.t === "sell" || a.t === "buy" || a.t === "buyPlot" || a.t === "listPlot" || a.t === "delist" || a.t === "acceptOffer") {
     const r = a.t === "sell" || a.t === "buy" ? trade(save, a, now) : land(world, save, a, now);
     if (r.ok) save.updatedAt = now;
@@ -274,6 +341,35 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       cell.wetUntil = now + WET_MS[season];
       take("water");
       r = { ok: true };
+      break;
+    }
+
+    case "plough": {
+      if (!save.bulls || !has("plough")) return fail("You need bulls and a plough.");
+      const bl = bullsNow(save.bulls, now);
+      save.bulls = bl;
+      if (bl.mood < MIN_MOOD) return fail("The bulls are sulking — feed them first.");
+      const d = ({ "x+": [1, 0], "x-": [-1, 0], "z+": [0, 1], "z-": [0, -1] } as const)[a.dir];
+      if (!d) return fail("Pick a direction.");
+      let done = 0;
+      for (let i = 0; i < PLOUGH_ROW; i++) {
+        if (save.bulls.stamina < PLOUGH_COST) break;
+        const cx = x + d[0] * i, cz = z + d[1] * i;
+        if (!inside(cx, y, cz) || !ownedPlot(world, save, cx, cz)) break;
+        const ck = key(cx, y, cz);
+        const b0 = blockAt(world, save, cx, y, cz, now);
+        if (save.farm[ck] || !block(b0).farmable) continue;
+        const above = blockAt(world, save, cx, y + 1, cz, now);
+        if (above !== B.AIR && !(block(above).shape === "cross" && !isCropBlock(above))) continue;
+        if (above !== B.AIR) save.edits[key(cx, y + 1, cz)] = B.AIR;
+        const q = soilQuality(world, cx, cz, b0);
+        save.farm[ck] = { baseQ: q, q, wetUntil: 0, restedAt: now };
+        delete save.edits[ck];
+        save.bulls = { ...save.bulls, stamina: save.bulls.stamina - PLOUGH_COST };
+        done++;
+      }
+      if (!done) return fail(save.bulls.stamina < PLOUGH_COST ? "The bulls are tired." : "Nothing to plough there.");
+      r = { ok: true, msg: `Ploughed ${done} with ${BULL_NAMES.join(" & ")}`, gained: { ploughed: done } };
       break;
     }
 

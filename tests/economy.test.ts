@@ -155,7 +155,7 @@ describe("buying and selling", () => {
     old.inv = { hoe: 1 };
     old.stats = { planted: 3, harvested: 1, produce: 5 } as Save["stats"];
     const s = migrate(old as Save);
-    expect(s.version).toBe(3);
+    expect(s.version).toBe(4);
     expect(s.listings).toEqual({});
     expect(s.ledger).toEqual([]);
     expect(s.inv["block:14"]).toBe(20);

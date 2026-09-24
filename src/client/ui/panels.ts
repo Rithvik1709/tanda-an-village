@@ -4,6 +4,7 @@ import { block } from "../../shared/blocks";
 import type { Action, Result } from "../../shared/rules";
 import type { Save } from "../../shared/save";
 import { askingPrice, forSale, offersFor, valuePlot } from "../../shared/land";
+import { BULL_NAMES, bullsMoodWord, bullsNow, CART_CAPACITY, TRIP_COST } from "../../shared/bulls";
 import { clock } from "../../shared/time";
 import type { World } from "../../shared/world";
 
@@ -11,7 +12,7 @@ import type { World } from "../../shared/world";
  * The trader's and shopkeeper's panels. They only ever call `act` — the same actions the server
  * re-checks — and re-render from the save after each one.
  */
-export type PanelKind = "trader" | "shop" | "land";
+export type PanelKind = "trader" | "shop" | "land" | "cart" | "town";
 type Ctx = {
   save: () => Save;
   now: () => number;
@@ -19,6 +20,7 @@ type Ctx = {
   toast: (m: string, k?: "ok" | "bad") => void;
   world: World;
   showMap: () => void;
+  ride: (dest: "town" | "home") => void;
 };
 
 const CROP_COLOR: Record<CropId, string> = { jowar: "#e0b060", onion: "#e07a9a", sugarcane: "#9ccf5a" };
@@ -41,7 +43,7 @@ export class Panels {
 
   show(kind: PanelKind, tab?: string) {
     this.open = kind;
-    this.tab = tab ?? (kind === "trader" ? "sell" : kind === "land" ? "plots" : "buy");
+    this.tab = tab ?? (kind === "trader" ? "sell" : kind === "land" ? "plots" : kind === "cart" ? "load" : kind === "town" ? "mandi" : "buy");
     this.el.hidden = false;
     this.render();
   }
@@ -59,6 +61,30 @@ export class Panels {
     const [what, a, b] = t.dataset.do!.split(":");
     if (what === "close") return this.close();
     if (what === "map") return this.ctx.showMap();
+    if (what === "rideHome") {
+      this.close();
+      return this.ctx.ride("home");
+    }
+    if (what === "setOff") {
+      const load: Record<string, number> = {};
+      this.el.querySelectorAll<HTMLInputElement>("input[data-load]").forEach((i) => {
+        const n = Math.floor(Number(i.value) || 0);
+        if (n > 0) load[i.dataset.load!] = n;
+      });
+      const res = this.ctx.act({ t: "startTrip", load });
+      this.ctx.toast(res.ok ? (res.msg ?? "Off we go") : res.error, res.ok ? "ok" : "bad");
+      if (res.ok) {
+        this.close();
+        this.ctx.ride("town");
+      } else this.render();
+      return;
+    }
+    if (what === "sellTown") {
+      const res = this.ctx.act({ t: "sellTown" });
+      this.ctx.toast(res.ok ? (res.msg ?? "Sold") : res.error, res.ok ? "ok" : "bad");
+      if (res.ok) this.tab = "sold";
+      return this.render();
+    }
     if (what === "tab") {
       this.tab = a;
       return this.render();
@@ -87,20 +113,26 @@ export class Panels {
     const s = this.ctx.save();
     const day = clock(this.ctx.now()).day;
     const tabs =
-      this.open === "trader" ? [["sell", "Sell"], ["prices", "Prices"], ["ledger", "Ledger"]] : this.open === "land" ? [["plots", "Plots"], ["mine", "Your land"]] : [["buy", "Buy"], ["ledger", "Ledger"]];
+      this.open === "cart" || this.open === "town"
+        ? []
+        : this.open === "trader" ? [["sell", "Sell"], ["prices", "Prices"], ["ledger", "Ledger"]] : this.open === "land" ? [["plots", "Plots"], ["mine", "Your land"]] : [["buy", "Buy"], ["ledger", "Ledger"]];
     const who =
       this.open === "trader"
         ? `<h2>Ganpat Seth <small>village trader · व्यापारी</small></h2><p class="lede">"I pay fair, and I pay today. For more, you'd have to cart it to the town mandi."</p>`
-        : this.open === "land"
+        : this.open === "cart"
+          ? `<h2>Load the bailgaadi <small>बैलगाडी</small></h2><p class="lede">The town mandi pays more than Ganpat — if you make the trip. Sarja and Raja know the road.</p>`
+          : this.open === "town"
+            ? `<h2>Town mandi <small>Haribhau, commission agent · अडत्या</small></h2><p class="lede">"Unload here, bhau. Town prices, cash today."</p>`
+            : this.open === "land"
           ? `<h2>Talathi's land office <small>तलाठी कार्यालय</small></h2><p class="lede">"Land is the long game, beta. Buy good soil near water, and it pays you back every season."</p>`
           : `<h2>Sakharam's seeds &amp; tools <small>बी-बियाणे</small></h2><p class="lede">"Good seed, good harvest. Tell me what you're growing."</p>`;
     const body =
-      this.tab === "sell" ? this.sell(s, day) : this.tab === "prices" ? this.prices(day) : this.tab === "ledger" ? this.ledger(s, day) : this.tab === "plots" ? this.plots(s, day) : this.tab === "mine" ? this.mine(s, day) : this.buy(s);
+      this.tab === "load" ? this.load(s, day) : this.tab === "mandi" || this.tab === "sold" ? this.mandi(s, day) : this.tab === "sell" ? this.sell(s, day) : this.tab === "prices" ? this.prices(day) : this.tab === "ledger" ? this.ledger(s, day) : this.tab === "plots" ? this.plots(s, day) : this.tab === "mine" ? this.mine(s, day) : this.buy(s);
     this.el.innerHTML = `
       <div class="panel-card">
         <button class="x" data-do="close" title="Close (E)">✕</button>
         ${who}
-        <div class="tabs">${tabs.map(([k, n]) => `<button data-do="tab:${k}" class="${k === this.tab ? "on" : ""}">${n}</button>`).join("")}<span class="wallet">${rs(s.money)}</span></div>
+        <div class="tabs" ${tabs.length ? "" : 'style="border:0"'}>${tabs.map(([k, n]) => `<button data-do="tab:${k}" class="${k === this.tab ? "on" : ""}">${n}</button>`).join("")}<span class="wallet">${rs(s.money)}</span></div>
         <div class="panel-body">${body}</div>
         <div class="panel-foot">E or Esc to close</div>
       </div>`;
@@ -148,8 +180,12 @@ export class Panels {
       const d = byDay.get(e.day) ?? { income: 0, costs: 0, lines: [] };
       if (e.kind === "sell") d.income += e.amount;
       else d.costs += e.amount;
-      const name = e.kind === "sell" ? CROPS[e.item as CropId]?.name ?? e.item : SHOP.find((i) => i.id === e.item)?.name ?? e.item;
-      d.lines.push(`${e.kind === "sell" ? "Sold" : "Bought"} ${e.n} ${name.toLowerCase()} · <b class="${e.kind === "sell" ? "up" : "down"}">${e.kind === "sell" ? "+" : "−"}${rs(e.amount)}</b>`);
+      const name = e.item.startsWith("plot:")
+        ? `the plot ${this.ctx.world.plots[Number(e.item.slice(5))]?.name ?? ""}`
+        : e.kind === "sell" ? CROPS[e.item as CropId]?.name ?? e.item : SHOP.find((i) => i.id === e.item)?.name ?? e.item;
+      const where = e.where === "town" ? " at the town mandi" : "";
+      const prem = e.premium ? ` <span class="prem">(+${rs(e.premium)} town premium)</span>` : "";
+      d.lines.push(`${e.kind === "sell" ? "Sold" : "Bought"} ${e.item.startsWith("plot:") ? "" : e.n + " "}${e.item.startsWith("plot:") || !CROPS[e.item as CropId] ? name : name.toLowerCase()}${where} · <b class="${e.kind === "sell" ? "up" : "down"}">${e.kind === "sell" ? "+" : "−"}${rs(e.amount)}</b>${prem}`);
       byDay.set(e.day, d);
     }
     if (!byDay.size) return `<p class="empty">Nothing yet. Harvest something and sell it to Ganpat — every sale and purchase shows up here, day by day.</p>`;
@@ -166,6 +202,39 @@ export class Panels {
     const cost = [...byDay.values()].reduce((a, v) => a + v.costs, 0);
     return `<table class="ledger"><thead><tr><th>Day</th><th class="num">Income</th><th class="num">Costs</th><th class="num">Profit</th></tr></thead><tbody>${rows}</tbody>
       <tfoot><tr><td>Last ${LEDGER_DAYS} days</td><td class="num up">+${rs(inc)}</td><td class="num down">−${rs(cost)}</td><td class="num"><b>${inc - cost >= 0 ? "+" : "−"}${rs(Math.abs(inc - cost))}</b></td></tr></tfoot></table>`;
+  }
+
+  private load(s: Save, day: number) {
+    const b = s.bulls ? bullsNow(s.bulls, this.ctx.now()) : null;
+    const status = b ? `<p class="hint">🐂 ${BULL_NAMES.join(" & ")} · stamina ${Math.round(b.stamina)} · ${bullsMoodWord(b.mood)}. The trip costs ${TRIP_COST} stamina.</p>` : "";
+    let room = CART_CAPACITY;
+    const rows = CROP_IDS.map((c) => {
+      const have = s.inv[c] ?? 0;
+      const n = Math.min(have, room);
+      room -= n;
+      const v = buyerPrice(c, day, "village"), t = buyerPrice(c, day, "town");
+      return `<tr><td><i class="dot" style="background:${CROP_COLOR[c]}"></i>${CROPS[c].name}</td><td class="num">${have}</td><td class="num">${rs(v)}</td><td class="num"><b>${rs(t)}</b> <span class="up">+${Math.round((t / v - 1) * 100)}%</span></td>
+        <td class="acts"><input class="qty" data-load="${c}" type="number" min="0" max="${have}" value="${n}" ${have ? "" : "disabled"}></td></tr>`;
+    }).join("");
+    const any = CROP_IDS.some((c) => (s.inv[c] ?? 0) > 0);
+    return `${status}<table><thead><tr><th>Produce</th><th class="num">You have</th><th class="num">Village</th><th class="num">Town</th><th class="num">Load</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="big-acts"><button data-do="setOff" ${any ? "" : "disabled"}>Set off for the town mandi →</button></div>
+      <p class="hint">The cart holds ${CART_CAPACITY}. The ride takes about half a minute along the road east.</p>`;
+  }
+
+  private mandi(s: Save, day: number) {
+    if (this.tab === "sold" || !s.trip) {
+      const last = s.ledger.filter((l) => l.where === "town" && l.day === day);
+      const total = last.reduce((a, l) => a + l.amount, 0), prem = last.reduce((a, l) => a + (l.premium ?? 0), 0);
+      const summary = last.length ? `<p class="sold">Sold for <b>${rs(total)}</b> — <b class="up">${rs(prem)} more</b> than Ganpat would have paid today.</p>` : `<p class="empty">Nothing on the cart. Load it at home and ride here to sell at town prices.</p>`;
+      return `${summary}<div class="big-acts"><button data-do="rideHome">Ride home ←</button><button class="ghost" data-do="close">Stay in town a while</button></div>`;
+    }
+    const rows = Object.entries(s.trip.load).map(([c, n]) => {
+      const t = buyerPrice(c as CropId, day, "town"), v = buyerPrice(c as CropId, day, "village");
+      return `<tr><td><i class="dot" style="background:${CROP_COLOR[c as CropId]}"></i>${CROPS[c as CropId].name}</td><td class="num">${n}</td><td class="num">${rs(t)}</td><td class="num"><b>${rs(Math.round(t * n))}</b></td><td class="num up">+${rs(Math.round(t * n) - Math.round(v * n))}</td></tr>`;
+    }).join("");
+    return `<table><thead><tr><th>On the cart</th><th class="num">Qty</th><th class="num">Town price</th><th class="num">You get</th><th class="num">vs village</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="big-acts"><button data-do="sellTown">Sell the load</button></div>`;
   }
 
   private plots(s: Save, day: number) {
@@ -213,7 +282,8 @@ export class Panels {
   }
 
   private buy(s: Save) {
-    const section = (i: { id: string }) => (i.id.startsWith("seed:") ? "Seeds" : i.id.startsWith("block:") ? "Building" : "Tools");
+    const section = (i: { id: string }) =>
+      i.id.startsWith("seed:") ? "Seeds" : i.id.startsWith("block:") ? "Building" : ["bulls", "cart", "fodder"].includes(i.id) ? "Bulls & cart" : "Tools";
     let last = "";
     const rows = SHOP.map((i) => {
       const head = section(i) !== last ? `<tr class="section"><td colspan="4">${(last = section(i))}</td></tr>` : "";
@@ -221,7 +291,7 @@ export class Panels {
       const one = i.max === 1;
       const owned = one && have >= 1;
       const afford = (n: number) => (s.money >= i.price * n ? "" : "disabled");
-      const icon = i.id.startsWith("block:") ? `<i class="dot sq" style="background:${blockColor(Number(i.id.slice(6)))}"></i>` : i.id.startsWith("seed:") ? `<i class="dot" style="background:${CROP_COLOR[i.id.slice(5) as CropId]}"></i>` : "🪣";
+      const icon = i.id === "bulls" ? "🐂" : i.id === "cart" ? "🛞" : i.id === "fodder" ? "🌾" : i.id === "plough" ? "⛏" : i.id.startsWith("block:") ? `<i class="dot sq" style="background:${blockColor(Number(i.id.slice(6)))}"></i>` : i.id.startsWith("seed:") ? `<i class="dot" style="background:${CROP_COLOR[i.id.slice(5) as CropId]}"></i>` : "🪣";
       return `${head}<tr><td>${icon} ${i.name}${i.note ? `<br><small>${i.note}</small>` : ""}</td><td class="num">${one ? (owned ? "owned" : "—") : have}</td><td class="num">${rs(i.price)}</td>
         <td class="acts">${owned ? "" : `<button data-do="buy" data-item="${i.id}" data-n="1" ${afford(1)}>Buy${one ? "" : " 1"}</button>`}${one ? "" : `<button data-do="buy" data-item="${i.id}" data-n="10" ${afford(10)}>10</button>`}</td></tr>`;
     }).join("");

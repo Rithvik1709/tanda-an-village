@@ -18,6 +18,8 @@ export class Controls {
   onInteract: () => void = () => {};
   onEscape: () => void = () => {};
   onMap: () => void = () => {};
+  onRide: () => void = () => {};
+  onFeed: () => void = () => {};
   onLockChange: (locked: boolean) => void = () => {};
 
   constructor(el: HTMLElement) {
@@ -55,6 +57,8 @@ export class Controls {
       if (e.code === "KeyE" && !e.repeat) this.onInteract();
       if (e.code === "Escape") this.onEscape();
       if (e.code === "KeyM" && !e.repeat) this.onMap();
+      if (e.code === "KeyR" && !e.repeat) this.onRide();
+      if (e.code === "KeyF" && !e.repeat) this.onFeed();
       if (this.locked) {
         this.held.add(e.code);
         if (e.code === "Space") e.preventDefault();

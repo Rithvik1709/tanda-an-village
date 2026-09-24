@@ -105,3 +105,11 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .map-card .x { position: absolute; right: 12px; top: 10px; border: 0; background: none; font-size: 18px; cursor: pointer; opacity: 0.6; }
 .map-legend { display: flex; gap: 14px; margin-top: 8px; font-size: 12px; font-weight: 600; flex-wrap: wrap; }
 .map-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; border: 1px solid rgba(0,0,0,0.3); }
+.big-acts { display: flex; gap: 8px; justify-content: center; margin: 14px 0 4px; }
+.big-acts button { font: 700 15px system-ui; padding: 9px 18px; border-radius: 9px; border: 0; background: #b8553a; color: #fff; cursor: pointer; }
+.big-acts button:disabled { background: #c8bca4; }
+.big-acts button.ghost { background: none; color: #6a5a48; }
+.panel-card input.qty { width: 64px; font: 600 14px system-ui; padding: 4px 6px; border-radius: 6px; border: 1px solid #d9c49a; text-align: right; }
+.panel-card .sold { font-size: 16px; text-align: center; }
+.prem { color: #2f7a2f; font-weight: 600; }
+.bulls-chip { top: 54px; right: 12px; font-size: 13px; }

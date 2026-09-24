@@ -19,6 +19,9 @@ import { type PanelKind, Panels } from "./ui/panels";
 import { MapView } from "./ui/map";
 import { Signs } from "./engine/signs";
 import { askingPrice, forSale } from "../shared/land";
+import { bullsMoodWord, bullsNow } from "../shared/bulls";
+import { Farmyard } from "./farmyard";
+import { groundY } from "./player/path";
 
 type Hooks = {
   ready: boolean;
@@ -113,6 +116,12 @@ const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: N
     npc: new Npc({ kurta: "#f4f0e4", dhoti: "#3a3a44", hat: "#f6f2e8", skin: "#9a6440" }, lo.x + 1.6, lo.y, lo.z + 0.5, Math.PI / 2),
     label: "Buy & sell land at the Talathi's office",
   },
+  {
+    kind: "town",
+    at: { x: 176.5, y: world.landmarks.market.y, z: 96.5 },
+    npc: new Npc({ kurta: "#e8d8a8", dhoti: "#f0ead8", hat: "#c0392b", hatTall: true, skin: "#9a6440" }, 178.8, world.landmarks.market.y, 96.5, -Math.PI / 2),
+    label: "Talk to Haribhau at the town mandi",
+  },
 ];
 for (const s of STALLS) scene.add(s.npc.group);
 const panels = new Panels(document.getElementById("ui")!, {
@@ -126,6 +135,7 @@ const panels = new Panels(document.getElementById("ui")!, {
   toast: (m, k) => hud.toast(m, k),
   world,
   showMap: () => showMap(),
+  ride: (dest) => startRide(dest),
 });
 panels.onClose = () => hud.setPlaying(false);
 
@@ -148,6 +158,64 @@ function refreshSigns() {
     else if (!game.save.plots.includes(p.id) && forSale(p, day)) want.set(p.id, { lines: ["FOR SALE · विक्री", p.name, `₹${askingPrice(p, day).toLocaleString("en-IN")}`], color: "#b0452a" });
   }
   signs.set(world.plots, want);
+}
+
+// ---- Sarja & Raja, and the bailgaadi ----
+const farmyard = new Farmyard(vox, world.plots.find((p) => p.starter)!);
+scene.add(farmyard.group);
+let rideHeading = 0;
+function startRide(dest: "town" | "home") {
+  if (!farmyard.startRide(dest)) return hud.toast("The bulls can't find a road from here.", "bad");
+  rideHeading = farmyard.pos.heading;
+  controls.yaw = farmyard.pos.heading + Math.PI;
+  controls.pitch = -0.08;
+  hud.setPlaying(true);
+  hud.toast(dest === "town" ? "Off to the town mandi…" : "Heading home…");
+  sfxQueue.push("bells");
+}
+farmyard.onArrive = (dest) => {
+  // step down beside the cart
+  const h = farmyard.cartAt.heading;
+  const x = farmyard.cartAt.x + Math.cos(h) * 1.6, z = farmyard.cartAt.z - Math.sin(h) * 1.6;
+  Object.assign(body.pos, { x, y: groundY(vox, x, z) + 0.05, z });
+  Object.assign(body.vel, { x: 0, y: 0, z: 0 });
+  hud.setPlaying(false);
+  // turn to whoever you came to see
+  const look = dest === "town" ? { x: 178.8, z: 96.5 } : { x: farmyard.pos.x, z: farmyard.pos.z };
+  controls.yaw = Math.atan2(-(look.x - x), -(look.z - z));
+  controls.pitch = -0.1;
+  if (dest === "town") openStall("town");
+  else hud.toast("Home again. Sarja and Raja deserve some kadba.");
+};
+const nearCart = () => game.save.inv.cart && !farmyard.ride && farmyard.distTo(body.pos, farmyard.cartAt.x, farmyard.cartAt.z) < 3.6;
+const nearBulls = () => game.save.bulls && !farmyard.ride && farmyard.distTo(body.pos, farmyard.pos.x, farmyard.pos.z) < 4.5;
+const cartInTown = () => farmyard.distTo(farmyard.cartAt, farmyard.town.x, farmyard.town.z) < 3;
+function cartAction() {
+  if (!nearCart()) return false;
+  if (game.save.trip) cartInTown() ? openStall("town") : startRide("town");
+  else if (cartInTown()) startRide("home");
+  else if (!game.save.bulls) hud.toast("A cart needs bulls — Sakharam sells a Khillari pair.", "bad");
+  else openStall("cart");
+  return true;
+}
+function feedBulls() {
+  if (!nearBulls()) return;
+  const r = game.act({ t: "feed" });
+  hud.toast(r.ok ? (r.msg ?? "Fed") : r.error, r.ok ? "ok" : "bad");
+}
+function cartHint(): string {
+  if (nearCart()) {
+    if (game.save.trip) return cartInTown() ? "<kbd>R</kbd> Sell the load at the mandi" : "<kbd>R</kbd> Continue to the town mandi";
+    return cartInTown() ? "<kbd>R</kbd> Ride home" : "<kbd>R</kbd> Load the cart for the town mandi";
+  }
+  if (nearBulls()) return `<kbd>F</kbd> Feed Sarja & Raja (${game.save.inv.fodder ?? 0} kadba)`;
+  return "";
+}
+function bullsChip(): string {
+  if (!game.save.bulls) return "";
+  const b = bullsNow(game.save.bulls, game.now());
+  const trip = game.save.trip ? " · 🛞 loaded" : "";
+  return `🐂 <b>Sarja & Raja</b> <span>stamina ${Math.round(b.stamina)}</span> <span>${bullsMoodWord(b.mood)}</span>${trip}`;
 }
 
 /** A small toast when you walk onto a different plot. */
@@ -185,6 +253,7 @@ function eye() {
 /** The watering can can aim at water (to fill up); everything else looks through it. */
 const pickWater = (x: number, y: number, z: number) => get(x, y, z) !== B.AIR;
 
+let ploughNext = false; // test hook: the next hoe use ploughs as if Shift were held
 /** Plants are slimmer than their cell, so you can aim past a row of crops at the one behind. */
 const PLANT_H = [0.35, 0.6, 0.85, 1];
 const plantBox = (x: number, y: number, z: number): Box | null => {
@@ -221,7 +290,23 @@ function useRight(): Outcome {
   // aiming at a plant means "the soil it grows in"
   const soilY = isCropBlock(id) ? target.y - 1 : target.y;
   const at = { x: target.x, y: soilY, z: target.z };
-  if (slot.kind === "tool" && slot.tool === "hoe") return report(game.act({ t: "till", ...at }), "till");
+  if (slot.kind === "tool" && slot.tool === "hoe") {
+    const shift = controls.held.has("ShiftLeft") || controls.held.has("ShiftRight") || ploughNext;
+    ploughNext = false;
+    if (shift && game.save.inv.plough && game.save.bulls && farmyard.distTo(body.pos, farmyard.pos.x, farmyard.pos.z) < 10) {
+      // plough the row ahead, in the direction you're facing
+      const fx = -Math.sin(controls.yaw), fz = -Math.cos(controls.yaw);
+      const dir = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? "x+" : "x-") : fz > 0 ? "z+" : "z-";
+      const r = game.act({ t: "plough", ...at, dir });
+      if (r.ok) {
+        const n = r.gained?.ploughed ?? 0;
+        for (let i = 0; i < n + 1; i++) for (const dy of [0, 1]) game.sync(at.x + (dir === "x+" ? i : dir === "x-" ? -i : 0), at.y + dy, at.z + (dir === "z+" ? i : dir === "z-" ? -i : 0));
+        farmyard.walk(at.x + 0.5 + (dir === "x+" ? n : dir === "x-" ? -n : 0), at.z + 0.5 + (dir === "z+" ? n : dir === "z-" ? -n : 0));
+      }
+      return report(r, "plough");
+    }
+    return report(game.act({ t: "till", ...at }), "till");
+  }
   if (slot.kind === "tool" && slot.tool === "can")
     return game.save.farm[String(idx(at.x, at.y, at.z))] ? report(game.act({ t: "water", ...at }), "water") : report(game.act({ t: "refill", ...target }), "fill");
   if (slot.kind === "seed") return report(game.act({ t: "plant", ...at, crop: slot.crop }), "plant");
@@ -294,6 +379,8 @@ controls.onEscape = () => {
   map.close();
 };
 controls.onMap = () => (map.open ? map.close() : showMap());
+controls.onRide = () => void (!panels.open && cartAction());
+controls.onFeed = () => void (!panels.open && feedBulls());
 // the pause panel sits over the canvas: a click on it (outside the account box) also starts play
 document.querySelector(".play-prompt")!.addEventListener("click", (e) => {
   if (!(e.target as HTMLElement).closest(".account")) canvas.requestPointerLock?.();
@@ -349,7 +436,20 @@ renderer.setAnimationLoop(() => {
   frameTimes.push(now - last);
   if (frameTimes.length > 240) frameTimes.shift();
   last = now;
-  if (mode === "play") {
+  farmyard.set(!!game.save.bulls, !!game.save.inv.cart);
+  farmyard.update(dt, body.pos);
+  if (farmyard.ride) {
+    // on the cart: the road does the walking, you look around — and your view turns with the cart
+    controls.yaw += Math.atan2(Math.sin(farmyard.pos.heading - rideHeading), Math.cos(farmyard.pos.heading - rideHeading));
+    rideHeading = farmyard.pos.heading;
+    const seat = farmyard.seat();
+    Object.assign(body.pos, { x: seat.x, y: seat.y - PLAYER.eye + 0.4, z: seat.z });
+    Object.assign(body.vel, { x: 0, y: 0, z: 0 });
+    camera.position.set(seat.x, seat.y + 0.45, seat.z);
+    camera.rotation.set(controls.pitch, controls.yaw, 0, "YXZ");
+    target = null;
+    outline.visible = false;
+  } else if (mode === "play") {
     // fixed sub-steps keep collision stable when a frame hitches
     const n = Math.ceil(dt / (1 / 120));
     for (let i = 0; i < n; i++) step(body, controls.input(), controls.yaw, dt / n, solidAt, waterAt);
@@ -368,8 +468,9 @@ renderer.setAnimationLoop(() => {
     hud.setTip(mode === "play" ? tipFor(target) : "");
     refreshSigns();
     if (mode === "play") checkPlotEntry();
-    const st = mode === "play" && !panels.open ? nearStall() : undefined;
-    hud.setHint(st ? `<kbd>E</kbd> ${st.label}` : "");
+    const st = mode === "play" && !panels.open && !farmyard.ride ? nearStall() : undefined;
+    hud.setHint(farmyard.ride || panels.open ? "" : st ? `<kbd>E</kbd> ${st.label}` : cartHint());
+    hud.setBulls(bullsChip());
   }
   for (const s of STALLS) s.npc.update(dt, camera.position);
   worldRenderer.flush();
@@ -513,6 +614,14 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     closePanel: () => panels.close(),
     showMap: () => showMap(),
     closeMap: () => map.close(),
+    key: (code: string) => window.dispatchEvent(new KeyboardEvent("keydown", { code })),
+    plough: async () => {
+      ploughNext = true;
+      const r = useRight();
+      await worldRenderer.flush();
+      return r;
+    },
+    farmyard: () => ({ pos: { ...farmyard.pos }, cartAt: { ...farmyard.cartAt }, home: farmyard.home, riding: farmyard.ride ? { d: farmyard.ride.d, len: farmyard.ride.len, dest: farmyard.ride.dest } : null, bulls: game.save.bulls && bullsNow(game.save.bulls, game.now()), trip: game.save.trip }),
     land: () => ({ owned: [...game.save.plots], listings: structuredClone(game.save.listings) }),
     act: (a: import("../shared/rules").Action) => game.act(a),
     nearStall: () => nearStall()?.kind ?? null,

@@ -1,5 +1,6 @@
 import type { Planting } from "./crops";
 import { CAN_MAX } from "./crops";
+import type { Bulls } from "./bulls";
 import type { Listing } from "./land";
 import type { World } from "./world";
 
@@ -7,7 +8,7 @@ import type { World } from "./world";
  * The save: everything that differs from the seeded world, plus the player's money and goods.
  * Stored as JSON by the server. Keys of `edits` and `farm` are voxel indices (x + W*(z + D*y)).
  */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export type FarmCell = {
   baseQ: number; // the soil's natural quality, 0..1
@@ -30,9 +31,13 @@ export type Save = {
   stats: { planted: number; harvested: number; produce: number; earned: number; spent: number };
   ledger: LedgerEntry[]; // the last LEDGER_DAYS game days of buying and selling
   listings: Record<string, Listing>; // plot id → your asking price, while it's on the market
+  bulls: Bulls | null; // your bull pair, once bought
+  trip: Trip | null; // a loaded cart on the road to the town mandi
 };
 
-export type LedgerEntry = { day: number; kind: "sell" | "buy"; item: string; n: number; amount: number; where?: string };
+export type Trip = { startedAt: number; load: Record<string, number> };
+
+export type LedgerEntry = { day: number; kind: "sell" | "buy"; item: string; n: number; amount: number; where?: string; premium?: number };
 
 /** Building blocks every farmer starts with (and v1 saves are given when they upgrade). */
 export const STARTER_BLOCKS = { "block:11": 20, "block:14": 20, "block:16": 12 };
@@ -54,6 +59,8 @@ export function newSave(id: string, world: World, now: number): Save {
     stats: { planted: 0, harvested: 0, produce: 0, earned: 0, spent: 0 },
     ledger: [],
     listings: {},
+    bulls: null,
+    trip: null,
   };
 }
 
@@ -70,6 +77,11 @@ export function migrate(s: Save): Save {
   if (s.version === 2) {
     s.listings = {}; // v3: the land market
     s.version = 3;
+  }
+  if (s.version === 3) {
+    s.bulls = null; // v4: bulls and the cart
+    s.trip = null;
+    s.version = 4;
   }
   return s;
 }

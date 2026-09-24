@@ -110,6 +110,13 @@ export class Hud {
     this.hint.hidden = !html;
   }
 
+  private bullsEl?: HTMLElement;
+  setBulls(html: string) {
+    this.bullsEl ??= el("div", "chip bulls-chip", this.root);
+    if (this.bullsEl.innerHTML !== html) this.bullsEl.innerHTML = html;
+    this.bullsEl.hidden = !html;
+  }
+
   setBanner(text: string) {
     this.banner.textContent = text;
     this.banner.hidden = !text;
