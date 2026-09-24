@@ -11,8 +11,11 @@ let skip = new Set<number>();
 self.onmessage = (e: MessageEvent) => {
   const m = e.data;
   if (m.type === "init") {
-    vox = generateWorld(m.seed).voxels;
+    const w = generateWorld(m.seed);
+    vox = w.voxels;
     skip = new Set(m.skipTerrain ?? []);
+    // trees are modelled now: clear their trunks from the voxels (leaves are in the skip set)
+    if (m.modelTrees) for (const t of w.trees) for (const [x, z, y0, y1] of t.trunks) for (let y = y0; y <= y1; y++) if (vox[idx(x, y, z)] === 9) vox[idx(x, y, z)] = 0;
     for (const [x, y, z, b] of m.edits ?? []) vox[idx(x, y, z)] = b;
     if (skip.size) for (let i = 0; i < vox.length; i++) if (skip.has(vox[i])) vox[i] = 0;
     (self as unknown as Worker).postMessage({ type: "ready" });

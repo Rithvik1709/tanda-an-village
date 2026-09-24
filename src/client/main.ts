@@ -16,6 +16,8 @@ import { type Box, boxHits, type Hit, MOVE, raycast } from "./player/physics";
 import { Heightfield, TERRAIN } from "./scene/heightfield";
 import { buildTerrain } from "./scene/terrain";
 import { Water } from "./scene/water";
+import { Grass } from "./scene/grass";
+import { Trees } from "./scene/trees";
 import { Post } from "./scene/post";
 import { FARMER, Figure } from "./scene/figure";
 import { Walker } from "./player/walker";
@@ -105,6 +107,24 @@ scene.add(water.mesh);
 const walker = new Walker((x, z) => hf.at(x, z), (x, y, z) => { const id = get(x, y, z); return !TERRAIN.has(id) && block(id).solid; }, WATER_Y, W);
 walker.pos = { x: spawn.x, y: hf.at(spawn.x, spawn.z), z: spawn.z };
 const body = Object.defineProperty(walker, "inWater", { get: () => walker.wading > 0.3 }) as Walker & { readonly inWater: boolean };
+// the living landscape: modelled trees, and grass wherever the ground is grassy and open
+const trees = new Trees(world.trees, (x, z) => hf.at(x, z));
+scene.add(trees.group);
+const grass = new Grass(
+  hf,
+  (x, z) => {
+    // no grass under buildings, walls and fences, in plots (they're fields) or under trunks
+    if (world.plotMap[x + W * z] >= 0) return true;
+    const g = Math.floor(hf.at(x + 0.5, z + 0.5));
+    for (let y = g; y < g + 2; y++) {
+      const id = get(x, y, z);
+      if (id && !TERRAIN.has(id) && block(id).solid) return true;
+    }
+    return false;
+  },
+  WATER_Y,
+);
+scene.add(grass.group);
 const farmer = new Figure(FARMER);
 scene.add(farmer.root);
 const controls = new Controls(canvas);
@@ -592,6 +612,9 @@ renderer.setAnimationLoop(() => {
   sky.update(hour, dt, mode === "play" ? new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z) : camera.position);
   const sc = skyColors(hour);
   water.update(now / 1000, sunDirection(hour), sc.sun, sc.top, sc.horizon);
+  trees.update(now / 1000);
+  const grassAt = mode === "play" ? new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z) : camera.position;
+  grass.update(now / 1000, grassAt, mode === "title" ? 90 : Math.min(90, settings.renderDistance * 0.55), sunDirection(hour), sc.sun, sc.top);
   if (mode !== "title") applyRenderDistance();
   renderer.info.reset();
   post.render();
@@ -790,4 +813,4 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     plots: world.plots.length,
   });
 });
-worker.postMessage({ type: "init", seed: WORLD_SEED, skipTerrain: [...TERRAIN, B.WATER] });
+worker.postMessage({ type: "init", seed: WORLD_SEED, skipTerrain: [...TERRAIN, B.WATER, B.LEAVES, B.BANYAN_LEAVES, B.TALL_GRASS, B.MARIGOLD], modelTrees: true });

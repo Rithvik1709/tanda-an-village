@@ -30,12 +30,15 @@ export type Plot = {
 };
 
 export type Landmark = { x: number; y: number; z: number; label: string };
+/** A tree: where it stands, how tall, how wide, and the trunk/root columns it occupies in the voxels. */
+export type Tree = { kind: "neem" | "banyan"; x: number; y: number; z: number; h: number; r: number; trunks: [number, number, number, number][] };
 
 export type World = {
   seed: number;
   voxels: Uint8Array; // index = x + W * (z + D * y)
   plots: Plot[];
   plotMap: Int16Array; // per column: plot id or -1
+  trees: Tree[];
   landmarks: Record<"spawn" | "temple" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat", Landmark>;
 };
 
@@ -374,12 +377,14 @@ export function generateWorld(seed = WORLD_SEED): World {
     const t = top[col(x, z)];
     return t === B.GRASS && height[col(x, z)] > WATER_LEVEL;
   };
+  const trees: Tree[] = [];
   const neem = (x: number, z: number) => {
     const y0 = height[col(x, z)] + 1;
     const h = 4 + Math.floor(treeRng() * 2);
     for (let y = y0; y < y0 + h; y++) set(x, y, z, B.LOG);
     const cy = y0 + h;
     const r = 2 + (treeRng() < 0.4 ? 1 : 0);
+    trees.push({ kind: "neem", x: x + 0.5, y: y0, z: z + 0.5, h, r, trunks: [[x, z, y0, y0 + h - 1]] });
     for (let dy = -1; dy <= 2; dy++)
       for (let dz = -r; dz <= r; dz++)
         for (let dx = -r; dx <= r; dx++) {
@@ -406,6 +411,10 @@ export function generateWorld(seed = WORLD_SEED): World {
     ])
       for (let y = y0; y < y0 + 5; y++) set(x + dx, y, z + dz, B.LOG);
     const cy = y0 + 6;
+    trees.push({
+      kind: "banyan", x: x + 1, y: y0, z: z + 1, h: 6, r: 6.6,
+      trunks: [[x, z, y0, y0 + 5], [x + 1, z, y0, y0 + 5], [x, z + 1, y0, y0 + 5], [x + 1, z + 1, y0, y0 + 5], [x - 3, z + 1, y0, y0 + 4], [x + 4, z - 1, y0, y0 + 4], [x + 1, z + 4, y0, y0 + 4], [x, z - 3, y0, y0 + 4]],
+    });
     for (let dy = -1; dy <= 2; dy++)
       for (let dz = -6; dz <= 7; dz++)
         for (let dx = -6; dx <= 7; dx++) {
@@ -453,6 +462,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     voxels: vox,
     plots,
     plotMap,
+    trees,
     landmarks: {
       spawn: { x: 96.5, y: SQUARE.y + 1, z: 90.5, label: "Village square" },
       temple: lm(temple, "Temple"),
