@@ -16,7 +16,7 @@ export const world = () => (worldCache ??= generateWorld(WORLD_SEED));
 
 /** Dev and tests may fast-forward a save's clock; production never can. */
 export const devClockAllowed = () => !process.env.VERCEL && process.env.NODE_ENV !== "production";
-export const serverNow = (save?: Save & { devSkew?: number }) => Date.now() + (devClockAllowed() ? (save?.devSkew ?? 0) : 0);
+export const serverNow = (save?: Save & { devSkew?: number }) => Date.now() + (save?.clockOffset ?? 0) + (devClockAllowed() ? (save?.devSkew ?? 0) : 0);
 
 const hex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 export const randomHex = (n: number) => hex(crypto.getRandomValues(new Uint8Array(n)));

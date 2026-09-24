@@ -195,3 +195,22 @@ describe("saves from the old map", () => {
     expect(apply(world, s, { t: "till", ...cells(1)[0] }, now).ok).toBe(true); // it really is yours now
   });
 });
+
+describe("nights in the tanda", () => {
+  it("sleep jumps this farm to 6 am, once a night; crops grow through the night; friends once an evening", async () => {
+    const { clock } = await import("../src/shared/time");
+    const s = newSave("n", world, now);
+    const at = (h: number) => EPOCH + 10 * DAY_MS + (h - 6) * HOUR_MS; // day 10 at hour h
+    const t = at(22);
+    expect(apply(world, s, { t: "sleep" }, at(14)).ok).toBe(false); // afternoon
+    const r = apply(world, s, { t: "sleep" }, t);
+    expect(r.ok).toBe(true);
+    expect(s.clockOffset).toBe(8 * HOUR_MS);
+    expect(clock(t + s.clockOffset!).hour).toBeCloseTo(6);
+    expect(apply(world, s, { t: "sleep" }, t + s.clockOffset!).ok).toBe(false); // it's morning now
+    expect((apply(world, s, { t: "friends" }, at(20)) as { msg?: string }).msg).toMatch(/\+1 reputation/);
+    expect((apply(world, s, { t: "friends" }, at(21)) as { msg?: string }).msg).not.toMatch(/reputation/); // only once an evening
+    expect(s.rep).toBe(1);
+    expect(apply(world, s, { t: "friends" }, at(12)).ok).toBe(false);
+  });
+});

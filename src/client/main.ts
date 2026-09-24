@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { inject as injectAnalytics } from "@vercel/analytics";
 import { B, block, BLOCKS, isCropBlock } from "../shared/blocks";
 import { advance, CROPS, msToRipe } from "../shared/crops";
-import { canCapacity, type Result } from "../shared/rules";
+import { canCapacity, isNight, type Result } from "../shared/rules";
 import { newSave } from "../shared/save";
 import { clock, fmtHour, SEASON_DAYS, SEASON_NAMES } from "../shared/time";
 import { D, generateWorld, H, idx, W, WATER_LEVEL, WORLD_SEED } from "../shared/world";
@@ -36,6 +36,7 @@ import { bullsMoodWord, bullsNow } from "../shared/bulls";
 import { isOverdue, netWorth, TITLES, titleFor } from "../shared/bank";
 import { Farmyard } from "./farmyard";
 import { Villagers } from "./villagers";
+import { FIRESIDE, Nights } from "./nights";
 import { Infrastructure } from "./scene/infrastructure";
 import { Nav, separate } from "./player/nav";
 import { Audio, renderRms, SOUNDS } from "./audio";
@@ -191,6 +192,22 @@ controls.yaw = 0.25; // face up the north road, your first field off to the left
 const hotbar = new Hotbar();
 const hud = new Hud(document.getElementById("ui")!, atlas.image as HTMLCanvasElement, hotbar);
 let mode: "play" | "cinematic" | "title" = "title";
+/*
+ * The mouse: the game releases it to show a card or panel (a "soft" release), and takes it back when
+ * that closes. Only when YOU press Esc does the full "Click to play" pause panel appear.
+ */
+let softRelease = false;
+function releaseMouse() {
+  if (document.pointerLockElement) softRelease = true;
+  document.exitPointerLock?.();
+}
+function resumePlay() {
+  if (titleScreen.open || mode !== "play") return;
+  const p = canvas.requestPointerLock?.() as Promise<void> | undefined;
+  // browsers refuse a re-lock right after a release; then a small "click to continue" chip is enough
+  if (p?.catch) p.catch(() => hud.setResume(true));
+  else if (!document.pointerLockElement) setTimeout(() => !document.pointerLockElement && hud.setResume(true), 200);
+}
 const audio = new Audio();
 const uiRoot = document.getElementById("ui")!;
 uiRoot.classList.add("ui-title");
@@ -204,10 +221,10 @@ const guide = new Guide(uiRoot, scene, (x, z) => hf.at(x, z));
 guide.act = (a) => game.act(a);
 guide.onToast = (m, k) => hud.toast(m, k);
 guide.onDialogue = (open) => {
-  if (open) document.exitPointerLock?.();
+  if (open) releaseMouse();
   hud.setPlaying(open || titleScreen.open);
   // closing a story card (a click, so the browser allows it) drops you straight back into play
-  if (!open && !titleScreen.open && mode === "play") canvas.requestPointerLock?.()?.catch?.(() => {});
+  if (!open) resumePlay();
 };
 guide.onGoalDone = (title) => {
   hud.toast(`✓ Done: ${title}`);
@@ -242,7 +259,7 @@ titleScreen.onPlay = () => {
 };
 titleScreen.onSettings = () => settingsPanel.show();
 const board = new Leaderboard(uiRoot, () => net.token);
-board.onClose = () => hud.setPlaying(titleScreen.open);
+board.onClose = () => (titleScreen.open ? hud.setPlaying(true) : resumePlay());
 board.setName = async (n) => {
   const r = game.act({ t: "setName", name: n });
   if (!r.ok) return r.error;
@@ -252,14 +269,14 @@ board.setName = async (n) => {
 const showBoard = () => {
   board.show();
   hud.setPlaying(true);
-  document.exitPointerLock?.();
+  releaseMouse();
 };
 titleScreen.onBoard = showBoard;
 const showSettings = settingsPanel.show.bind(settingsPanel);
 settingsPanel.show = () => {
   showSettings();
   hud.setPlaying(true); // the pause panel steps aside
-  document.exitPointerLock?.();
+  releaseMouse();
 };
 if (isTouchOnly()) showMobileNote(uiRoot, () => {});
 let target: Hit | null = null;
@@ -389,6 +406,8 @@ for (const p of infra.poleSpots) {
 }
 const nav = new Nav(vox, (x, z) => hf.at(x, z));
 const villagers = new Villagers(world, (x, z) => hf.at(x, z), nav);
+const nights = new Nights(world, (x, z) => hf.at(x, z));
+scene.add(nights.group);
 // stall keepers and the neighbours by the well stand still; everyone else keeps clear of them
 const fixedBodies = [...STALLS.map((s) => s.npc), ...NEIGHBOURS].map((n) => ({ pos: { x: n.group.position.x, z: n.group.position.z }, r: 0.34, fixed: true }));
 const playerBody = { pos: { x: 0, z: 0 }, r: 0.32 };
@@ -409,15 +428,15 @@ const panels = new Panels(document.getElementById("ui")!, {
     if (tab === "prices" && current(game.save)?.id === "firstcrop") game.act({ t: "visit", place: "prices" });
   },
 });
-panels.onClose = () => hud.setPlaying(false);
+panels.onClose = () => resumePlay();
 
 // ---- the map (M) and the for-sale boards at plot gates ----
 const map = new MapView(document.getElementById("ui")!, world);
-map.onClose = () => hud.setPlaying(!!panels.open);
+map.onClose = () => (panels.open ? hud.setPlaying(true) : resumePlay());
 function showMap() {
   map.show(game.save, clock(game.now()).day, { x: body.pos.x, z: body.pos.z, yaw: controls.yaw });
   hud.setPlaying(true);
-  document.exitPointerLock?.();
+  releaseMouse();
 }
 const signs = new Signs();
 scene.add(signs.group);
@@ -486,6 +505,8 @@ function cartHint(): string {
     return cartInTown() ? "<kbd>R</kbd> Ride home" : "<kbd>R</kbd> Load the cart for the town mandi";
   }
   if (polaHere()) return "<kbd>E</kbd> Lead Sarja & Raja in the Pola procession";
+  if (isNight(nowHour()) && nearHome()) return "<kbd>E</kbd> Go home and sleep till morning";
+  if (Nights.evening(nowHour()) && nearFire()) return "<kbd>E</kbd> Sit with your friends by the fire";
   if (schoolHere()) {
     const ms = game.save.missions;
     const sabha = (ms.c["visit:gramsabha"] ?? 0) > (ms.base["visit:gramsabha"] ?? 0);
@@ -538,7 +559,7 @@ function openStall(kind: PanelKind, tab?: string) {
   panels.show(kind, tab);
   hud.setPlaying(true); // hide the click-to-play panel under it
   hud.setHint("");
-  document.exitPointerLock?.();
+  releaseMouse();
 }
 
 /** The watering can can aim at water (to fill up); everything else looks through it. */
@@ -684,7 +705,41 @@ function schoolHere() {
   const sc = world.landmarks.school;
   return current(game.save)?.id === "election" && Math.hypot(body.pos.x - sc.x, body.pos.z - sc.z) < 3.2;
 }
+const nowHour = () => hourOverride ?? clock(game.now()).hour;
+const nearHome = () => Math.hypot(body.pos.x - nights.home.door.x, body.pos.z - nights.home.door.z) < 2.6;
+const nearFire = () => Math.hypot(body.pos.x - nights.fire.x, body.pos.z - nights.fire.z) < 4.2;
+let sleeping = false;
+/** Go home: the door swings open, you step in, the screen fades to night and back to dawn. */
+async function goHomeToSleep() {
+  if (sleeping) return;
+  const r = game.act({ t: "sleep" });
+  if (!r.ok) return hud.toast(r.error, "bad");
+  sleeping = true;
+  const skip = (r as { gained?: { sleptMs?: number } }).gained?.sleptMs ?? 0;
+  game.skew += skip; // our clock jumps with the server's (it confirms on the next sync)
+  nights.openDoor(true);
+  audio.play("place");
+  hud.fade(true, "You sleep soundly at home…");
+  await new Promise((res) => setTimeout(res, 1600));
+  Object.assign(body.pos, { x: nights.home.door.x, y: hf.at(nights.home.door.x, nights.home.door.z), z: nights.home.door.z });
+  controls.yaw = nights.home.face + Math.PI;
+  nights.openDoor(false);
+  await net.flush();
+  await new Promise((res) => setTimeout(res, 900));
+  hud.fade(false, "");
+  hud.toast("Good morning, Ukhali! The bulls are rested and the crops grew overnight.");
+  audio.play("chirp");
+  sleeping = false;
+}
 controls.onInteract = () => {
+  const h = nowHour();
+  if (isNight(h) && nearHome() && !nearStall()) return void goHomeToSleep();
+  if (Nights.evening(h) && nearFire() && !nearStall()) {
+    const r = game.act({ t: "friends" });
+    const line = FIRESIDE[clock(game.now()).day % FIRESIDE.length];
+    guide.dialogue("Friends at the chowk", "Evening round the fire", line.replace(/^[^:]+: /, "").replace(/^"|"$/g, ""), [{ label: r.ok ? (r.msg ?? "Good night!") : r.error, onClick: () => guide.onDialogue(false) }]);
+    return;
+  }
   if (schoolHere() && !nearStall()) {
     const ms = game.save.missions;
     const sabhaDone = (ms.c["visit:gramsabha"] ?? 0) - (ms.base["visit:gramsabha"] ?? 0) > 0;
@@ -713,7 +768,7 @@ controls.onMap = () => (map.open ? map.close() : showMap());
 controls.onBoard = () => (board.open ? board.close() : showBoard());
 controls.onHelp = () => {
   guide.toggleHelp();
-  if (guide.helpOpen) document.exitPointerLock?.();
+  if (guide.helpOpen) releaseMouse();
 };
 controls.onTorch = () => {
   torchOn = !torchOn;
@@ -737,8 +792,17 @@ controls.onLockChange = (locked) => {
     panels.close();
   }
   if (locked) map.close();
-  // any card or panel on screen keeps the "Click to play" pause panel out of the way
-  hud.setPlaying(locked || !!panels.open || map.open || titleScreen.open || guide.dialogueOpen || board.open || settingsPanel.open || guide.helpOpen);
+  const busy = !!panels.open || map.open || titleScreen.open || guide.dialogueOpen || board.open || settingsPanel.open || guide.helpOpen;
+  if (locked) {
+    softRelease = false;
+    hud.setResume(false);
+    hud.setPlaying(true);
+  } else if (softRelease || busy) {
+    // the game let go of the mouse for a card: no pause panel
+    softRelease = false;
+    hud.setPlaying(true);
+    if (!busy) hud.setResume(true);
+  } else hud.setPlaying(titleScreen.open); // you pressed Esc: the pause panel
 };
 // the pause panel gets a Settings button
 {
@@ -910,6 +974,7 @@ renderer.setAnimationLoop(() => {
   water.update(now / 1000, sunDirection(hour), sc.sun, sc.top, sc.horizon);
   trees.update(now / 1000);
   village.update(dt);
+  nights.update(dt, hourOverride ?? clock(game.now()).hour);
   for (let i = confetti.length - 1; i >= 0; i--) {
     const c = confetti[i];
     c.v.y -= 6 * dt;
@@ -1126,6 +1191,8 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     setView: (v: "first" | "third") => (rig.view = v),
     torch: (on: boolean) => (torchOn = on),
     villagerDebug: () => villagers.debug(),
+    home: () => ({ door: { ...nights.home.door }, fire: { ...nights.fire } }),
+    clockNow: () => ({ hour: clock(game.now()).hour, day: clock(game.now()).day }),
     noFog: () => {
       settings.renderDistance = 2000;
       document.getElementById("ui")!.style.display = "none";

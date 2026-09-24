@@ -7,7 +7,7 @@ import { begin, BANDH_PLOT, bump, complete, current, deadlineAt, since } from ".
 import { BULL_NAMES, bullsNow, CART_CAPACITY, FEED, MIN_MOOD, newBulls, PLOUGH_COST, PLOUGH_ROW, TRIP_COST, TRIP_MS } from "./bulls.js";
 import { hash2 } from "./rng.js";
 import type { LedgerEntry, Save } from "./save.js";
-import { clock, DAY_MS } from "./time.js";
+import { clock, DAY_MS, HOUR_MS } from "./time.js";
 import { D, H, idx, W, type World } from "./world.js";
 
 /*
@@ -45,7 +45,9 @@ export type Action =
   | { t: "claimMission" }
   | { t: "decorate" }
   | { t: "installDrip"; plot: number }
-  | { t: "setName"; name: string };
+  | { t: "setName"; name: string }
+  | { t: "sleep" }
+  | { t: "friends" };
 
 export type Result = { ok: true; msg?: string; gained?: Record<string, number> } | { ok: false; error: string };
 
@@ -90,7 +92,10 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
-const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName"]);
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends"]);
+export const isNight = (hour: number) => hour >= 19.5 || hour < 4;
+/** How long until 6 am, from a night hour (ms). */
+export const untilMorning = (hour: number) => ((hour >= 19.5 ? 30 : 6) - hour) * HOUR_MS;
 
 /** A leaderboard name: 2–20 letters (any script), digits, spaces, dots, dashes or apostrophes. */
 export function cleanName(raw: unknown): string | null {
@@ -467,6 +472,28 @@ function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: numbe
 export function apply(world: World, save: Save, a: Action, now: number): Result {
   if (!a || typeof a !== "object" || !KNOWN.has(a.t)) return fail("Unknown action.");
   if (save.missions) checkDeadline(world, save, now);
+  if (a.t === "sleep") {
+    const c = clock(now);
+    if (!isNight(c.hour)) return fail("It's not night yet — sleep after 7:30 pm.");
+    const skip = Math.round(untilMorning(c.hour));
+    const wakeDay = clock(now + skip).day;
+    if (save.sleptDay === wakeDay) return fail("You've already slept tonight.");
+    save.clockOffset = (save.clockOffset ?? 0) + skip;
+    save.sleptDay = wakeDay;
+    // a night's rest does the bulls good too
+    if (save.bulls) save.bulls = { ...bullsNow(save.bulls, now + skip), stamina: 100 };
+    save.updatedAt = now;
+    return { ok: true, msg: "Good morning, Ukhali!", gained: { sleptMs: skip } };
+  }
+  if (a.t === "friends") {
+    const c = clock(now);
+    if (!(c.hour >= 19 && c.hour < 23.5)) return fail("Your friends gather at the chowk in the evening, 7 to 11:30 pm.");
+    if (save.friendsDay === c.day) return { ok: true, msg: "More chai, more stories." };
+    save.friendsDay = c.day;
+    save.rep += 1;
+    save.updatedAt = now;
+    return { ok: true, msg: "An evening with friends · +1 reputation" };
+  }
   if (a.t === "setName") {
     const n = cleanName(a.name);
     if (!n) return fail("Use 2–20 letters, numbers or spaces.");

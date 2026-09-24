@@ -228,3 +228,6 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .name-form input { flex: 1; font: 600 14px system-ui; padding: 7px 10px; border-radius: 8px; border: 1px solid #d9c49a; }
 .name-form button { font: 700 14px system-ui; padding: 7px 16px; border-radius: 8px; border: 0; background: #b8553a; color: #fff; cursor: pointer; }
 .name-form small { opacity: 0.65; }
+.resume-chip { position: absolute; left: 50%; top: calc(50% + 40px); transform: translateX(-50%); padding: 7px 16px; border-radius: 20px; background: rgba(30,24,20,0.7); font-weight: 700; font-size: 14px; pointer-events: none; }
+.sleep-fade { position: absolute; inset: 0; background: #06070d; color: #e8dcc0; display: grid; place-items: center; font: italic 22px Georgia, serif; opacity: 0; transition: opacity 1.2s; pointer-events: none; z-index: 60; }
+.sleep-fade.on { opacity: 1; }

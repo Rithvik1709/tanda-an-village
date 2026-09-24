@@ -87,18 +87,18 @@ export class Hud {
       last.dataset.n = String(Number(last.dataset.n) + 1);
       last.textContent = `${msg} ×${last.dataset.n}`;
       clearTimeout(Number(last.dataset.timer));
-      last.dataset.timer = String(window.setTimeout(() => this.fade(last), 1800));
+      last.dataset.timer = String(window.setTimeout(() => this.fadeToast(last), 1800));
       return;
     }
     const t = el("div", `toast ${kind}`, this.toasts);
     t.textContent = msg;
     t.dataset.msg = msg;
     t.dataset.n = "1";
-    t.dataset.timer = String(window.setTimeout(() => this.fade(t), 1800));
+    t.dataset.timer = String(window.setTimeout(() => this.fadeToast(t), 1800));
     while (this.toasts.children.length > 3) this.toasts.firstChild!.remove();
   }
 
-  private fade(t: HTMLElement) {
+  private fadeToast(t: HTMLElement) {
     t.classList.add("gone");
     setTimeout(() => t.remove(), 500);
   }
@@ -140,6 +140,23 @@ export class Hud {
     });
     // typing a code must not walk the farmer around
     this.account.addEventListener("keydown", (e) => e.stopPropagation());
+  }
+
+  private fadeEl?: HTMLElement;
+  /** Fade the screen to night (with a line of text) and back. */
+  fade(on: boolean, text: string) {
+    if (!this.fadeEl) this.fadeEl = el("div", "sleep-fade", this.root);
+    this.fadeEl.textContent = text;
+    this.fadeEl.classList.toggle("on", on);
+  }
+  private resume?: HTMLElement;
+  /** A small, quiet "click to continue" chip (instead of the full pause panel). */
+  setResume(on: boolean) {
+    if (!this.resume) {
+      this.resume = el("div", "resume-chip", this.root);
+      this.resume.textContent = "Click to continue";
+    }
+    this.resume.hidden = !on;
   }
 
   setPlaying(on: boolean) {

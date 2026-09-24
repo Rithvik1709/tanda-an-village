@@ -44,6 +44,9 @@ export type Save = {
   perks: string[]; // earned in missions: discount, townContact, polaChampion
   drip: number[]; // plots with drip irrigation installed
   layout: number; // which world layout the plot ids refer to
+  clockOffset?: number; // ms added to this farm's clock by sleeping through nights
+  sleptDay?: number; // the game day you last woke on (one sleep per night)
+  friendsDay?: number; // the last night you sat with friends at the chowk
   name?: string; // shown on the leaderboard (optional — guests are "Farmer ABCD")
 };
 
