@@ -128,9 +128,13 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .wordmark { font: 800 clamp(64px, 9vw, 120px)/0.92 Georgia, "Times New Roman", serif; letter-spacing: -0.02em; color: #fff4dc; text-shadow: 0 4px 30px rgba(60,20,0,0.5); margin-top: 6px; }
 .wordmark span { display: block; font: 700 clamp(20px, 2.4vw, 28px) system-ui; letter-spacing: 0.02em; margin-top: 12px; color: #ffd98a; }
 .tagline { font-size: 17px; line-height: 1.55; margin: 18px 0 10px; opacity: 0.92; }
+.tagline b { color: #ffd98a; font-weight: 700; }
 .title-save { min-height: 22px; font-size: 15px; color: #ffe6b0; }
-.title-buttons { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 16px; }
-.title-row { display: flex; gap: 10px; }
+.title-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; width: min(400px, 100%); }
+.title-buttons button.primary, .title-buttons .link, .title-buttons .title-restore, .title-buttons .restore-msg { grid-column: 1 / -1; }
+.title-row { display: contents; }
+.title-buttons button { width: 100%; text-align: center; }
+.title-buttons button.link { width: auto; justify-self: start; }
 .title-buttons button { font: 700 15px system-ui; padding: 11px 20px; border-radius: 12px; border: 1px solid rgba(255,236,200,0.35); background: rgba(255,244,220,0.12); color: #fff4dc; cursor: pointer; backdrop-filter: blur(6px); }
 .title-buttons button:hover { background: rgba(255,244,220,0.22); }
 .title-buttons button.primary { background: #c25a36; border-color: transparent; font-size: 18px; padding: 14px 34px; box-shadow: 0 10px 30px rgba(120,40,10,0.45); }

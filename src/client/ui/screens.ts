@@ -42,8 +42,8 @@ export class TitleScreen {
     this.el = el("div", "title-screen", parent, `
       <div class="title-inner">
         <div class="eyebrow">A farming game from the Deccan</div>
-        <div class="wordmark">Tanda<span>उखळी तांडा · Ukhali Tanda</span></div>
-        <p class="tagline">Come home to the tanda. Plough the black soil, cart your harvest to the mandi the old caravan way, and grow from a small farmer to the Pola champion.</p>
+        <div class="wordmark">Tanda</div>
+        <p class="tagline">Come home to <b>Ukhali Tanda · उखळी तांडा</b>, a Banjara village in Jalna. Plough the black soil, cart your harvest to the mandi the old caravan way, and grow from a small farmer to the Pola champion.</p>
         <div class="title-save"></div>
         <div class="title-buttons">
           <button class="primary" data-t="play">Start farming</button>
