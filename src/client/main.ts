@@ -20,6 +20,7 @@ import { MapView } from "./ui/map";
 import { Signs } from "./engine/signs";
 import { askingPrice, forSale } from "../shared/land";
 import { bullsMoodWord, bullsNow } from "../shared/bulls";
+import { isOverdue, netWorth, TITLES, titleFor } from "../shared/bank";
 import { Farmyard } from "./farmyard";
 import { groundY } from "./player/path";
 
@@ -77,6 +78,8 @@ const pickable = (x: number, y: number, z: number) => {
 // a placeholder until the server's save arrives (nothing is drawn or sent before that)
 const game = new Game(world, vox, newSave("loading", world, Date.now()), worldRenderer);
 const net = new Net();
+let lastTitle = -1; // the title shown so far, for the "you are now…" toast
+let booted_ = false;
 
 // ---- the player ----
 const spawn = world.landmarks.spawn;
@@ -115,6 +118,18 @@ const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: N
     at: { x: lo.x + 3, y: lo.y, z: lo.z + 0.5 },
     npc: new Npc({ kurta: "#f4f0e4", dhoti: "#3a3a44", hat: "#f6f2e8", skin: "#9a6440" }, lo.x + 1.6, lo.y, lo.z + 0.5, Math.PI / 2),
     label: "Buy & sell land at the Talathi's office",
+  },
+  {
+    kind: "bank",
+    at: { x: world.landmarks.bank.x + 0.5, y: world.landmarks.bank.y, z: world.landmarks.bank.z - 0.3 },
+    npc: new Npc({ kurta: "#dfe6ee", dhoti: "#3a3a44", hat: "#2a2a30", skin: "#b07a52" }, world.landmarks.bank.x + 0.5, world.landmarks.bank.y, world.landmarks.bank.z + 1.3, Math.PI),
+    label: "Loans & the godown at the Sahakari Bank",
+  },
+  {
+    kind: "sahukar",
+    at: { x: 108.5, y: groundY(vox, 108.5, 108.5), z: 108.5 },
+    npc: new Npc({ kurta: "#f2e6c8", dhoti: "#f6f0e0", hat: "#c0392b", hatTall: true, skin: "#b07a52" }, 108.5, groundY(vox, 108.5, 110.3), 110.3, Math.PI),
+    label: "Borrow from Sahukar Motilal (fast, but dear)",
   },
   {
     kind: "town",
@@ -351,8 +366,13 @@ function refreshStatus() {
   hud.setInventory(s.inv, canCapacity(s));
   panels.render();
   const c = clock(game.now());
+  const worth = netWorth(world, s, game.now(), c.day);
+  const title = titleFor(worth.total);
+  const overdue = s.loans.some((l) => isOverdue(l, game.now()));
+  if (s.bestTitle > lastTitle && lastTitle >= 0) hud.toast(`You are now a ${TITLES[s.bestTitle].name}! · ${TITLES[s.bestTitle].local}`);
+  if (booted_) lastTitle = s.bestTitle;
   const saved = { saved: "✓ saved", saving: "saving…", offline: "offline — retrying" }[net.status];
-  hud.setInfo(`<span class="money">₹${s.money.toLocaleString("en-IN")}</span><span class="sync ${net.status}">${saved}</span><span>${fmtHour(hourOverride ?? c.hour)}</span><span>${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}</span>`);
+  hud.setInfo(`<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${title.name}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${overdue ? `<span class="debt">loan overdue!</span>` : ""}<span class="sync ${net.status}">${saved}</span><span>${fmtHour(hourOverride ?? c.hour)}</span><span>${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}</span>`);
 }
 game.onChange(refreshStatus);
 const sfxQueue: string[] = []; // sound arrives in M9; the queue keeps the call sites honest
@@ -526,6 +546,7 @@ hud.onRestore = async (code) => {
 Promise.all([booted, workerReady]).then(async ([boot]) => {
   hud.setBanner("");
   game.save = boot.save;
+  booted_ = true;
   game.skew = boot.serverNow - Date.now();
   net.attach(game);
   hud.setAccount(net.recoveryCode);
@@ -626,6 +647,10 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     act: (a: import("../shared/rules").Action) => game.act(a),
     nearStall: () => nearStall()?.kind ?? null,
     money: () => game.save.money,
+    worth: () => {
+      const w = netWorth(world, game.save, game.now(), clock(game.now()).day);
+      return { ...w, title: titleFor(w.total).name, bestTitle: game.save.bestTitle, loans: structuredClone(game.save.loans), godown: structuredClone(game.save.godown) };
+    },
     ledger: () => game.save.ledger,
     editMs: () => worldRenderer.lastEditMs,
     stats: () => {

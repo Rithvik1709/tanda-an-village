@@ -11,7 +11,8 @@ export function groundY(vox: Uint8Array, x: number, z: number): number {
   const xi = Math.max(0, Math.min(W - 1, Math.floor(x))), zi = Math.max(0, Math.min(D - 1, Math.floor(z)));
   for (let y = H - 2; y > 0; y--) {
     const id = vox[xi + W * (zi + D * y)];
-    if (id && block(id).solid) return y + 1;
+    // look through tree canopies: the ground is under the leaves
+    if (id && block(id).solid && id !== B.LEAVES && id !== B.BANYAN_LEAVES) return y + 1;
   }
   return 1;
 }

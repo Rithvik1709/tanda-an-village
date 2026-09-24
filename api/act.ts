@@ -1,4 +1,6 @@
+import { netWorth, TITLES, titleFor } from "../src/shared/bank";
 import { type Action, apply } from "../src/shared/rules";
+import { clock } from "../src/shared/time";
 import { authed, json, loadSave, readJson, serverNow, unauthorized, world, writeSave } from "./lib/game";
 
 export const MAX_BATCH = 256;
@@ -23,6 +25,12 @@ export async function POST(req: Request): Promise<Response> {
     const r = apply(w, save, a, serverNow(save));
     return r.ok ? { ok: true } : { ok: false, error: r.error };
   });
-  if (results.some((r) => r.ok)) await writeSave(save);
+  if (results.some((r) => r.ok)) {
+    // titles are earned on the server too, so the ceremony can't be faked
+    const now = serverNow(save);
+    const t = TITLES.findIndex((x) => x.name === titleFor(netWorth(w, save, now, clock(now).day).total).name);
+    if (t > save.bestTitle) save.bestTitle = t;
+    await writeSave(save);
+  }
   return json({ results, save, serverNow: serverNow(save) });
 }

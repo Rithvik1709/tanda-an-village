@@ -1,5 +1,6 @@
 import type { Planting } from "./crops";
 import { CAN_MAX } from "./crops";
+import type { GodownLot, Loan } from "./bank";
 import type { Bulls } from "./bulls";
 import type { Listing } from "./land";
 import type { World } from "./world";
@@ -8,7 +9,7 @@ import type { World } from "./world";
  * The save: everything that differs from the seeded world, plus the player's money and goods.
  * Stored as JSON by the server. Keys of `edits` and `farm` are voxel indices (x + W*(z + D*y)).
  */
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export type FarmCell = {
   baseQ: number; // the soil's natural quality, 0..1
@@ -33,11 +34,15 @@ export type Save = {
   listings: Record<string, Listing>; // plot id → your asking price, while it's on the market
   bulls: Bulls | null; // your bull pair, once bought
   trip: Trip | null; // a loaded cart on the road to the town mandi
+  loans: Loan[];
+  nextLoanId: number;
+  godown: Record<string, GodownLot>; // produce stored at the cooperative's godown
+  bestTitle: number; // the highest title reached (index into TITLES), for the ceremony toast
 };
 
 export type Trip = { startedAt: number; load: Record<string, number> };
 
-export type LedgerEntry = { day: number; kind: "sell" | "buy"; item: string; n: number; amount: number; where?: string; premium?: number };
+export type LedgerEntry = { day: number; kind: "sell" | "buy" | "borrow" | "repay"; item: string; n: number; amount: number; where?: string; premium?: number };
 
 /** Building blocks every farmer starts with (and v1 saves are given when they upgrade). */
 export const STARTER_BLOCKS = { "block:11": 20, "block:14": 20, "block:16": 12 };
@@ -61,6 +66,10 @@ export function newSave(id: string, world: World, now: number): Save {
     listings: {},
     bulls: null,
     trip: null,
+    loans: [],
+    nextLoanId: 1,
+    godown: {},
+    bestTitle: 0,
   };
 }
 
@@ -82,6 +91,10 @@ export function migrate(s: Save): Save {
     s.bulls = null; // v4: bulls and the cart
     s.trip = null;
     s.version = 4;
+  }
+  if (s.version === 4) {
+    Object.assign(s, { loans: [], nextLoanId: 1, godown: {}, bestTitle: 0 }); // v5: money tools
+    s.version = 5;
   }
   return s;
 }

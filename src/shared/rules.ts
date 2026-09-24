@@ -2,6 +2,7 @@ import { B, block, isCropBlock } from "./blocks";
 import { advance, CAN_MAX, CROPS, type CropId, isCrop, stageOf, WET_MS, yieldOf } from "./crops";
 import { type Buyer, buyerPrice, LEDGER_DAYS, shopItem } from "./economy";
 import { askingPrice, clearPlot, forSale, offersFor, valuePlot } from "./land";
+import { carried, CARRY, creditLimit, GODOWN_CAPACITY, isOverdue, LENDERS, type Lender, type Loan, owed, rentFor, stored } from "./bank";
 import { BULL_NAMES, bullsNow, CART_CAPACITY, FEED, MIN_MOOD, newBulls, PLOUGH_COST, PLOUGH_ROW, TRIP_COST, TRIP_MS } from "./bulls";
 import { hash2 } from "./rng";
 import type { LedgerEntry, Save } from "./save";
@@ -31,7 +32,11 @@ export type Action =
   | { t: "feed" }
   | { t: "plough"; x: number; y: number; z: number; dir: "x+" | "x-" | "z+" | "z-" }
   | { t: "startTrip"; load: Record<string, number> }
-  | { t: "sellTown" };
+  | { t: "sellTown" }
+  | { t: "borrow"; lender: Lender; amount: number }
+  | { t: "repay"; loan: number; amount: number }
+  | { t: "store"; item: CropId; n: number }
+  | { t: "withdraw"; item: CropId; n: number };
 
 export type Result = { ok: true; msg?: string; gained?: Record<string, number> } | { ok: false; error: string };
 
@@ -76,7 +81,69 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
-const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown"]);
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw"]);
+
+/** The bank, the sahukar and the godown. */
+function finance(world: World, save: Save, a: Extract<Action, { t: "borrow" | "repay" | "store" | "withdraw" }>, now: number): Result {
+  const day = clock(now).day;
+  switch (a.t) {
+    case "borrow": {
+      const L = LENDERS[a.lender];
+      if (!L) return fail("Who from?");
+      if (!Number.isInteger(a.amount) || a.amount < 100 || a.amount % 100) return fail("Borrow in hundreds of rupees.");
+      if (save.loans.some((l) => isOverdue(l, now))) return fail("Clear your overdue loan first — nobody lends to a defaulter.");
+      if (save.loans.filter((l) => l.lender === a.lender).length >= 3) return fail(`${L.name} won't give a fourth loan.`);
+      const limit = creditLimit(world, save, a.lender, now, day);
+      if (a.amount > limit) return fail(limit ? `${L.name} will lend at most ₹${limit.toLocaleString("en-IN")}.` : `${L.name} won't lend more right now.`);
+      const loan: Loan = { id: save.nextLoanId++, lender: a.lender, principal: a.amount, rate: L.rate, takenAt: now, dueAt: now + L.termDays * DAY_MS, paid: 0 };
+      save.loans.push(loan);
+      save.money += a.amount;
+      record(save, { day, kind: "borrow", item: `loan:${a.lender}`, n: 1, amount: a.amount, where: L.name });
+      return { ok: true, msg: `Borrowed ₹${a.amount.toLocaleString("en-IN")} from ${L.name} — due in ${L.termDays} days` };
+    }
+    case "repay": {
+      const loan = save.loans.find((l) => l.id === a.loan);
+      if (!loan) return fail("No such loan.");
+      if (!Number.isInteger(a.amount) || a.amount < 1) return fail("How much?");
+      const due = owed(loan, now);
+      const pay = Math.min(a.amount, due);
+      if (save.money < pay) return fail(`You have ₹${save.money.toLocaleString("en-IN")}.`);
+      save.money -= pay;
+      loan.paid += pay;
+      record(save, { day, kind: "repay", item: `repay:${loan.lender}`, n: 1, amount: pay, where: LENDERS[loan.lender].name });
+      if (owed(loan, now) <= 0) {
+        save.loans = save.loans.filter((l) => l !== loan);
+        return { ok: true, msg: `Loan from ${LENDERS[loan.lender].name} paid off!` };
+      }
+      return { ok: true, msg: `Repaid ₹${pay.toLocaleString("en-IN")} — ₹${owed(loan, now).toLocaleString("en-IN")} left` };
+    }
+    case "store": {
+      if (!isCrop(a.item) || !qty(a.n)) return fail("Store produce, in whole units.");
+      if ((save.inv[a.item] ?? 0) < a.n) return fail(`You don't have ${a.n} ${CROPS[a.item].name.toLowerCase()}.`);
+      if (stored(save) + a.n > GODOWN_CAPACITY) return fail("The godown is full.");
+      const lot = save.godown[a.item] ?? { n: 0, since: now };
+      // one lot per crop: its date is the weighted average, so rent stays fair
+      save.godown[a.item] = { n: lot.n + a.n, since: Math.round((lot.since * lot.n + now * a.n) / (lot.n + a.n)) };
+      save.inv[a.item] -= a.n;
+      if (!save.inv[a.item]) delete save.inv[a.item];
+      return { ok: true, msg: `Stored ${a.n} ${CROPS[a.item].name.toLowerCase()} in the godown` };
+    }
+    case "withdraw": {
+      if (!isCrop(a.item) || !qty(a.n)) return fail("Take out produce, in whole units.");
+      const lot = save.godown[a.item];
+      if (!lot || lot.n < a.n) return fail("Not that much in the godown.");
+      if (carried(save) + a.n > CARRY) return fail(`You can carry ${CARRY} at most.`);
+      const rent = rentFor(lot, a.n, now);
+      if (save.money < rent) return fail(`The rent is ₹${rent}.`);
+      save.money -= rent;
+      lot.n -= a.n;
+      if (!lot.n) delete save.godown[a.item];
+      save.inv[a.item] = (save.inv[a.item] ?? 0) + a.n;
+      if (rent) record(save, { day, kind: "buy", item: "godown-rent", n: a.n, amount: rent });
+      return { ok: true, msg: `Took out ${a.n} ${CROPS[a.item].name.toLowerCase()}${rent ? ` (rent ₹${rent})` : ""}` };
+    }
+  }
+}
 
 /** Bulls and the cart: feeding, and the trip to the town mandi. (Ploughing is with the farm actions.) */
 function livestock(save: Save, a: Extract<Action, { t: "feed" | "startTrip" | "sellTown" }>, now: number): Result {
@@ -227,6 +294,11 @@ function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: numbe
 
 export function apply(world: World, save: Save, a: Action, now: number): Result {
   if (!a || typeof a !== "object" || !KNOWN.has(a.t)) return fail("Unknown action.");
+  if (a.t === "borrow" || a.t === "repay" || a.t === "store" || a.t === "withdraw") {
+    const r = finance(world, save, a, now);
+    if (r.ok) save.updatedAt = now;
+    return r;
+  }
   if (a.t === "feed" || a.t === "startTrip" || a.t === "sellTown") {
     const r = livestock(save, a, now);
     if (r.ok) save.updatedAt = now;
@@ -380,6 +452,7 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       const p = advance(cell.plant, cell.wetUntil, now);
       if (p.progress < 1) return fail(`Not ripe yet — ${Math.floor(p.progress * 100)}% grown.`);
       const n = yieldOf(p, cell.q);
+      if (carried(save) + n > CARRY) return fail(`Your sacks are full (${CARRY}) — sell, load the cart, or store it in the godown.`);
       give(p.crop, n);
       cell.q = Math.max(0.45, cell.q - 0.04);
       cell.restedAt = now;

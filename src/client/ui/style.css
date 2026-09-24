@@ -17,7 +17,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #bcd4de; fon
 .slot-label { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); padding: 3px 10px; border-radius: 6px; background: rgba(30,24,20,0.5); opacity: 0; transition: opacity 0.3s; }
 .slot-label.show { opacity: 1; }
 .debug { position: absolute; left: 10px; top: 10px; margin: 0; padding: 8px 10px; font: 12px/1.45 ui-monospace, Menlo, monospace; background: rgba(0,0,0,0.5); border-radius: 6px; }
-.play-prompt { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 18px; border-radius: 10px; background: rgba(30,24,20,0.6); text-align: center; }
+.play-prompt { position: absolute; left: 50%; top: 20%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 18px; border-radius: 10px; background: rgba(30,24,20,0.6); text-align: center; }
 .play-prompt b { font-size: 18px; }
 .play-prompt span { font-size: 12px; opacity: 0.85; }
 [hidden] { display: none !important; }
@@ -113,3 +113,9 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .panel-card .sold { font-size: 16px; text-align: center; }
 .prem { color: #2f7a2f; font-weight: 600; }
 .bulls-chip { top: 54px; right: 12px; font-size: 13px; }
+.title-card { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px; margin-bottom: 10px; border-radius: 12px; background: linear-gradient(135deg, #f3d9a0, #e8b86a); }
+.title-card b { font-size: 26px; }
+.title-card .progress { width: 70%; height: 8px; border-radius: 4px; background: rgba(0,0,0,0.15); overflow: hidden; margin: 6px 0 2px; }
+.title-card .progress i { display: block; height: 100%; background: #8a5a10; }
+.info .title { color: #f3d9a0; font-weight: 700; }
+.info .debt { color: #ffb4a0; font-weight: 700; }
