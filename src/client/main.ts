@@ -19,6 +19,7 @@ import { Water } from "./scene/water";
 import { Grass } from "./scene/grass";
 import { Trees } from "./scene/trees";
 import { Village } from "./scene/village";
+import { Fields } from "./scene/crops";
 import { Post } from "./scene/post";
 import { FARMER, Figure } from "./scene/figure";
 import { Walker } from "./player/walker";
@@ -128,6 +129,9 @@ const grass = new Grass(
   WATER_Y,
 );
 scene.add(grass.group);
+const fields = new Fields();
+scene.add(fields.group);
+const syncFields = () => fields.sync(game.save, game.now(), (x, z) => hf.at(x, z));
 const farmer = new Figure(FARMER);
 scene.add(farmer.root);
 const controls = new Controls(canvas);
@@ -374,7 +378,7 @@ function useLeft(): Outcome {
   const { x, y, z } = target;
   if (block(get(x, y, z)).liquid) return null;
   if (isCropBlock(get(x, y, z))) return report(game.act({ t: "harvest", x, y: y - 1, z }), "harvest");
-  return report(game.act({ t: "dig", x, y, z }), "dig");
+  return null; // real farming: the land isn't dug up block by block
 }
 
 /** Right click: use whatever is in hand on the block you're looking at. */
@@ -455,6 +459,7 @@ function refreshStatus() {
   hud.setInfo(`<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${title.name}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${overdue ? `<span class="debt">loan overdue!</span>` : ""}<span class="sync ${net.status}">${saved}</span><span>${fmtHour(hourOverride ?? c.hour)}</span><span>${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}</span>`);
 }
 game.onChange(refreshStatus);
+game.onChange(() => syncFields());
 const sfxQueue = { push: (name: string) => audio.play(name) };
 
 controls.onDig = () => void useLeft();
@@ -570,6 +575,7 @@ renderer.setAnimationLoop(() => {
     camera.rotation.set(controls.pitch, controls.yaw, 0, "YXZ");
     target = null;
     outline.visible = false;
+    fields.setAim(null);
   } else if (mode === "play") {
     // fixed sub-steps keep collision stable when a frame hitches
     const n = Math.ceil(dt / (1 / 120));
@@ -580,9 +586,12 @@ renderer.setAnimationLoop(() => {
     const cur = hotbar.current;
     const hit = raycast({ x: ray.o.x, y: ray.o.y, z: ray.o.z }, { x: ray.d.x, y: ray.d.y, z: ray.d.z }, MOVE.reach + (rig.view === "third" ? rig.distance + 1 : 0), cur.kind === "tool" && cur.tool === "can" ? pickWater : pickable, plantBox);
     target = hit && Math.hypot(hit.x + 0.5 - body.pos.x, hit.y + 0.5 - (body.pos.y + 1), hit.z + 0.5 - body.pos.z) <= MOVE.reach ? hit : null;
-    outline.visible = !!target;
-    if (target) outline.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5);
+    outline.visible = false;
+    // mark the field cell you'd act on (the soil under a crop, or the ground you look at)
+    const aimCell = target && (isCropBlock(get(target.x, target.y, target.z)) || target.ny === 1 || game.save.farm[String(idx(target.x, target.y, target.z))]) ? target : null;
+    fields.setAim(aimCell && world.plotMap[aimCell.x + W * aimCell.z] >= 0 ? aimCell : null, hf.at((aimCell?.x ?? 0) + 0.5, (aimCell?.z ?? 0) + 0.5));
   } else if (mode === "title") {
+    fields.setAim(null);
     // the title screen: a slow circle over the village at golden hour
     const a = now / 1000 * 0.045;
     camera.position.set(96 + Math.cos(a) * 78, 40, 92 + Math.sin(a) * 78);
@@ -595,6 +604,7 @@ renderer.setAnimationLoop(() => {
   if (now - lastTick > 500) {
     lastTick = now;
     game.tick();
+    syncFields();
     refreshStatus();
     hud.setTip(mode === "play" ? tipFor(target) : "");
     refreshSigns();
@@ -617,6 +627,7 @@ renderer.setAnimationLoop(() => {
   water.update(now / 1000, sunDirection(hour), sc.sun, sc.top, sc.horizon);
   trees.update(now / 1000);
   village.update(dt);
+  fields.update(now / 1000);
   const grassAt = mode === "play" ? new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z) : camera.position;
   grass.update(now / 1000, grassAt, mode === "title" ? 90 : Math.min(90, settings.renderDistance * 0.55), sunDirection(hour), sc.sun, sc.top);
   if (mode !== "title") applyRenderDistance();
@@ -694,6 +705,7 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
   hud.setAccount(net.recoveryCode);
   const t0 = performance.now();
   game.syncAll(); // saved edits and fields go to the worker before the first mesh
+  syncFields();
   await worldRenderer.meshAll();
   refreshStatus();
   const meshAllMs = performance.now() - t0;
@@ -817,5 +829,5 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     plots: world.plots.length,
   });
 });
-// the voxels remain for collision and the rules; the mesher now only draws growing crops
-worker.postMessage({ type: "init", seed: WORLD_SEED, skipTerrain: BLOCKS.map((b) => b.id).filter((id) => !isCropBlock(id)), modelTrees: true });
+// the voxels remain for collision and the rules; everything you see is modelled, so the mesher draws nothing
+worker.postMessage({ type: "init", seed: WORLD_SEED, skipTerrain: BLOCKS.map((b) => b.id), modelTrees: true });

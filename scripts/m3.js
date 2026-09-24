@@ -1,5 +1,5 @@
 // M3 scripted farming: till → sow → water → fast-forward → harvest. Run via shots.mjs --eval.
-(async () => {
+(async () => { window.__bailgaadi.setView("first");
   const g = window.__bailgaadi;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const log = { errors: [] };
@@ -39,8 +39,8 @@
   g.select(2);
   for (const c of cells) await use("R", c); // watering can
   log.afterSow = g.inv();
-  g.teleport(p.x0 + 1.5, y + 1, p.z0 + 2.2, -Math.PI / 2 - 0.35, -0.5);
-  await window.__shot("m3-sown");
+  const pretty = async (name) => { g.setView("third"); g.teleport(p.x0 + 2.2, y, p.z0 + 1.6, -Math.PI / 2 - 0.55, -0.32); await wait(600); await window.__shot(name); g.setView("first"); };
+  await pretty("m3-sown");
   const refill = async () => {
     const w = g.landmarks().well; // well water sits two blocks down inside the cobble ring
     g.teleport(91.5, 16, 97.6, 0, -0.5); // looking at the well's rim from the path
@@ -57,8 +57,7 @@
   await g.skip(0.5 * 10 * 60 * 1000); // half a game day
   await waterAll();
   await g.skip(0.45 * 10 * 60 * 1000);
-  g.teleport(p.x0 + 1.5, y + 1, p.z0 + 2.2, -Math.PI / 2 - 0.35, -0.5);
-  await window.__shot("m3-growing");
+  await pretty("m3-growing");
   log.unripe = await (async () => { await aim(...cells[4], true); return g.left(); })(); // sugarcane, far from ripe
   if (log.unripe?.ok) log.errors.push("harvested an unripe crop!");
   // keep watering through two more days so even sugarcane ripens
@@ -70,8 +69,7 @@
     await g.skip(0.4 * 10 * 60 * 1000);
     log.rounds = i + 1;
   }
-  g.teleport(p.x0 + 1.5, y + 1, p.z0 + 2.2, -Math.PI / 2 - 0.35, -0.5);
-  await window.__shot("m3-ripe");
+  await pretty("m3-ripe");
   log.tipsAtRipe = [];
   for (const c of [cells[0], cells[2], cells[4]]) { await aim(c[0], c[1], c[2], true); await wait(600); log.tipsAtRipe.push(document.querySelector(".tip").textContent); }
   g.select(0);
@@ -84,7 +82,8 @@
   }
   log.harvests = harvests;
   log.inv = g.inv();
-  g.teleport(p.x0 + 1.5, y + 1, p.z0 + 2.2, -Math.PI / 2 - 0.35, -0.5);
-  await wait(300);
+  g.setView("third");
+  g.teleport(p.x0 + 2.2, y, p.z0 + 1.6, -Math.PI / 2 - 0.55, -0.32);
+  await wait(600);
   return log;
 })()

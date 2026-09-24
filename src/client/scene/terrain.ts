@@ -15,8 +15,8 @@ const PALETTE: Record<number, THREE.Color> = {
   [B.GRASS]: C("#7d9a47"),
   [B.DIRT]: C("#9a7c56"),
   [B.ROAD]: C("#ad8f66"),
-  [B.BLACK_SOIL]: C("#43372e"),
-  [B.RED_SOIL]: C("#8e4c30"),
+  [B.BLACK_SOIL]: C("#5b4431"),
+  [B.RED_SOIL]: C("#9a5030"),
   [B.SAND]: C("#c9b387"),
   [B.STONE]: C("#8b867c"),
   [B.TILLED]: C("#3a2d24"),
@@ -80,7 +80,10 @@ export function buildTerrain(hf: Heightfield, waterLevel: number): THREE.Mesh {
         float broad = bgFbm(wp * 0.06);
         float mid = bgFbm(wp * 0.35 + 7.0);
         float fine = bgNoise(wp * 3.1);
-        diffuseColor.rgb *= mix(0.84, 1.12, broad) * mix(0.9, 1.08, mid) * mix(0.94, 1.05, fine);
+        diffuseColor.rgb *= mix(0.84, 1.12, broad) * mix(0.9, 1.08, mid) * mix(0.9, 1.08, fine);
+        // clods and pebbles in bare earth
+        float bare = 1.0 - smoothstep(0.1, 0.25, diffuseColor.g - diffuseColor.b);
+        diffuseColor.rgb *= 1.0 + bare * (bgNoise(wp * 9.0) - 0.5) * 0.35;
         // slopes show a little earth through the grass
         float slope = 1.0 - clamp(vBgNormal.y, 0.0, 1.0);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.52, 0.42, 0.3), clamp(slope * 2.2, 0.0, 0.45));`,

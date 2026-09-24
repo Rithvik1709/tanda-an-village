@@ -1,4 +1,4 @@
-import { B, block } from "../../shared/blocks";
+import { block } from "../../shared/blocks";
 import { CROPS, type CropId } from "../../shared/crops";
 
 /** What a hotbar slot holds. */
@@ -15,9 +15,6 @@ export const DEFAULT_HOTBAR: Slot[] = [
   { kind: "seed", crop: "jowar" },
   { kind: "seed", crop: "onion" },
   { kind: "seed", crop: "sugarcane" },
-  { kind: "block", block: B.PLANKS },
-  { kind: "block", block: B.BRICK },
-  { kind: "block", block: B.FENCE },
 ];
 
 export const slotName = (s: Slot) =>
