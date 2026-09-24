@@ -101,6 +101,64 @@ PAINTERS[T.RED_SOIL] = speckle("#9a4a2e", "#7a3822", "#b85e3c", 0.22, 0.12);
 PAINTERS[T.HAY_TOP] = (x, y, r) => mix(hex("#d9b35a"), hex("#b8903a"), (Math.hypot(x - 7.5, y - 7.5) % 3 < 1 ? 0.4 : 0) + r() * 0.2);
 PAINTERS[T.HAY_SIDE] = (x, y, r) => mix(hex("#d9b35a"), hex(y === 4 || y === 11 ? "#7a5c2a" : "#b8903a"), y === 4 || y === 11 ? 0.8 : ((x * 3) % 4 === 0 ? 0.3 : 0) + r() * 0.2);
 
+// ---- crops: four growth stages each, drawn bottom-up so shorter stages sit on the soil ----
+const cropH = [5, 9, 13, 16]; // plant height in pixels per stage
+const stemGreen = (r: () => number) => mix(hex("#5f8f34"), hex("#3f6b24"), r() * 0.6);
+
+/** Jowar (sorghum): tall blades; the ripe head is a cream-and-rust grain cluster. */
+const jowar = (st: number): Px => (x, y, r) => {
+  const top = 16 - cropH[st];
+  if (y < top) return null;
+  const stalk = x === 7 || x === 8;
+  const leafL = st > 0 && x < 7 && Math.abs((7 - x) - (y - top - 3) * 0.7) < 0.8 && y > top + 2;
+  const leafR = st > 0 && x > 8 && Math.abs((x - 8) - (y - top - 6) * 0.7) < 0.8 && y > top + 5;
+  // ripe: a compact oval grain panicle, tan with rust and pale grains, on top of the stalk
+  if (st === 3 && y < top + 6 && Math.hypot((x - 7.5) / 1.7, (y - top - 2.6) / 2.9) < 1) {
+    const v = r();
+    return v < 0.12 ? hex("#a8683a") : v > 0.85 ? hex("#e2cc98") : mix(hex("#c89c5c"), hex("#b3844a"), r() * 0.6);
+  }
+  if (st === 0) return (x === 6 && y > 12) || (x === 9 && y > 11) || (stalk && y > 13) ? stemGreen(r) : null;
+  if (stalk || leafL || leafR) return st === 3 ? mix(hex("#a8a048"), hex("#6f7a34"), r() * 0.5) : stemGreen(r);
+  return null;
+};
+
+/** Onion: tufts of hollow green leaves; ripe shows the pink-purple bulb and yellowing tips. */
+const onion = (st: number): Px => (x, y, r) => {
+  const h = [4, 7, 10, 10][st];
+  const top = 16 - h;
+  if (st === 3 && y >= 12 && Math.hypot(x - 7.5, (y - 13.5) * 1.3) < 3.2) return mix(hex("#b2506e"), hex("#e08aa0"), r() * 0.4 + (x < 6 ? 0.3 : 0));
+  if (y < top) return null;
+  for (const lx of st === 0 ? [7] : [4, 7, 10, 12]) {
+    const lean = (lx - 7.5) * (16 - y) * 0.06;
+    if (Math.abs(x - lx - lean) < 0.7 && y < (st === 3 ? 12 : 16)) {
+      const tip = y < top + 2 && st === 3;
+      return tip ? mix(hex("#c8b44a"), hex("#a08a30"), r() * 0.4) : mix(hex("#6aa040"), hex("#4a8030"), r() * 0.5);
+    }
+  }
+  return null;
+};
+
+/** Sugarcane: jointed stalks, getting thicker and taller; ripe stalks are yellow-green with dry leaves. */
+const cane = (st: number): Px => (x, y, r) => {
+  const top = 16 - cropH[st];
+  if (y < top) return null;
+  const stalks = st === 0 ? [7] : st === 1 ? [5, 10] : [3, 7, 11];
+  for (const sx of stalks) {
+    if (x === sx || (st >= 2 && x === sx + 1)) {
+      const joint = (y + sx) % 4 === 0;
+      const base = st === 3 ? "#b8b04a" : "#6f9a3a";
+      return mix(hex(base), hex(joint ? "#4f5a24" : "#8fb050"), joint ? 0.7 : r() * 0.3);
+    }
+  }
+  const leaf = st > 0 && y < top + 5 && (x + y) % 5 === 0;
+  if (leaf) return st === 3 ? mix(hex("#c0a860"), hex("#8a8040"), r() * 0.5) : stemGreen(r);
+  return null;
+};
+
+[jowar, onion, cane].forEach((f, c) => {
+  for (let st = 0; st < 4; st++) PAINTERS[T.CROP0 + c * 4 + st] = f(st);
+});
+
 export function buildAtlasCanvas(): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = ATLAS_COLS * TILE;

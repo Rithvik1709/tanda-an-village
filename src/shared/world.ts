@@ -317,7 +317,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     const y0 = SQUARE.y;
     for (let z = cz - 1; z <= cz + 1; z++)
       for (let x = cx - 1; x <= cx + 1; x++) {
-        for (let y = y0 - 5; y <= y0; y++) set(x, y, z, x === cx && z === cz ? (y < y0 - 1 ? B.WATER : B.AIR) : B.COBBLE);
+        for (let y = y0 - 5; y <= y0; y++) set(x, y, z, x === cx && z === cz ? (y < y0 ? B.WATER : B.AIR) : B.COBBLE);
         set(x, y0 + 1, z, x === cx && z === cz ? B.AIR : B.COBBLE);
       }
     set(cx - 1, y0 + 2, cz - 1, B.LOG);

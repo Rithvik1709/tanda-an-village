@@ -99,12 +99,12 @@ another device. Google sign-in is a v2 item.
 - [x] *Done when:* scripted headless test digs and places a block and the screenshot shows it.
 
 ### M3 · Farming
-- [ ] Crops: jowar, onion, sugarcane (v1), with seasons, growth days, water need, yield; unit tests.
-- [ ] Hoe tills grass/soil → tilled; seeds plant on tilled; watering can makes soil wet (dries over time).
-- [ ] Crop rendering: cross-plane sprites with 4 growth stages.
-- [ ] Growth from timestamps (server clock), watered-ness affects speed/yield; soil quality per block.
-- [ ] Harvest ripe crops into inventory; replant loop.
-- [ ] *Done when:* a scripted test tills, plants, fast-forwards time (dev-only), harvests, inventory shows produce.
+- [x] Crops: jowar, onion, sugarcane (v1), with seasons, growth days, water need, yield; unit tests.
+- [x] Hoe tills grass/soil → tilled; seeds plant on tilled; watering can makes soil wet (dries over time).
+- [x] Crop rendering: cross-plane sprites with 4 growth stages.
+- [x] Growth from timestamps (server clock), watered-ness affects speed/yield; soil quality per block.
+- [x] Harvest ripe crops into inventory; replant loop.
+- [x] *Done when:* a scripted test tills, plants, fast-forwards time (dev-only), harvests, inventory shows produce.
 
 ### M4 · Server, accounts, saves
 - [ ] Store interface; file store (dev) and Upstash REST store (prod) with the same tests.
@@ -156,3 +156,4 @@ _(one line per loop iteration: date · task · how it was verified · commit)_
 - 2026-09-24 · M0 scaffold · `tsc` clean, vitest 1/1, `vite build` ok, `/api/health` → FileStore ok, headless Chrome screenshot shows a lit WebGL cube, no page errors
 - 2026-09-24 · M1 world · 27 blocks, canvas atlas, seeded world (6 vitest: determinism, 16 non-overlapping plots, one starter, river water, spawn), worker mesher with AO (0.8 ms/chunk, whole world 0.1–0.3 s), sky + day–night; screenshots at noon / golden hour / 5 views looked at and fixed (market pit, river framing, map edge ring, soil and sunset tone); 60 fps (16.6 ms median, p95 17.6 ms, 270 draw calls worst view)
 - 2026-09-24 · M2 walking and building · 5 new vitest (landing, no tunnelling from y 47, wall stop, 1.25-block jump, DDA faces); scripted headless play: walked 3 blocks, jumped 1.25, dug a 3-block trench in the road and stacked bricks (screenshots m2-before/after/wide looked at), swam out of the river onto the bank, outline visible; edit → new geometry 1.3–2.5 ms; outline strengthened after first look
+- 2026-09-24 · M3 farming · shared/time + crops + save + rules (the same code the server will run), 8 new vitest (clock/seasons, wet/dry growth integration is sample-independent, yield, till→plant→water→harvest, cheating refusals, refill/uproot, soil wear + rest); scripted headless run (scripts/m3.js) tilled 12 cells, sowed 3 crops, watered with 13 can refills at the well, fast-forwarded ~5 game days, harvested 24 jowar / 20 onion / 28 sugarcane, unripe refused; screenshots sown/growing/ripe/close-up/harvested looked at. Fixed on the way: client was drawing into the pristine world array (harvested plants reappeared), plants had full-cell hitboxes (now slim, stage-height), unripe left-click uprooted (now just reports %), well water unreachable (refill counts water within 2 blocks), jowar head redrawn, repeated toasts collapse. Edits are now limited to land you own.

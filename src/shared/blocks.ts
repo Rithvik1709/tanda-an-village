@@ -12,6 +12,7 @@ export type BlockDef = {
   shape?: "cube" | "cross";
   tiles: [number, number, number];
   farmable?: boolean; // can be tilled
+  crop?: boolean; // a growing plant (drawn from the save's plantings)
 };
 
 export const B = {
@@ -42,6 +43,19 @@ export const B = {
   RED_SOIL: 24,
   BANYAN_LEAVES: 25,
   HAY: 26,
+  // crops, four growth stages each (the save stores the planting; these are only what's drawn)
+  JOWAR_0: 27,
+  JOWAR_1: 28,
+  JOWAR_2: 29,
+  JOWAR_3: 30,
+  ONION_0: 31,
+  ONION_1: 32,
+  ONION_2: 33,
+  ONION_3: 34,
+  CANE_0: 35,
+  CANE_1: 36,
+  CANE_2: 37,
+  CANE_3: 38,
 } as const;
 export type BlockId = (typeof B)[keyof typeof B];
 
@@ -77,8 +91,9 @@ export const T = {
   HAY_TOP: 27,
   HAY_SIDE: 28,
   BLACK_SOIL_SIDE: 29,
+  CROP0: 30, // 30..41: jowar 0–3, onion 0–3, sugarcane 0–3
 } as const;
-export const TILE_COUNT = 30;
+export const TILE_COUNT = 42;
 
 const cube = (id: number, name: string, t: number | [number, number, number], extra: Partial<BlockDef> = {}): BlockDef => ({
   id,
@@ -120,4 +135,13 @@ add(cube(B.RED_SOIL, "Red soil", T.RED_SOIL, { farmable: true }));
 add(cube(B.BANYAN_LEAVES, "Banyan leaves", T.BANYAN_LEAVES, { opaque: false, cutout: true }));
 add(cube(B.HAY, "Hay bale", [T.HAY_TOP, T.HAY_SIDE, T.HAY_TOP]));
 
+const CROP_NAMES = ["Jowar", "Onion", "Sugarcane"];
+const STAGE_NAMES = ["sprout", "young", "growing", "ripe"];
+for (let c = 0; c < 3; c++)
+  for (let st = 0; st < 4; st++) {
+    const t = T.CROP0 + c * 4 + st;
+    add({ id: B.JOWAR_0 + c * 4 + st, name: `${CROP_NAMES[c]} (${STAGE_NAMES[st]})`, solid: false, opaque: false, cutout: true, shape: "cross", tiles: [t, t, t], crop: true });
+  }
+
+export const isCropBlock = (id: number) => id >= B.JOWAR_0 && id <= B.CANE_3;
 export const block = (id: number) => BLOCKS[id] ?? BLOCKS[0];

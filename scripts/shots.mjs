@@ -18,6 +18,12 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+// scripts can take extra screenshots mid-run: await window.__shot("name")
+await page.exposeFunction("__shot", async (n) => {
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: `out/${n}.png` });
+  console.log(`shot out/${n}.png`);
+});
 await page.goto(url, { waitUntil: "load" });
 await page.waitForFunction(() => window.__bailgaadi?.ready === true, null, { timeout: 60_000 });
 if (script) {

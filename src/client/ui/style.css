@@ -21,3 +21,18 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #bcd4de; fon
 .play-prompt b { font-size: 18px; }
 .play-prompt span { font-size: 12px; opacity: 0.85; }
 [hidden] { display: none !important; }
+.slot .count { position: absolute; right: 4px; bottom: 1px; font-size: 12px; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+.slot .water { position: absolute; left: 6px; right: 6px; bottom: 4px; height: 4px; border-radius: 2px; background: rgba(0,0,0,0.45); overflow: hidden; }
+.slot .water i { display: block; height: 100%; background: #6fc0e0; }
+.slot.empty canvas { opacity: 0.35; }
+.chip { position: absolute; top: 12px; padding: 7px 12px; border-radius: 10px; background: rgba(30, 24, 20, 0.55); backdrop-filter: blur(4px); display: flex; gap: 12px; align-items: center; }
+.info { left: 50%; transform: translateX(-50%); }
+.info .money { color: #ffd98a; font-weight: 700; }
+.goods { right: 12px; font-size: 13px; }
+.goods b { font-size: 15px; }
+.tip { position: absolute; left: 50%; top: calc(50% + 22px); transform: translateX(-50%); padding: 3px 9px; border-radius: 6px; background: rgba(30,24,20,0.5); font-size: 13px; white-space: nowrap; }
+.toasts { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.toast { padding: 5px 12px; border-radius: 8px; background: rgba(30,24,20,0.7); transition: opacity 0.5s; font-weight: 600; }
+.toast.ok { color: #d8f0b0; }
+.toast.bad { color: #ffc0a8; }
+.toast.gone { opacity: 0; }

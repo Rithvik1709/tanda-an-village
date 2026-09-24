@@ -14,6 +14,10 @@
   log.jumpRise = +(g.player().y - y0).toFixed(2);
   await new Promise((r) => setTimeout(r, 700));
   if (!window.M2_EDIT) return log;
+  // edits are only allowed on your own land (M3 rules): do the digging in the starter plot
+  const sp = g.starterPlot();
+  g.teleport(sp.x0 + 4.5, sp.y + 1, sp.z0 + 3.5, Math.PI, 0);
+  await new Promise((r) => setTimeout(r, 300));
   const p = g.player();
   // look down at the ground ahead and dig three blocks in a row
   const dug = [];
@@ -21,16 +25,16 @@
     g.teleport(p.x, p.y, p.z, Math.PI, pitch);
     await new Promise((r) => setTimeout(r, 60));
     log["t" + pitch] = g.target();
-    dug.push(await g.dig());
+    dug.push((await g.left())?.ok);
   }
   log.dug = dug;
   // then face a little to the left and stack three bricks
-  g.select(2);
+  g.select(7);
   const placed = [];
   for (let i = 0; i < 3; i++) {
     g.teleport(p.x, p.y, p.z, Math.PI + 0.5, -0.55 + i * 0.3);
     await new Promise((r) => setTimeout(r, 60));
-    placed.push(await g.place());
+    placed.push((await g.right())?.ok);
   }
   log.placed = placed;
   log.editMs = g.editMs();

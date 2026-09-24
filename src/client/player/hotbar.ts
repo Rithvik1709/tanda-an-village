@@ -1,21 +1,27 @@
 import { B, block } from "../../shared/blocks";
+import { CROPS, type CropId } from "../../shared/crops";
 
-/** What a hotbar slot holds. Tools arrive with farming (M3); for now it's the hand and building blocks. */
-export type Slot = { kind: "hand" } | { kind: "block"; block: number };
+/** What a hotbar slot holds. */
+export type Slot =
+  | { kind: "hand" }
+  | { kind: "tool"; tool: "hoe" | "can" }
+  | { kind: "seed"; crop: CropId }
+  | { kind: "block"; block: number };
 
 export const DEFAULT_HOTBAR: Slot[] = [
   { kind: "hand" },
+  { kind: "tool", tool: "hoe" },
+  { kind: "tool", tool: "can" },
+  { kind: "seed", crop: "jowar" },
+  { kind: "seed", crop: "onion" },
+  { kind: "seed", crop: "sugarcane" },
   { kind: "block", block: B.PLANKS },
   { kind: "block", block: B.BRICK },
-  { kind: "block", block: B.WHITEWASH },
-  { kind: "block", block: B.THATCH },
-  { kind: "block", block: B.COBBLE },
   { kind: "block", block: B.FENCE },
-  { kind: "block", block: B.ROOF_TILE },
-  { kind: "block", block: B.HAY },
 ];
 
-export const slotName = (s: Slot) => (s.kind === "hand" ? "Hand" : block(s.block).name);
+export const slotName = (s: Slot) =>
+  s.kind === "hand" ? "Hand" : s.kind === "tool" ? (s.tool === "hoe" ? "Hoe" : "Watering can") : s.kind === "seed" ? `${CROPS[s.crop].name} seeds` : block(s.block).name;
 
 export class Hotbar {
   selected = 0;
