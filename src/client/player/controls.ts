@@ -22,6 +22,7 @@ export class Controls {
   onFeed: () => void = () => {};
   onView: () => void = () => {};
   onTorch: () => void = () => {};
+  onHelp: () => void = () => {};
   onLockChange: (locked: boolean) => void = () => {};
 
   constructor(el: HTMLElement) {
@@ -63,6 +64,7 @@ export class Controls {
       if (e.code === "KeyF" && !e.repeat) this.onFeed();
       if (e.code === "KeyV" && !e.repeat) this.onView();
       if (e.code === "KeyT" && !e.repeat) this.onTorch();
+      if (e.code === "KeyH" && !e.repeat) this.onHelp();
       if (this.locked) {
         this.held.add(e.code);
         if (e.code === "Space") e.preventDefault();

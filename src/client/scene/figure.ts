@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeParts } from "../engine/merge";
 
 /*
  * A villager, modelled rather than built from blocks: kurta, dhoti, pheta or topi, moustache.
@@ -81,6 +82,7 @@ export class Figure {
     const b = this.body;
     if (look.woman) {
       this.woman(look);
+      mergeParts(this.root);
       return;
     }
     // legs: a loose white dhoti over the thighs, bare shins, chappals
@@ -142,6 +144,7 @@ export class Figure {
       cap.scale.set(1, 1, 1.35);
       cap.rotation.y = Math.PI / 4;
     }
+    mergeParts(this.root);
   }
 
   private woman(look: Look) {
@@ -213,6 +216,32 @@ export class Figure {
   }
 
   /** speed in m/s drives the gait; call every frame. */
+  /** What a villager is doing: the arms and body pose on top of the walk. */
+  action: "none" | "hoe" | "bend" | "carry" | "sit" = "none";
+  private props = new Map<string, THREE.Object3D>();
+
+  /** Give the figure something to hold: a hoe (kudal) in the hands, or a clay pot (matka) on the head. */
+  hold(kind: "hoe" | "pot" | "none") {
+    for (const [k, o] of this.props) o.visible = k === kind;
+    if (kind === "none" || this.props.has(kind)) return;
+    const g = new THREE.Group();
+    if (kind === "hoe") {
+      part(new THREE.CylinderGeometry(0.02, 0.02, 1.0, 6), "#7a5a3c", g, 0, -0.1, 0);
+      const blade = part(new THREE.BoxGeometry(0.16, 0.02, 0.2), "#7c7f84", g, 0, 0.4, 0.1, 0.4);
+      blade.rotation.x = 0.5;
+      g.position.set(0, -0.3, 0.05);
+      g.rotation.x = Math.PI / 2;
+      this.elbows[1].add(g);
+    } else {
+      part(lathe([[0.001, 0], [0.1, 0.02], [0.15, 0.1], [0.14, 0.2], [0.06, 0.28], [0.07, 0.32], [0.001, 0.32]], 16), "#a8542e", g, 0, 0, 0, 0.7);
+      const ring = part(new THREE.TorusGeometry(0.08, 0.025, 6, 12), "#c9a45c", g, 0, -0.01, 0); // the chumbal, a cloth ring under the pot
+      ring.rotation.x = Math.PI / 2;
+      g.position.set(0, 0.25, 0);
+      this.head.add(g);
+    }
+    this.props.set(kind, g);
+  }
+
   animate(dt: number, speed: number) {
     const walking = Math.min(1, speed / 3.5);
     this.t += dt * (speed > 0.2 ? 1.6 + speed * 1.2 : 1);
@@ -229,6 +258,36 @@ export class Figure {
     // a walk bob, and slow breathing when still
     this.body.position.y = Math.abs(Math.cos(ph)) * 0.035 * walking + Math.sin(this.t * 1.6) * 0.004;
     this.head.rotation.y = Math.sin(this.t * 0.35) * 0.15 * (1 - walking);
+    this.body.rotation.x = 0;
+    if (this.action === "hoe") {
+      // raise the hoe overhead and bring it down into the soil, about once a second
+      const c = (this.t * 1.1) % 1;
+      const lift = c < 0.55 ? c / 0.55 : 1 - (c - 0.55) / 0.45;
+      const arm = -0.2 - 2.4 * Math.pow(lift, 1.4);
+      this.shoulders[0].rotation.x = this.shoulders[1].rotation.x = arm;
+      this.elbows[0].rotation.x = this.elbows[1].rotation.x = -0.3 - 0.4 * lift;
+      this.body.rotation.x = 0.28 - 0.18 * lift;
+      this.knees[0].rotation.x = this.knees[1].rotation.x = 0.25;
+      this.hips[0].rotation.x = this.hips[1].rotation.x = -0.25;
+    } else if (this.action === "bend") {
+      // bent to the crop, hands working at it
+      this.body.rotation.x = 0.55;
+      this.hips[0].rotation.x = this.hips[1].rotation.x = -0.55;
+      this.knees[0].rotation.x = this.knees[1].rotation.x = 0.35;
+      const w = Math.sin(this.t * 5);
+      this.shoulders[0].rotation.x = -0.9 + w * 0.2;
+      this.shoulders[1].rotation.x = -0.9 - w * 0.2;
+      this.elbows[0].rotation.x = this.elbows[1].rotation.x = -0.4;
+    } else if (this.action === "carry") {
+      // one hand steadies the pot on the head
+      this.shoulders[0].rotation.x = -2.9;
+      this.elbows[0].rotation.x = -0.9;
+    } else if (this.action === "sit") {
+      this.hips[0].rotation.x = this.hips[1].rotation.x = -1.5;
+      this.knees[0].rotation.x = this.knees[1].rotation.x = 1.5;
+      this.body.position.y = -0.45;
+      this.shoulders[0].rotation.x = this.shoulders[1].rotation.x = -0.4;
+    }
   }
 
   set visible(v: boolean) {

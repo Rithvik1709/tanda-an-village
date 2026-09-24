@@ -33,7 +33,7 @@ export class Hud {
     this.debug = el("pre", "debug", this.root);
     this.debug.hidden = true;
     this.prompt = el("div", "play-prompt", this.root);
-    this.prompt.innerHTML = `<b>Click to play</b><span>WASD move · Space jump · Shift run · Left click dig / harvest · Right click use · E talk · M map · V view · T torch · 1–6 / wheel pick</span>`;
+    this.prompt.innerHTML = `<b>Click to play</b><span>Paused · <b>H</b> shows all the controls</span>`;
     this.account = el("div", "account", this.prompt);
     this.banner = el("div", "banner", this.root);
     this.hint = el("div", "interact", this.root);

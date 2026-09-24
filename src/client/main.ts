@@ -34,7 +34,9 @@ import { askingPrice, forSale } from "../shared/land";
 import { bullsMoodWord, bullsNow } from "../shared/bulls";
 import { isOverdue, netWorth, TITLES, titleFor } from "../shared/bank";
 import { Farmyard } from "./farmyard";
+import { Villagers } from "./villagers";
 import { Audio, renderRms, SOUNDS } from "./audio";
+import { Guide } from "./ui/guide";
 import { isTouchOnly, loadSettings, SettingsPanel, showMobileNote, TitleScreen, Tutorial } from "./ui/screens";
 
 type Hooks = {
@@ -172,6 +174,11 @@ audio.setVolume(settings.volume);
 const titleScreen = new TitleScreen(uiRoot);
 const settingsPanel = new SettingsPanel(uiRoot, settings);
 const tutorial = new Tutorial(uiRoot);
+const guide = new Guide(uiRoot, scene, (x, z) => hf.at(x, z));
+guide.onGoalDone = (title) => {
+  hud.toast(`✓ Done: ${title}`);
+  audio.play("cash");
+};
 settingsPanel.onChange = (st) => {
   controls.sensitivity = st.sensitivity;
   audio.setVolume(st.volume);
@@ -195,7 +202,10 @@ function enterGame(lock: boolean) {
   hud.setPlaying(false);
   if (lock) canvas.requestPointerLock?.();
 }
-titleScreen.onPlay = () => enterGame(true);
+titleScreen.onPlay = () => {
+  // the first time: a short story card first, then into the village
+  if (!guide.showWelcome(uiRoot, () => enterGame(true))) enterGame(true);
+};
 titleScreen.onSettings = () => settingsPanel.show();
 const showSettings = settingsPanel.show.bind(settingsPanel);
 settingsPanel.show = () => {
@@ -262,6 +272,8 @@ const NEIGHBOURS = [
   new Npc({ kurta: "#f1ead9", dhoti: "#e9e1cd", hat: "#f2f2ee", hatTall: true }, 86.4, hf.at(86.4, 96), 96, 1.2),
 ];
 for (const n of NEIGHBOURS) scene.add(n.group);
+const villagers = new Villagers(world, (x, z) => hf.at(x, z));
+scene.add(villagers.group);
 const panels = new Panels(document.getElementById("ui")!, {
   save: () => game.save,
   now: () => game.now(),
@@ -463,18 +475,27 @@ function tipFor(t: Hit | null): string {
   if (!t) return "";
   const id = get(t.x, t.y, t.z);
   const soil = game.save.farm[String(idx(t.x, isCropBlock(id) ? t.y - 1 : t.y, t.z))];
+  const cur = hotbar.current;
   if (!soil) {
-    const cur = hotbar.current;
-    return cur.kind === "tool" && cur.tool === "can" && nearWater(t) ? "Right click to fill the can" : "";
+    if (cur.kind === "tool" && cur.tool === "can" && nearWater(t)) return "Right-click: fill the can";
+    const plotId = world.plotMap[t.x + W * t.z];
+    if (plotId < 0 || t.ny !== 1) return nearWater(t) && !(cur.kind === "tool" && cur.tool === "can") ? "Water here — press 3 for the can" : "";
+    if (!game.save.plots.includes(plotId)) return `✋ ${world.plots[plotId].name} is a neighbour's field`;
+    if (!block(id).farmable) return "";
+    return cur.kind === "tool" && cur.tool === "hoe" ? "Right-click: plough this soil" : "Press 2 for the hoe to plough here";
   }
   const now = game.now();
   const wet = soil.wetUntil > now ? "watered" : "dry";
-  if (!soil.plant) return `Tilled soil · ${wet} · quality ${Math.round(soil.q * 100)}%`;
+  if (!soil.plant) {
+    if (cur.kind === "seed") return `Right-click: sow ${CROPS[cur.crop].name.toLowerCase()} · soil ${Math.round(soil.q * 100)}%`;
+    return `Ploughed soil · press 4, 5 or 6 for seeds, then right-click`;
+  }
   const p = advance(soil.plant, soil.wetUntil, now);
   const c = CROPS[p.crop];
-  if (p.progress >= 1) return `${c.name} · ripe — click to harvest`;
+  if (p.progress >= 1) return `${c.name} is ripe · left-click to harvest`;
+  if (wet === "dry" && cur.kind === "tool" && cur.tool === "can") return `${c.name} · ${Math.floor(p.progress * 100)}% · right-click to water`;
   const mins = Math.ceil(msToRipe(p) / 60000);
-  return `${c.name} · ${Math.floor(p.progress * 100)}% · ${wet} · ~${mins} min if watered`;
+  return `${c.name} · ${Math.floor(p.progress * 100)}% grown · ${wet === "dry" ? "dry — water it (press 3)" : "watered"} · ripe in ~${mins} min`;
 }
 
 function refreshStatus() {
@@ -516,6 +537,10 @@ controls.onEscape = () => {
   map.close();
 };
 controls.onMap = () => (map.open ? map.close() : showMap());
+controls.onHelp = () => {
+  guide.toggleHelp();
+  if (guide.helpOpen) document.exitPointerLock?.();
+};
 controls.onTorch = () => {
   torchOn = !torchOn;
   hud.toast(torchOn ? "Torch on" : "Torch off");
@@ -666,6 +691,9 @@ renderer.setAnimationLoop(() => {
   worldRenderer.cull(camera.position, mode === "title" ? 200 : settings.renderDistance);
   for (const s of STALLS) s.npc.update(dt, camera.position);
   for (const n of NEIGHBOURS) n.update(dt, camera.position);
+  const tv0 = performance.now();
+  villagers.update(dt, now / 1000, hourOverride ?? clock(game.now()).hour, game.save, clock(game.now()).day, game.now(), camera.position);
+  prof.villagers = prof.villagers * 0.95 + (performance.now() - tv0) * 0.05;
   farmer.root.position.set(body.pos.x, body.pos.y, body.pos.z);
   farmer.root.rotation.y = body.heading;
   farmer.visible = mode !== "title" && (rig.view === "third" || !!farmyard.ride);
@@ -701,11 +729,19 @@ renderer.setAnimationLoop(() => {
   grass.update(now / 1000, grassAt, mode === "title" ? 90 : Math.min(90, settings.renderDistance * 0.55), sunDirection(hour), sc.sun, sc.top);
   if (mode !== "title") applyRenderDistance();
   renderer.info.reset();
+  const tr0 = performance.now();
   post.render();
+  prof.render = prof.render * 0.95 + (performance.now() - tr0) * 0.05;
+  prof.frame = prof.frame * 0.95 + (performance.now() - now) * 0.05;
   if (hud.debugOn) hud.setDebug(debugText(dt));
+  if (booted_) {
+    const c = clock(game.now());
+    guide.update(game.save, { world, now: game.now(), day: c.day, onOwnLand: game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]) }, camera, now / 1000, mode === "title" || !!panels.open || map.open || !!farmyard.ride);
+  }
 });
 
 let lastTick = 0;
+const prof = { villagers: 0, frame: 0, render: 0 };
 let fpsAvg = 60;
 let stepAcc = 0;
 /** A footstep every so often while walking on the ground; road crunches brighter than grass. */
@@ -859,6 +895,13 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     toggleDebug: () => hud.toggleDebug(),
     setView: (v: "first" | "third") => (rig.view = v),
     torch: (on: boolean) => (torchOn = on),
+    villagerDebug: () => villagers.debug(),
+    prof: () => ({ ...prof }),
+    hideLayer: (name: string, on: boolean) => {
+      const m: Record<string, THREE.Object3D> = { villagers: villagers.group, grass: grass.group, trees: trees.group, village: village.group, fields: fields.group };
+      if (name === "vfields") villagers.fields.group.visible = !on;
+      else m[name].visible = !on;
+    },
     title: () => ({ open: titleScreen.open, mode }),
     openSettings: () => settingsPanel.show(),
     audioSelfTest: async () => Object.fromEntries(await Promise.all(Object.keys(SOUNDS).map(async (k) => [k, Math.round((await renderRms(k)) * 1e4) / 1e4]))),
