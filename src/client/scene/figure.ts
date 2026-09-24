@@ -5,7 +5,48 @@ import * as THREE from "three";
  * One rig for the farmer and everyone in the village; `animate` swings limbs from a walk phase.
  * Faces +z, feet at the origin, about 1.7 m tall.
  */
-export type Look = { kurta: string; dhoti: string; hat: string; hatStyle: "pheta" | "topi"; skin: string; tail?: string };
+export type Look = { kurta: string; dhoti: string; hat: string; hatStyle: "pheta" | "topi" | "odhni"; skin: string; tail?: string; woman?: boolean };
+
+/** A Banjara woman: mirror-work ghaghra, embroidered kanchali, a coin-edged odhni over the head, arms stacked with bangles. */
+export const banjaraWoman = (skirt: string, odhni: string): Look => ({ kurta: "#1f5a52", dhoti: skirt, hat: odhni, hatStyle: "odhni", skin: "#9a6240", woman: true });
+
+/** The embroidery: bands of colour, zigzags, and little round mirrors that catch the light. */
+function mirrorWork(base: string): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 256;
+  const g = c.getContext("2d")!;
+  g.fillStyle = base;
+  g.fillRect(0, 0, 256, 256);
+  const bands = ["#e8b830", "#1b1b1b", "#2e8a4a", "#d8342a", "#f2f0e6", "#1f4fa0"];
+  for (let i = 0; i < 6; i++) {
+    const y = 150 + i * 17;
+    g.fillStyle = bands[i];
+    g.fillRect(0, y, 256, 11);
+    g.strokeStyle = bands[(i + 3) % 6];
+    g.lineWidth = 2;
+    g.beginPath();
+    for (let x = 0; x <= 256; x += 8) g.lineTo(x, y + (x % 16 ? 1 : 10));
+    g.stroke();
+  }
+  for (let row = 0; row < 3; row++)
+    for (let x = 6; x < 256; x += 16) {
+      const y = 60 + row * 30 + (x % 32 ? 0 : 8);
+      g.fillStyle = "#e8b830";
+      g.beginPath();
+      g.arc(x, y, 5, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#e8eef4"; // the mirror
+      g.beginPath();
+      g.arc(x, y, 3, 0, Math.PI * 2);
+      g.fill();
+    }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = THREE.RepeatWrapping;
+  t.repeat.set(3, 1);
+  return t;
+}
 export const FARMER: Look = { kurta: "#f1ead9", dhoti: "#e9e1cd", hat: "#e0762a", hatStyle: "pheta", skin: "#9b6541", tail: "#e0762a" };
 
 const mats = new Map<string, THREE.MeshStandardMaterial>();
@@ -38,6 +79,10 @@ export class Figure {
     const r = this.root;
     r.add(this.body);
     const b = this.body;
+    if (look.woman) {
+      this.woman(look);
+      return;
+    }
     // legs: a loose white dhoti over the thighs, bare shins, chappals
     for (const s of [-1, 1]) {
       const hip = new THREE.Group();
@@ -96,6 +141,74 @@ export class Figure {
       const cap = part(new THREE.CylinderGeometry(0.1, 0.12, 0.09, 4, 1), look.hat, h, 0, 0.24, 0);
       cap.scale.set(1, 1, 1.35);
       cap.rotation.y = Math.PI / 4;
+    }
+  }
+
+  private woman(look: Look) {
+    const b = this.body;
+    // legs under the skirt still swing a little, so walking reads
+    for (const s of [-1, 1]) {
+      const hip = new THREE.Group();
+      hip.position.set(s * 0.08, 0.86, 0);
+      b.add(hip);
+      const knee = new THREE.Group();
+      knee.position.set(0, -0.44, 0);
+      hip.add(knee);
+      part(new THREE.CylinderGeometry(0.04, 0.035, 0.4, 8), look.skin, knee, 0, -0.2, 0);
+      part(new THREE.BoxGeometry(0.09, 0.03, 0.22), "#3b2a1e", knee, 0, -0.41, 0.04);
+      for (let i = 0; i < 3; i++) part(new THREE.TorusGeometry(0.045, 0.012, 5, 10), "#d8d8d0", knee, 0, -0.34 - i * 0.02, 0, 0.3).rotation.x = Math.PI / 2; // silver anklets
+      this.hips.push(hip);
+      this.knees.push(knee);
+    }
+    // the ghaghra: a full skirt, embroidered at the hem
+    const skirt = new THREE.Mesh(lathe([[0.001, 0.06], [0.38, 0.06], [0.37, 0.1], [0.3, 0.45], [0.22, 0.8], [0.17, 0.98], [0.001, 0.98]], 26), new THREE.MeshStandardMaterial({ map: mirrorWork(look.dhoti), roughness: 0.75 }));
+    skirt.castShadow = true;
+    b.add(skirt);
+    // the kanchali (backless embroidered blouse) and bare midriff
+    part(lathe([[0.001, 0.98], [0.16, 0.98], [0.155, 1.12], [0.001, 1.12]], 18), look.skin, b);
+    const top = new THREE.Mesh(lathe([[0.001, 1.12], [0.17, 1.12], [0.18, 1.3], [0.15, 1.42], [0.05, 1.46], [0.001, 1.46]], 20), new THREE.MeshStandardMaterial({ map: mirrorWork(look.kurta), roughness: 0.7 }));
+    top.castShadow = true;
+    b.add(top);
+    part(new THREE.CylinderGeometry(0.045, 0.05, 0.1, 10), look.skin, b, 0, 1.49, 0);
+    for (const s of [-1, 1]) {
+      const sh = new THREE.Group();
+      sh.position.set(s * 0.2, 1.36, 0);
+      b.add(sh);
+      part(new THREE.CapsuleGeometry(0.045, 0.26, 4, 10), look.skin, sh, 0, -0.15, 0);
+      // Banjara women wear stacks of bangles up the arm
+      for (let i = 0; i < 6; i++) part(new THREE.TorusGeometry(0.055, 0.013, 5, 12), i % 2 ? "#f2eee2" : "#c8392b", sh, 0, -0.08 - i * 0.04, 0, 0.4).rotation.x = Math.PI / 2;
+      const el = new THREE.Group();
+      el.position.set(0, -0.32, 0);
+      sh.add(el);
+      part(new THREE.CapsuleGeometry(0.038, 0.22, 4, 10), look.skin, el, 0, -0.13, 0);
+      for (let i = 0; i < 5; i++) part(new THREE.TorusGeometry(0.047, 0.012, 5, 12), "#f2eee2", el, 0, -0.08 - i * 0.035, 0, 0.4).rotation.x = Math.PI / 2;
+      sh.rotation.z = s * 0.1;
+      this.shoulders.push(sh);
+      this.elbows.push(el);
+    }
+    this.head.position.set(0, 1.53, 0);
+    b.add(this.head);
+    const h = this.head;
+    part(new THREE.SphereGeometry(0.11, 20, 16), look.skin, h, 0, 0.11, 0).scale.set(0.9, 1.05, 0.95);
+    part(new THREE.SphereGeometry(0.024, 10, 8), look.skin, h, 0, 0.1, 0.105);
+    for (const s of [-1, 1]) {
+      part(new THREE.SphereGeometry(0.013, 8, 6), "#1c1410", h, s * 0.04, 0.14, 0.098, 0.4);
+      part(new THREE.SphereGeometry(0.03, 8, 6), "#d8d8d0", h, s * 0.11, 0.05, 0, 0.3); // heavy silver earrings
+    }
+    part(new THREE.SphereGeometry(0.115, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), "#1a1210", h, 0, 0.14, -0.01); // hair
+    // the odhni: a long veil over the head and down the back, edged with coins
+    const veil = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.15, 0.3, 0.95, 18, 1, true, Math.PI * 0.35, Math.PI * 1.3),
+      new THREE.MeshStandardMaterial({ map: mirrorWork(look.hat), roughness: 0.8, side: THREE.DoubleSide }),
+    );
+    veil.position.set(0, -0.2, -0.03);
+    veil.castShadow = true;
+    h.add(veil);
+    const cap = part(new THREE.SphereGeometry(0.135, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2.2), look.hat, h, 0, 0.14, -0.01);
+    cap.scale.set(1, 0.9, 1.05);
+    for (let i = 0; i < 9; i++) {
+      const a = Math.PI * (0.15 + i * 0.087) - Math.PI / 2;
+      part(new THREE.CylinderGeometry(0.016, 0.016, 0.005, 10), "#d9c07a", h, Math.cos(a) * 0.125, 0.16, Math.sin(-a) * 0.125 + 0.02, 0.3).rotation.x = Math.PI / 2; // coins on the brow
     }
   }
 

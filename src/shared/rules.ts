@@ -147,7 +147,7 @@ function finance(world: World, save: Save, a: Extract<Action, { t: "borrow" | "r
 
 /** Bulls and the cart: feeding, and the trip to the town mandi. (Ploughing is with the farm actions.) */
 function livestock(save: Save, a: Extract<Action, { t: "feed" | "startTrip" | "sellTown" }>, now: number): Result {
-  if (!save.bulls) return fail("You don't have bulls yet — Sakharam sells a fine pair.");
+  if (!save.bulls) return fail("You don't have bulls yet — Sitabai at the seed shop sells a fine pair.");
   const b = bullsNow(save.bulls, now);
   save.bulls = b;
   const day = clock(now).day;

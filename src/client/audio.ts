@@ -1,5 +1,5 @@
 /*
- * Every sound in Bailgaadi is synthesized with WebAudio — no files. Each effect is a function of
+ * Every sound in Tanda is synthesized with WebAudio — no files. Each effect is a function of
  * (context, destination, start time), so the same code plays live or renders offline for tests.
  */
 type Ctx = BaseAudioContext;

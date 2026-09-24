@@ -41,15 +41,15 @@ export class TitleScreen {
   constructor(parent: HTMLElement) {
     this.el = el("div", "title-screen", parent, `
       <div class="title-inner">
-        <div class="wordmark">Bailgaadi<span>बैलगाडी</span></div>
-        <p class="tagline">Farm the black soil of the Deccan. Cart your harvest to the mandi. Buy the land.</p>
+        <div class="wordmark">Tanda<span>उखळी तांडा · Ukhali Tanda</span></div>
+        <p class="tagline">A Banjara tanda on the black soil of the Deccan. Farm, cart your harvest to the mandi the old caravan way, and buy the land.</p>
         <div class="title-save"></div>
         <div class="title-buttons">
           <button class="primary" data-t="play">Start farming</button>
           <button data-t="settings">Settings</button>
           <button class="link" data-t="restore">Continue a farm from another device</button>
         </div>
-        <p class="keys">WASD walk · mouse look · left click dig &amp; harvest · right click use · E talk · M map</p>
+        <p class="keys">WASD walk · mouse look · left click harvest · right click use · E talk · M map · V view · T torch</p>
       </div>
       <div class="loading">Preparing the village…</div>`);
     this.el.addEventListener("click", (e) => {
@@ -185,7 +185,7 @@ export class Tutorial {
     this.el.hidden = false;
     if (i < 0) {
       this.doneAt ||= now;
-      this.el.innerHTML = `<b>Your first profit!</b> Now save up: better seeds, a bull pair and a cart (Sakharam's shop), and more land (the land office).`;
+      this.el.innerHTML = `<b>Your first profit!</b> Now save up: better seeds, a bull pair and a cart (Sitabai's shop), and more land (the land office).`;
       if (now - this.doneAt > 20000) this.finish();
       return;
     }
@@ -198,8 +198,8 @@ export function isTouchOnly() {
   return (matchMedia("(pointer: coarse)").matches && !matchMedia("(pointer: fine)").matches) || innerWidth < 640;
 }
 export function showMobileNote(parent: HTMLElement, onAnyway: () => void) {
-  const n = el("div", "mobile-note", parent, `<div class="panel-card"><h2>Bailgaadi is a computer game</h2>
-    <p>It's played with a keyboard and mouse. Open <b>bailgaadi.gajananrathod.in</b> on a laptop or desktop to farm.</p>
+  const n = el("div", "mobile-note", parent, `<div class="panel-card"><h2>Tanda is a computer game</h2>
+    <p>It's played with a keyboard and mouse. Open <b>tanda.gajananrathod.in</b> on a laptop or desktop to farm.</p>
     <div class="big-acts"><button data-anyway>Just look around</button></div></div>`);
   n.querySelector("[data-anyway]")!.addEventListener("click", () => {
     n.remove();

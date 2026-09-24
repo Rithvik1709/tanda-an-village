@@ -147,8 +147,8 @@ export class Panels {
           : this.open === "town"
             ? `<h2>Town mandi <small>Haribhau, commission agent · अडत्या</small></h2><p class="lede">"Unload here, bhau. Town prices, cash today."</p>`
             : this.open === "land"
-          ? `<h2>Talathi's land office <small>तलाठी कार्यालय</small></h2><p class="lede">"Land is the long game, beta. Buy good soil near water, and it pays you back every season."</p>`
-          : `<h2>Sakharam's seeds &amp; tools <small>बी-बियाणे</small></h2><p class="lede">"Good seed, good harvest. Tell me what you're growing."</p>`;
+          ? `<h2>Naik Dhavlu's kacheri <small>the tanda's headman · नायक</small></h2><p class="lede">"Ram Ram! The tanda settled here for this black soil. Buy land near water, bhai — it feeds you every season."</p>`
+          : `<h2>Sitabai's seeds &amp; tools <small>बी-बियाणे</small></h2><p class="lede">"Ram Ram! Good seed, good harvest. And my Khillari bulls pull a cart like our caravans of old."</p>`;
     const body =
       this.tab === "loans" ? this.loans(s, day, this.open === "bank" ? "bank" : "sahukar") : this.tab === "godown" ? this.godown(s) : this.tab === "worth" ? this.worth(s, day) : this.tab === "load" ? this.load(s, day) : this.tab === "mandi" || this.tab === "sold" ? this.mandi(s, day) : this.tab === "sell" ? this.sell(s, day) : this.tab === "prices" ? this.prices(day) : this.tab === "ledger" ? this.ledger(s, day) : this.tab === "plots" ? this.plots(s, day) : this.tab === "mine" ? this.mine(s, day) : this.buy(s);
     this.el.innerHTML = `

@@ -481,10 +481,10 @@ export function generateWorld(seed = WORLD_SEED): World {
     structures,
     landmarks: {
       spawn: { x: 96.5, y: SQUARE.y + 1, z: 90.5, label: "Village square" },
-      temple: lm(temple, "Temple"),
+      temple: lm(temple, "Sevalal Maharaj mandir"),
       trader: lm(trader, "Trader"),
       seedShop: lm(seedShop, "Seed & tool shop"),
-      landOffice: lm(landOffice, "Land office"),
+      landOffice: lm(landOffice, "Naik's kacheri"),
       bank: lm(bank, "Cooperative bank"),
       well: lm(well, "Well"),
       market: lm(market, "Town market"),

@@ -22,7 +22,7 @@ export class MapView {
     this.el = document.createElement("div");
     this.el.className = "mapview";
     this.el.hidden = true;
-    this.el.innerHTML = `<div class="map-card"><button class="x" title="Close (M)">✕</button><h2>Gaon naksha <small>गावाचा नकाशा · the village map</small></h2><canvas></canvas>
+    this.el.innerHTML = `<div class="map-card"><button class="x" title="Close (M)">✕</button><h2>Ukhali Tanda <small>उखळी तांडा · the tanda map</small></h2><canvas></canvas>
       <div class="map-legend"><span><i style="background:#3fbf5a"></i>your land</span><span><i style="background:#f0a030"></i>for sale</span><span><i style="background:#5a8fe0"></i>you listed</span><span><i style="background:#ffffff"></i>other farms</span><span>▲ you</span></div></div>`;
     parent.appendChild(this.el);
     this.canvas = this.el.querySelector("canvas")!;
@@ -87,10 +87,10 @@ export class MapView {
     // the few places worth finding, nudged so the village square doesn't turn into a pile of text
     const L = this.world.landmarks;
     const pins: [typeof L.trader, string, number, number, CanvasTextAlign][] = [
-      [L.temple, "Temple", 0, -10, "center"],
+      [L.temple, "Sevalal mandir", 0, -10, "center"],
       [L.trader, "Trader", 6, -2, "left"],
       [L.seedShop, "Seed shop", 6, 8, "left"],
-      [L.landOffice, "Land office", -6, 8, "right"],
+      [L.landOffice, "Naik (land)", -6, 8, "right"],
       [L.bank, "Bank", 6, -6, "left"],
       [L.market, "Town market", -4, -12, "right"],
       [L.ghat, "Ghat", 8, 4, "left"],

@@ -26,6 +26,11 @@ export class Grass {
     uGround: { value: new THREE.Color("#6a5a3c") },
     uPlayer: { value: new THREE.Vector3() },
     uFade: { value: 70 },
+    uTorchPos: { value: new THREE.Vector3() },
+    uTorchDir: { value: new THREE.Vector3(0, -1, 0) },
+    uTorchOn: { value: 0 },
+    uBulbs: { value: Array.from({ length: 8 }, () => new THREE.Vector3(0, -99, 0)) },
+    uBulbK: { value: 0 },
     ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
   };
 
@@ -77,6 +82,8 @@ export class Grass {
         }`,
       fragmentShader: /* glsl */ `
         uniform vec3 uSunDir, uSunColor, uSky, uGround;
+        uniform vec3 uTorchPos, uTorchDir; uniform float uTorchOn;
+        uniform vec3 uBulbs[8]; uniform float uBulbK;
         varying vec3 vColor; varying float vT; varying float vFlower; varying vec3 vWorld;
         #include <fog_pars_fragment>
         void main(){
@@ -86,6 +93,18 @@ export class Grass {
           vec3 light = uSky * 0.7 + uGround * 0.25 + uSunColor * (0.6 + 0.5 * vT) * sun * 1.35;
           vec3 col = base * light;
           col += uSunColor * pow(vT, 3.0) * 0.12 * sun;                 // sunlit tips glow a little (translucency)
+          // the hand torch: a soft cone
+          if (uTorchOn > 0.5) {
+            vec3 d = vWorld - uTorchPos;
+            float dist = length(d);
+            float cone = smoothstep(0.86, 0.95, dot(d / dist, uTorchDir));
+            col += base * vec3(1.0, 0.95, 0.82) * cone * 5.0 / (1.0 + dist * dist * 0.03);
+          }
+          // warm tungsten bulbs at the houses
+          for (int i = 0; i < 8; i++) {
+            float dist = distance(vWorld, uBulbs[i]);
+            col += base * vec3(1.0, 0.62, 0.3) * uBulbK * 2.2 / (1.0 + dist * dist * 0.35);
+          }
           gl_FragColor = vec4(col, 1.0);
           #include <fog_fragment>
         }`,
@@ -139,6 +158,16 @@ export class Grass {
   }
 
   /** Density falls with distance: all blades close by, a thinning share farther out, none past `fade`. */
+  /** Night lights the grass should respond to. */
+  lights(torch: { on: boolean; pos: THREE.Vector3; dir: THREE.Vector3 }, bulbs: THREE.Vector3[], k: number) {
+    const u = this.uniforms;
+    u.uTorchOn.value = torch.on ? 1 : 0;
+    u.uTorchPos.value.copy(torch.pos);
+    u.uTorchDir.value.copy(torch.dir).normalize();
+    bulbs.slice(0, 8).forEach((b, i) => u.uBulbs.value[i].copy(b));
+    u.uBulbK.value = k;
+  }
+
   update(t: number, player: THREE.Vector3, fade: number, sunDir: THREE.Vector3, sun: THREE.Color, sky: THREE.Color) {
     const u = this.uniforms;
     u.uTime.value = t;

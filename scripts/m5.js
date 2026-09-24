@@ -19,7 +19,7 @@
   };
   for (const [slot, list] of [[1, cells], [4, cells]]) for (const c of list) { g.select(slot); await at(c); const r = await g.right(); if (!r?.ok) log.errors.push(r); }
   await g.sync();
-  await g.skip(6 * 10 * 60 * 1000);
+  await g.skip(10 * 10 * 60 * 1000); // ten game days: enough even for dry soil in summer
   g.select(0);
   for (const c of cells) { await at([c[0], c[1] + 0.3, c[2]]); const r = await g.left(); if (!r?.ok) log.errors.push(r); }
   log.onions = g.inv().onion;

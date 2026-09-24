@@ -131,6 +131,30 @@ export const TEX = {
       }
       blotch(g, s, r, 20, "rgba(60,70,40,0.2)", 8, 30); // a little moss
     }),
+  /** Banjara embroidery: bold colour bands, zigzag stitching and small round mirrors. */
+  mirrorWork: () =>
+    make("mirrorwork", 256, (g, s) => {
+      const bands = ["#c8292e", "#1b1b1b", "#e8b830", "#1f7a45", "#1f4fa0", "#e8662a"];
+      for (let i = 0; i < 8; i++) {
+        g.fillStyle = bands[i % 6];
+        g.fillRect(0, i * 32, s, 32);
+        g.strokeStyle = bands[(i + 2) % 6];
+        g.lineWidth = 3;
+        g.beginPath();
+        for (let x = 0; x <= s; x += 12) g.lineTo(x, i * 32 + (x % 24 ? 6 : 26));
+        g.stroke();
+        for (let x = 16; x < s; x += 32) {
+          g.fillStyle = "#f2d060";
+          g.beginPath();
+          g.arc(x, i * 32 + 16, 7, 0, Math.PI * 2);
+          g.fill();
+          g.fillStyle = "#eef4f8";
+          g.beginPath();
+          g.arc(x, i * 32 + 16, 4.5, 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+    }),
   cloth: (color: string, stripe: string) =>
     make("cloth" + color, 128, (g, s) => {
       g.fillStyle = color;

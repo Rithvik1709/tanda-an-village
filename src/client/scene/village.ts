@@ -17,6 +17,24 @@ export class Village {
   private buckets = new Map<string, Bucket>();
   private flagCloth: THREE.Mesh[] = [];
   private t = 0;
+  /** Where the small tungsten bulbs hang (over doors and stall counters), for night lighting. */
+  readonly lamps: THREE.Vector3[] = [];
+  private bulbMat = new THREE.MeshStandardMaterial({ color: "#fff1d0", emissive: new THREE.Color("#ffb05a"), emissiveIntensity: 0, roughness: 0.3 });
+
+  /** A bare bulb on a short flex, the way village verandahs are lit. */
+  private bulb(x: number, y: number, z: number) {
+    this.box("dark", () => new THREE.MeshStandardMaterial({ color: "#2a2018" }), 0.015, 0.25, 0.015, x, y + 0.2, z);
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 10), this.bulbMat);
+    b.scale.set(1, 1.25, 1);
+    b.position.set(x, y, z);
+    this.group.add(b);
+    this.lamps.push(new THREE.Vector3(x, y - 0.05, z));
+  }
+
+  /** 0 by day, 1 at night: the bulbs glow. */
+  setNight(k: number) {
+    this.bulbMat.emissiveIntensity = k * 4.5;
+  }
 
   private put(key: string, m: () => THREE.Material, g: THREE.BufferGeometry, at?: THREE.Matrix4) {
     if (!this.buckets.has(key)) this.buckets.set(key, { mat: m(), geos: [] });
@@ -60,6 +78,12 @@ export class Village {
       sack: () => new THREE.MeshStandardMaterial({ color: "#c8b48a", roughness: 1 }),
       cane: () => new THREE.MeshStandardMaterial({ color: "#a8b84a", roughness: 0.7 }),
       rope: () => new THREE.MeshStandardMaterial({ color: "#a08a60", roughness: 1 }),
+      toran: () => mat(TEX.mirrorWork(), { roughness: 0.6 }),
+      tasselA: () => new THREE.MeshStandardMaterial({ color: "#d8342a", roughness: 0.9 }),
+      tasselB: () => new THREE.MeshStandardMaterial({ color: "#e8b830", roughness: 0.9 }),
+      whiteFlag: () => new THREE.MeshStandardMaterial({ color: "#f6f4ec", roughness: 0.9, side: THREE.DoubleSide }),
+      basket: () => mat(TEX.thatch(), { color: "#c09050", roughness: 1 }),
+      sprouts: () => new THREE.MeshStandardMaterial({ color: "#8cc84a", roughness: 0.8 }),
     };
     for (const s of structures) {
       if (s.kind === "house") this.house(s, M);
@@ -97,6 +121,11 @@ export class Village {
     };
     face(side[0], side[1], 0, 1.05, 1.25, 2.1, "blue", 0.08);
     face(side[0], side[1], 0, 1.0, 0.95, 1.95, "wood", 0.1);
+    // a Banjara toran over the door: an embroidered, mirror-studded hanging with little tassels
+    face(side[0], side[1], 0, 2.25, 1.35, 0.22, "toran", 0.12);
+    for (let i = -2; i <= 2; i++) face(side[0], side[1], i * 0.28, 2.02, 0.07, 0.22, i % 2 ? "tasselA" : "tasselB", 0.13);
+    // and the bulb under the verandah
+    this.bulb(cx + side[0] * (w / 2 + 0.55), y + 0.3 + 2.25, cz + side[1] * (d / 2 + 0.55));
     for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       if (sx === side[0] && sz === side[1]) continue;
       const span = sx ? d : w;
@@ -127,7 +156,8 @@ export class Village {
     for (const [px, pz] of [[x0 + 0.3, z0 + 0.3], [x0 + w - 0.3, z0 + 0.3], [x0 + 0.3, z0 + d - 0.3], [x0 + w - 0.3, z0 + d - 0.3]])
       this.box("wood", M.wood, 0.18, pz < cz ? 3.1 : 2.6, 0.18, px, y + (pz < cz ? 1.55 : 1.3), pz);
     // the awning slopes down toward the customer (the +z front), with a scalloped edge
-    const cloth = s.awning === "saffron" ? "saffron" : "blueCloth";
+    const cloth = s.awning === "saffron" ? "toranCloth" : "blueCloth";
+    if (!M.toranCloth) M.toranCloth = () => mat(TEX.mirrorWork(), { side: THREE.DoubleSide, roughness: 0.7 });
     const aw = new THREE.PlaneGeometry(w + 0.6, d + 0.9, 8, 1);
     aw.rotateX(-Math.PI / 2 + 0.2);
     this.put(cloth, M[cloth], aw, new THREE.Matrix4().makeTranslation(cx, y + 2.85, cz + 0.2));
@@ -137,6 +167,7 @@ export class Village {
     }
     // the counter, and what's for sale on it
     this.box("wood", M.wood, w - 0.4, 0.9, 0.7, cx, y + 0.45, z0 + d - 0.6);
+    this.bulb(cx, y + 2.35, cz + 0.4);
     const r = mulberry32(x0 * 31 + z0);
     for (let i = 0; i < 6; i++) {
       const sx = x0 + 0.6 + (i % 3) * ((w - 1.2) / 2), sz = z0 + d - 0.6 + (i < 3 ? -0.15 : 0.15);
@@ -180,11 +211,32 @@ export class Village {
     this.put("gold", M.gold, new THREE.ConeGeometry(0.1, 0.4, 8), new THREE.Matrix4().makeTranslation(cx, y + 9.3, cz));
     // the flag on its pole
     this.box("wood", M.wood, 0.06, 2.2, 0.06, cx + 0.4, y + 9.4, cz);
-    const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.7, 8, 2), M.saffron());
+    // Sevalal Maharaj's shrine flies white flags
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.7, 8, 2), M.whiteFlag());
     flag.geometry.translate(0.6, 0, 0);
     flag.position.set(cx + 0.42, y + 10.1, cz);
     this.group.add(flag);
     this.flagCloth.push(flag);
+    // more white flags on poles at the corners of the plinth
+    for (const [fx, fz] of [[-4, -4], [4, -4], [-4, 4], [4, 4]]) {
+      this.box("wood", M.wood, 0.05, 3.2, 0.05, cx + fx, y + 1.4, cz + fz);
+      const f = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.45, 6, 2), M.whiteFlag());
+      f.geometry.translate(0.35, 0, 0);
+      f.position.set(cx + fx + 0.03, y + 2.75, cz + fz);
+      this.group.add(f);
+      this.flagCloth.push(f);
+    }
+    // Teej: baskets of sprouting wheat that the girls of the tanda tend for the festival
+    for (let i = 0; i < 5; i++) {
+      const bx = cx - 1.6 + i * 0.8, bz = cz + 3.4;
+      this.put("basket", M.basket, new THREE.CylinderGeometry(0.24, 0.16, 0.22, 12), new THREE.Matrix4().makeTranslation(bx, y + 0.5, bz));
+      for (let k = 0; k < 14; k++) {
+        const a = k * 2.4, r = 0.05 + (k % 4) * 0.045;
+        const sp = new THREE.ConeGeometry(0.012, 0.28 + (k % 3) * 0.06, 4);
+        this.put("sprouts", M.sprouts, sp, new THREE.Matrix4().makeTranslation(bx + Math.cos(a) * r, y + 0.74, bz + Math.sin(a) * r));
+      }
+    }
+    this.bulb(cx, y + 2.8, cz + 2.9);
     // a bell by the door
     this.box("wood", M.wood, 0.06, 0.6, 0.06, cx + 1.2, y + 2.9, cz + 2.7);
     this.put("gold", M.gold, new THREE.ConeGeometry(0.15, 0.25, 10, 1, true), new THREE.Matrix4().makeTranslation(cx + 1.2, y + 2.5, cz + 2.7));

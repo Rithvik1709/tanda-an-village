@@ -1,8 +1,8 @@
 import * as THREE from "three";
-import { Figure, type Look } from "../scene/figure";
+import { banjaraWoman, Figure, type Look } from "../scene/figure";
 
 /** A villager at a stall: the same modelled figure as the farmer, turning to face you when you come near. */
-export type NpcLook = { kurta: string; dhoti: string; hat: string; hatTall?: boolean; skin?: string };
+export type NpcLook = { kurta: string; dhoti: string; hat: string; hatTall?: boolean; skin?: string; woman?: boolean };
 
 export class Npc {
   readonly group: THREE.Group;
@@ -10,7 +10,9 @@ export class Npc {
   private t = Math.random() * 10;
 
   constructor(look: NpcLook, x: number, y: number, z: number, private facing: number) {
-    const l: Look = { kurta: look.kurta, dhoti: look.dhoti, hat: look.hat, hatStyle: look.hatTall ? "pheta" : "topi", skin: look.skin ?? "#a06a45" };
+    const l: Look = look.woman
+      ? banjaraWoman(look.dhoti, look.hat)
+      : { kurta: look.kurta, dhoti: look.dhoti, hat: look.hat, hatStyle: look.hatTall ? "pheta" : "topi", skin: look.skin ?? "#a06a45" };
     this.fig = new Figure(l);
     this.group = this.fig.root;
     this.group.position.set(x, y, z);

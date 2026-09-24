@@ -133,6 +133,31 @@ scene.add(fields.group);
 const syncFields = () => fields.sync(game.save, game.now(), (x, z) => hf.at(x, z));
 const farmer = new Figure(FARMER);
 scene.add(farmer.root);
+
+// ---- night: tungsten bulbs at every door, and the farmer's hand torch (T) ----
+// a fixed pool of lights follows the nearest bulbs, so the shader cost stays constant all night
+const BULB_LIGHTS = Array.from({ length: 8 }, () => {
+  const l = new THREE.PointLight("#ffac55", 0, 11, 1.6);
+  scene.add(l);
+  return l;
+});
+const torch = new THREE.SpotLight("#fff2d6", 0, 34, 0.42, 0.55, 1.2);
+const torchAim = new THREE.Object3D();
+scene.add(torch, torchAim);
+torch.target = torchAim;
+// the torch itself, held in the right hand: a steel body and a glowing lens
+const torchModel = new THREE.Group();
+{
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.22, 10), new THREE.MeshStandardMaterial({ color: "#8a9096", metalness: 0.7, roughness: 0.35 }));
+  body.rotation.x = Math.PI / 2;
+  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.034, 12), new THREE.MeshStandardMaterial({ color: "#fff6e0", emissive: "#fff2d0", emissiveIntensity: 6 }));
+  lens.position.z = 0.111;
+  torchModel.add(body, lens);
+  torchModel.position.set(0.24, 0.98, 0.16);
+  farmer.root.add(torchModel);
+}
+let torchOn = false;
+let nightK = 0;
 const controls = new Controls(canvas);
 controls.yaw = 0.25; // face up the north road, your first field off to the left
 const hotbar = new Hotbar();
@@ -200,14 +225,14 @@ const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: N
   {
     kind: "shop",
     at: { ...world.landmarks.seedShop, x: world.landmarks.seedShop.x + 0.5, z: world.landmarks.seedShop.z - 0.5 },
-    npc: new Npc({ kurta: "#4f7fae", dhoti: "#e8e0cc", hat: "#e8892c", hatTall: true }, 102.5, world.landmarks.seedShop.y, 102.3, 0),
-    label: "Buy seeds & tools from Sakharam",
+    npc: new Npc({ kurta: "", dhoti: "#a8262c", hat: "#d04a2a", woman: true }, 102.5, world.landmarks.seedShop.y, 102.3, 0),
+    label: "Buy seeds & tools from Sitabai",
   },
   {
     kind: "land",
     at: { x: lo.x + 3, y: lo.y, z: lo.z + 0.5 },
     npc: new Npc({ kurta: "#f4f0e4", dhoti: "#3a3a44", hat: "#f6f2e8", skin: "#9a6440" }, lo.x + 1.6, lo.y, lo.z + 0.5, Math.PI / 2),
-    label: "Buy & sell land at the Talathi's office",
+    label: "Buy & sell land with Naik Dhavlu, the tanda's headman",
   },
   {
     kind: "bank",
@@ -229,6 +254,14 @@ const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: N
   },
 ];
 for (const s of STALLS) scene.add(s.npc.group);
+// the people of the tanda going about their day (not traders — just neighbours)
+const NEIGHBOURS = [
+  new Npc({ kurta: "", dhoti: "#1f4fa0", hat: "#c0392b", woman: true }, 89.5, hf.at(89.5, 97.5), 97.5, 0.6), // at the well
+  new Npc({ kurta: "", dhoti: "#7a1f4a", hat: "#e8a030", woman: true }, 92.8, hf.at(92.8, 96.2), 96.2, -2.2),
+  new Npc({ kurta: "", dhoti: "#1b6a3a", hat: "#8a2a8a", woman: true }, 88.5, hf.at(88.5, 95.5), 95.5, 3.0), // at Sevalal's shrine
+  new Npc({ kurta: "#f1ead9", dhoti: "#e9e1cd", hat: "#f2f2ee", hatTall: true }, 86.4, hf.at(86.4, 96), 96, 1.2),
+];
+for (const n of NEIGHBOURS) scene.add(n.group);
 const panels = new Panels(document.getElementById("ui")!, {
   save: () => game.save,
   now: () => game.now(),
@@ -299,7 +332,7 @@ function cartAction() {
   if (!nearCart()) return false;
   if (game.save.trip) cartInTown() ? openStall("town") : startRide("town");
   else if (cartInTown()) startRide("home");
-  else if (!game.save.bulls) hud.toast("A cart needs bulls — Sakharam sells a Khillari pair.", "bad");
+  else if (!game.save.bulls) hud.toast("A cart needs bulls — Sitabai sells a Khillari pair.", "bad");
   else openStall("cart");
   return true;
 }
@@ -483,6 +516,11 @@ controls.onEscape = () => {
   map.close();
 };
 controls.onMap = () => (map.open ? map.close() : showMap());
+controls.onTorch = () => {
+  torchOn = !torchOn;
+  hud.toast(torchOn ? "Torch on" : "Torch off");
+  audio.play("buy");
+};
 controls.onView = () => {
   rig.view = rig.view === "third" ? "first" : "third";
   hud.toast(rig.view === "third" ? "Third person" : "First person");
@@ -614,12 +652,20 @@ renderer.setAnimationLoop(() => {
     refreshSigns();
     if (mode === "play") checkPlotEntry();
     const st = mode === "play" && !panels.open && !farmyard.ride ? nearStall() : undefined;
-    hud.setHint(farmyard.ride || panels.open ? "" : st ? `<kbd>E</kbd> ${st.label}` : cartHint());
+    hud.setHint(farmyard.ride || panels.open ? "" : st ? `<kbd>E</kbd> ${st.label}` : cartHint() || (nightK > 0.6 && !torchOn && mode === "play" ? "<kbd>T</kbd> Switch on your torch" : ""));
     hud.setBulls(bullsChip());
+    // point the pool of bulb lights at the bulbs nearest to you
+    if (nightK > 0) {
+      const here = camera.position;
+      const near = [...village.lamps].sort((a, b) => a.distanceToSquared(here) - b.distanceToSquared(here));
+      BULB_LIGHTS.forEach((l, i) => near[i] && l.position.copy(near[i]));
+    }
+    BULB_LIGHTS.forEach((l) => (l.intensity = nightK * 9));
     if (!titleScreen.open) tutorial.update(game.save, game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]), now);
   }
   worldRenderer.cull(camera.position, mode === "title" ? 200 : settings.renderDistance);
   for (const s of STALLS) s.npc.update(dt, camera.position);
+  for (const n of NEIGHBOURS) n.update(dt, camera.position);
   farmer.root.position.set(body.pos.x, body.pos.y, body.pos.z);
   farmer.root.rotation.y = body.heading;
   farmer.visible = mode !== "title" && (rig.view === "third" || !!farmyard.ride);
@@ -636,6 +682,20 @@ renderer.setAnimationLoop(() => {
   water.update(now / 1000, sunDirection(hour), sc.sun, sc.top, sc.horizon);
   trees.update(now / 1000);
   village.update(dt);
+  // how dark it is: bulbs come on at dusk, off at dawn
+  nightK = Math.max(0, Math.min(1, (0.1 - sunDirection(hour).y) / 0.22));
+  village.setNight(nightK);
+  torchModel.visible = torchOn;
+  torch.intensity = torchOn ? 70 : 0;
+  if (torchOn) {
+    // shine where you look, from the hand (or the eyes in first person)
+    const ray = rig.ray();
+    const from = rig.view === "first" || farmyard.ride ? camera.position.clone().add(new THREE.Vector3(0, -0.25, 0)) : new THREE.Vector3(body.pos.x, body.pos.y + 1.1, body.pos.z);
+    torch.position.copy(from);
+    torchAim.position.copy(from).addScaledVector(ray.d, 12);
+    torchModel.rotation.y = Math.atan2(ray.d.x, ray.d.z) - farmer.root.rotation.y;
+  }
+  grass.lights({ on: torchOn, pos: torch.position, dir: torchAim.position.clone().sub(torch.position) }, BULB_LIGHTS.map((l) => l.position), nightK);
   fields.update(now / 1000);
   const grassAt = mode === "play" ? new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z) : camera.position;
   grass.update(now / 1000, grassAt, mode === "title" ? 90 : Math.min(90, settings.renderDistance * 0.55), sunDirection(hour), sc.sun, sc.top);
@@ -665,7 +725,7 @@ function debugText(dt: number) {
   const facing = dirs[Math.round((((controls.yaw % (2 * Math.PI)) + 2 * Math.PI) / (Math.PI / 4))) % 8];
   const plot = world.plotMap[Math.floor(p.x) + W * Math.floor(p.z)];
   return [
-    `Bailgaadi v1 · ${Math.round(fpsAvg)} fps · ${renderer.info.render.calls} draws`,
+    `Tanda v1 · ${Math.round(fpsAvg)} fps · ${renderer.info.render.calls} draws`,
     `xyz ${p.x.toFixed(1)} ${p.y.toFixed(1)} ${p.z.toFixed(1)}  chunk ${Math.floor(p.x / 16)},${Math.floor(p.z / 16)}  facing ${facing}`,
     `ground ${body.onGround ? "yes" : "no"}${body.inWater ? " · in water" : ""}  plot ${plot >= 0 ? world.plots[plot].name : "—"}`,
     target ? `target ${target.x} ${target.y} ${target.z} ${block(get(target.x, target.y, target.z)).name}` : "target —",
@@ -798,6 +858,7 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
       : {}),
     toggleDebug: () => hud.toggleDebug(),
     setView: (v: "first" | "third") => (rig.view = v),
+    torch: (on: boolean) => (torchOn = on),
     title: () => ({ open: titleScreen.open, mode }),
     openSettings: () => settingsPanel.show(),
     audioSelfTest: async () => Object.fromEntries(await Promise.all(Object.keys(SOUNDS).map(async (k) => [k, Math.round((await renderRms(k)) * 1e4) / 1e4]))),
