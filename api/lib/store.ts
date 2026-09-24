@@ -8,10 +8,10 @@ export interface Store {
   del(key: string): Promise<void>;
 }
 
-class UpstashStore implements Store {
-  constructor(private url: string, private token: string) {}
+export class UpstashStore implements Store {
+  constructor(private url: string, private token: string, private fetchFn: typeof fetch = fetch) {}
   private async cmd(args: (string | number)[]) {
-    const r = await fetch(this.url, { method: "POST", headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" }, body: JSON.stringify(args) });
+    const r = await this.fetchFn(this.url, { method: "POST", headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" }, body: JSON.stringify(args) });
     if (!r.ok) throw new Error(`upstash ${r.status}`);
     return (await r.json()) as { result: unknown };
   }
@@ -41,8 +41,8 @@ export class MemoryStore implements Store {
   }
 }
 
-class FileStore implements Store {
-  private dir = ".data";
+export class FileStore implements Store {
+  constructor(private dir = ".data") {}
   private path(key: string) {
     return `${this.dir}/${key.replace(/[^a-zA-Z0-9_-]/g, "_")}.json`;
   }

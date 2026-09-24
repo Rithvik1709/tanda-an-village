@@ -36,3 +36,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #bcd4de; fon
 .toast.ok { color: #d8f0b0; }
 .toast.bad { color: #ffc0a8; }
 .toast.gone { opacity: 0; }
+.play-prompt { pointer-events: auto; max-width: min(620px, calc(100vw - 32px)); }
+.account { margin-top: 8px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.15); display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.account code { font: 700 14px ui-monospace, Menlo, monospace; letter-spacing: 0.06em; color: #ffd98a; padding: 1px 6px; background: rgba(0,0,0,0.3); border-radius: 4px; }
+.account button { font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 0; background: #f4ecd8; color: #2a2530; cursor: pointer; }
+.account .restore { display: flex; gap: 6px; justify-content: center; }
+.account input { font: 13px ui-monospace, Menlo, monospace; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.3); color: #fff; width: 230px; text-transform: uppercase; }
+.account .restore-msg { min-height: 1em; opacity: 0.85; }
+.banner { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); padding: 6px 14px; border-radius: 8px; background: rgba(160, 60, 40, 0.8); font-weight: 600; }
+.sync { font-size: 12px; opacity: 0.8; }
+.sync.offline { color: #ffb4a0; opacity: 1; }
+.account input::placeholder { text-transform: none; color: rgba(255,255,255,0.5); }

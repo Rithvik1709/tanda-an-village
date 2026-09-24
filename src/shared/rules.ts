@@ -63,8 +63,11 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest"]);
+
 export function apply(world: World, save: Save, a: Action, now: number): Result {
-  if (!a || typeof a !== "object" || !inside(a.x, a.y, a.z)) return fail("That's outside the world.");
+  if (!a || typeof a !== "object" || !KNOWN.has(a.t)) return fail("Unknown action.");
+  if (!inside(a.x, a.y, a.z)) return fail("That's outside the world.");
   const { x, y, z } = a;
   const k = key(x, y, z);
   const here = blockAt(world, save, x, y, z, now);

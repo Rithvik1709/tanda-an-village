@@ -28,13 +28,39 @@ export class Game {
     this.listeners.push(f);
   }
 
+  /** Called with every locally accepted action (the network layer sends them to the server). */
+  onAct: (a: Action) => void = () => {};
+
   act(a: Action): Result {
     const r = apply(this.world, this.save, a, this.now());
     if (r.ok) {
       for (const dy of [-1, 0, 1]) this.sync(a.x, a.y + dy, a.z);
+      this.onAct(a);
       this.listeners.forEach((f) => f());
     }
     return r;
+  }
+
+  /** Re-run actions locally without sending them (rebasing unsent work onto a fresh server save). */
+  replay(actions: Action[]) {
+    for (const a of actions) apply(this.world, this.save, a, this.now());
+  }
+
+  /**
+   * Swap in a new save (the server's word is final) and redraw only what differs. This is how a
+   * rejected optimistic action is rolled back.
+   */
+  replaceSave(next: Save) {
+    const prev = this.save;
+    this.save = next;
+    const edits = new Set([...Object.keys(prev.edits), ...Object.keys(next.edits)]);
+    const farm = new Set([...Object.keys(prev.farm), ...Object.keys(next.farm)]);
+    this.each((x, y, z) => this.sync(x, y, z), [...edits]);
+    this.each((x, y, z) => {
+      this.sync(x, y, z);
+      this.sync(x, y + 1, z);
+    }, [...farm]);
+    this.listeners.forEach((f) => f());
   }
 
   /** What's really at a position right now (save + clock over the seeded world). */
@@ -49,7 +75,7 @@ export class Game {
     if (this.vox[idx(x, y, z)] !== want) this.renderer.setBlock(this.vox, x, y, z, want);
   }
 
-  private each(f: (x: number, y: number, z: number) => void, keys: string[]) {
+  each(f: (x: number, y: number, z: number) => void, keys: string[]) {
     const W = 192, D = 192;
     for (const k of keys) {
       const i = Number(k);

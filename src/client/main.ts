@@ -9,6 +9,7 @@ import { buildAtlasTexture } from "./engine/atlas";
 import { Sky } from "./engine/sky";
 import { WorldRenderer } from "./engine/world-renderer";
 import { Game } from "./game";
+import { Net } from "./net";
 import { Controls } from "./player/controls";
 import { Hotbar } from "./player/hotbar";
 import { type Body, type Box, boxHits, type Hit, MOVE, PLAYER, raycast, step } from "./player/physics";
@@ -65,13 +66,15 @@ const pickable = (x: number, y: number, z: number) => {
 };
 
 // ---- the game state (local until the server arrives in M4) ----
-const game = new Game(world, vox, newSave("local", world, Date.now()), worldRenderer);
+// a placeholder until the server's save arrives (nothing is drawn or sent before that)
+const game = new Game(world, vox, newSave("loading", world, Date.now()), worldRenderer);
+const net = new Net();
 
 // ---- the player ----
 const spawn = world.landmarks.spawn;
 const body: Body = { pos: { x: spawn.x, y: spawn.y, z: spawn.z }, vel: { x: 0, y: 0, z: 0 }, onGround: false, inWater: false };
 const controls = new Controls(canvas);
-controls.yaw = 0.675; // face north-west, toward your first field
+controls.yaw = 0.25; // face up the north road, your first field off to the left
 const hotbar = new Hotbar();
 const hud = new Hud(document.getElementById("ui")!, atlas.image as HTMLCanvasElement, hotbar);
 let mode: "play" | "cinematic" = "play";
@@ -174,7 +177,8 @@ function refreshStatus() {
   const s = game.save;
   hud.setInventory(s.inv, CAN_MAX);
   const c = clock(game.now());
-  hud.setInfo(`<span class="money">₹${s.money.toLocaleString("en-IN")}</span><span>${fmtHour(hourOverride ?? c.hour)}</span><span>${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}</span>`);
+  const saved = { saved: "✓ saved", saving: "saving…", offline: "offline — retrying" }[net.status];
+  hud.setInfo(`<span class="money">₹${s.money.toLocaleString("en-IN")}</span><span class="sync ${net.status}">${saved}</span><span>${fmtHour(hourOverride ?? c.hour)}</span><span>${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}</span>`);
 }
 game.onChange(refreshStatus);
 const sfxQueue: string[] = []; // sound arrives in M9; the queue keeps the call sites honest
@@ -190,6 +194,10 @@ controls.onScroll = (d) => {
   hud.refresh();
 };
 controls.onToggleDebug = () => hud.toggleDebug();
+// the pause panel sits over the canvas: a click on it (outside the account box) also starts play
+document.querySelector(".play-prompt")!.addEventListener("click", (e) => {
+  if (!(e.target as HTMLElement).closest(".account")) canvas.requestPointerLock?.();
+});
 controls.onLockChange = (locked) => {
   if (locked) mode = "play";
   hud.setPlaying(locked);
@@ -279,8 +287,38 @@ function debugText(dt: number) {
   ].join("\n");
 }
 
-worker.addEventListener("message", async (e) => {
-  if (e.data.type !== "ready") return;
+/** Sign in and load the farm, retrying until the village server answers. */
+async function bootNet() {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await net.boot();
+    } catch {
+      hud.setBanner("Can't reach the village server — retrying…");
+      await new Promise((r) => setTimeout(r, Math.min(8000, 1000 * 2 ** attempt)));
+    }
+  }
+}
+const booted = bootNet();
+const workerReady = new Promise<void>((res) => worker.addEventListener("message", (e) => e.data.type === "ready" && res()));
+
+net.onStatus = () => refreshStatus();
+net.onRejected = (errs) => {
+  hud.toast(`The village refused: ${errs[0]}`, "bad");
+  sfxQueue.push("refused");
+};
+hud.onRestore = async (code) => {
+  const err = await net.restore(code);
+  if (err) return err;
+  location.reload(); // simplest correct way to swap every block, crop and coin for the other farm
+  return null;
+};
+
+Promise.all([booted, workerReady]).then(async ([boot]) => {
+  hud.setBanner("");
+  game.save = boot.save;
+  game.skew = boot.serverNow - Date.now();
+  net.attach(game);
+  hud.setAccount(net.recoveryCode);
   const t0 = performance.now();
   game.syncAll(); // saved edits and fields go to the worker before the first mesh
   await worldRenderer.meshAll();
@@ -329,6 +367,19 @@ worker.addEventListener("message", async (e) => {
       return r;
     },
     inv: () => ({ ...game.save.inv }),
+    // what a cheater could do in devtools: edit the local save. The server must undo it.
+    tamperLocal: (item: string, n: number) => {
+      game.save.inv[item] = n;
+      refreshStatus();
+    },
+    sync: () => net.flush().then(() => net.status),
+    netStatus: () => net.status,
+    recoveryCode: () => net.recoveryCode,
+    // test hook: act as a tampering client would — send an action straight to the server, skipping local rules
+    sendRaw: async (a: unknown) => {
+      const r = await fetch("/api/act", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${net.token}` }, body: JSON.stringify({ actions: [a] }) });
+      return r.json();
+    },
     farm: () => structuredClone(game.save.farm),
     landmarks: () => world.landmarks,
     starterPlot: () => world.plots.find((p) => p.starter),
@@ -336,7 +387,7 @@ worker.addEventListener("message", async (e) => {
       ? {
           // dev-only: fast-forward the game clock (never shipped; the server owns time in M4)
           skip: async (ms: number) => {
-            game.skew += ms;
+            await net.skip(ms);
             game.tick();
             refreshStatus();
             await worldRenderer.flush();

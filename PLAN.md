@@ -107,12 +107,12 @@ another device. Google sign-in is a v2 item.
 - [x] *Done when:* a scripted test tills, plants, fast-forwards time (dev-only), harvests, inventory shows produce.
 
 ### M4 · Server, accounts, saves
-- [ ] Store interface; file store (dev) and Upstash REST store (prod) with the same tests.
-- [ ] `POST /api/session` creates a guest + recovery code; restore by code.
-- [ ] `GET /api/state` returns the save; `POST /api/act` validates a batch via `shared/rules.ts`.
-- [ ] Rules reject: planting without seeds, harvesting unripe, editing plots you don't own, selling what you don't have, spending money you don't have.
-- [ ] Client: optimistic apply, server confirm, rollback on reject; autosave; "saved" indicator.
-- [ ] *Done when:* reload the page → same world edits, crops, money; a tampered client request is rejected (test).
+- [x] Store interface; file store (dev) and Upstash REST store (prod) with the same tests.
+- [x] `POST /api/session` creates a guest + recovery code; restore by code.
+- [x] `GET /api/state` returns the save; `POST /api/act` validates a batch via `shared/rules.ts`.
+- [x] Rules reject: planting without seeds, harvesting unripe, editing plots you don't own, selling what you don't have, spending money you don't have.
+- [x] Client: optimistic apply, server confirm, rollback on reject; autosave; "saved" indicator.
+- [x] *Done when:* reload the page → same world edits, crops, money; a tampered client request is rejected (test).
 
 ### M5 · Economy
 - [ ] Daily prices per crop from a seeded model: seasonal base, monsoon effect, random walk, occasional events (glut / shortage).
@@ -157,3 +157,4 @@ _(one line per loop iteration: date · task · how it was verified · commit)_
 - 2026-09-24 · M1 world · 27 blocks, canvas atlas, seeded world (6 vitest: determinism, 16 non-overlapping plots, one starter, river water, spawn), worker mesher with AO (0.8 ms/chunk, whole world 0.1–0.3 s), sky + day–night; screenshots at noon / golden hour / 5 views looked at and fixed (market pit, river framing, map edge ring, soil and sunset tone); 60 fps (16.6 ms median, p95 17.6 ms, 270 draw calls worst view)
 - 2026-09-24 · M2 walking and building · 5 new vitest (landing, no tunnelling from y 47, wall stop, 1.25-block jump, DDA faces); scripted headless play: walked 3 blocks, jumped 1.25, dug a 3-block trench in the road and stacked bricks (screenshots m2-before/after/wide looked at), swam out of the river onto the bank, outline visible; edit → new geometry 1.3–2.5 ms; outline strengthened after first look
 - 2026-09-24 · M3 farming · shared/time + crops + save + rules (the same code the server will run), 8 new vitest (clock/seasons, wet/dry growth integration is sample-independent, yield, till→plant→water→harvest, cheating refusals, refill/uproot, soil wear + rest); scripted headless run (scripts/m3.js) tilled 12 cells, sowed 3 crops, watered with 13 can refills at the well, fast-forwarded ~5 game days, harvested 24 jowar / 20 onion / 28 sugarcane, unripe refused; screenshots sown/growing/ripe/close-up/harvested looked at. Fixed on the way: client was drawing into the pristine world array (harvested plants reappeared), plants had full-cell hitboxes (now slim, stage-height), unripe left-click uprooted (now just reports %), well water unreachable (refill counts water within 2 blocks), jowar head redrawn, repeated toasts collapse. Edits are now limited to land you own.
+- 2026-09-24 · M4 server, accounts, saves · /api/session (guest + recovery code, restore), /api/state, /api/act (batch ≤ 256, shared rules on the server clock), /api/dev (fast-forward, dev only, 404 on Vercel); tokens stored as sha256; 8 new vitest (store contract run against memory, file and an Upstash REST fake; accounts; persistence; tampered batch all refused; seed-limit enforced server-side; server clock); scripts/m4.mjs 14/14 in headless Chrome: farm → raw tampered requests refused → devtools seed cheat rolled back 6→4 → reload restores same code/inventory/11 cells/brick/crops → second device restores by typed code; screenshots looked at (spawn now faces up the road; placeholder casing). Real Upstash is exercised at deploy (M9).

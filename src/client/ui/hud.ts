@@ -16,7 +16,11 @@ export class Hud {
   private toasts: HTMLElement;
   private counts: HTMLElement[] = [];
   private labelTimer = 0;
+  private banner: HTMLElement;
+  private account: HTMLElement;
   debugOn = false;
+  /** Called with a recovery code the player typed; resolves to an error message or null. */
+  onRestore: (code: string) => Promise<string | null> = async () => null;
 
   constructor(parent: HTMLElement, private atlas: HTMLCanvasElement, private hotbar: Hotbar) {
     this.root = el("div", "hud", parent);
@@ -31,6 +35,9 @@ export class Hud {
     this.debug.hidden = true;
     this.prompt = el("div", "play-prompt", this.root);
     this.prompt.innerHTML = `<b>Click to play</b><span>WASD move · Space jump · Shift run · Left click dig / harvest · Right click use · 1–9 / wheel pick · F3 info</span>`;
+    this.account = el("div", "account", this.prompt);
+    this.banner = el("div", "banner", this.root);
+    this.banner.hidden = true;
     hotbar.slots.forEach((s, i) => {
       const cell = el("div", "slot", this.bar);
       cell.appendChild(this.icon(s));
@@ -90,6 +97,33 @@ export class Hud {
   private fade(t: HTMLElement) {
     t.classList.add("gone");
     setTimeout(() => t.remove(), 500);
+  }
+
+  setBanner(text: string) {
+    this.banner.textContent = text;
+    this.banner.hidden = !text;
+  }
+
+  /** The pause panel's account box: your recovery code, and a way to continue another farm. */
+  setAccount(code: string) {
+    this.account.innerHTML = `
+      <div class="code-row">Your farm is saved online. Recovery code <code>${code}</code> <button data-copy>Copy</button></div>
+      <form class="restore"><input name="code" placeholder="Have a code? XXXX-XXXX-XXXX" maxlength="16" autocomplete="off" spellcheck="false"><button>Continue that farm</button></form>
+      <div class="restore-msg"></div>`;
+    const msg = this.account.querySelector(".restore-msg") as HTMLElement;
+    this.account.querySelector("[data-copy]")!.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await navigator.clipboard?.writeText(code).catch(() => {});
+      msg.textContent = "Copied. Keep it somewhere safe — it's the key to your farm.";
+    });
+    this.account.querySelector("form")!.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = (e.target as HTMLFormElement).code as HTMLInputElement;
+      msg.textContent = "Checking…";
+      msg.textContent = (await this.onRestore(input.value)) ?? "Loading that farm…";
+    });
+    // typing a code must not walk the farmer around
+    this.account.addEventListener("keydown", (e) => e.stopPropagation());
   }
 
   setPlaying(on: boolean) {
