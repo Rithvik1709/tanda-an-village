@@ -521,6 +521,23 @@ export function generateWorld(seed = WORLD_SEED): World {
     for (let z = z0; z <= z1; z += 3) for (let y = y0; y < y0 + 3; y++) set(x1, y, z, B.LOG);
     for (let y = y0; y < y0 + 3; y++) set(x1, y, z1, B.LOG);
     structures.push({ kind: "wada", x0, z0, w, d, y: y0, name: "Rathod Bhuvan" });
+    // a lane along the front of the wada, turning east past the aangan to meet the village road
+    const lane = (x: number, z: number) => {
+      const c = col(x, z);
+      if (plotMap[c] >= 0) return;
+      roadCells[c] ||= 1;
+      top[c] = B.ROAD;
+      if (get(x, height[c] + 1, z) === B.AIR) set(x, height[c], z, B.ROAD); // open ground only, not under a house
+    };
+    // the rest of the aangan is grass round the tulsi, so the lane reads as a lane
+    for (let z = z0; z <= z0 + 8; z++) for (let x = x1 + 4; x <= x1 + 7; x++) {
+      const c = col(x, z);
+      if (plotMap[c] >= 0 || get(x, height[c] + 1, z) !== B.AIR) continue;
+      top[c] = B.GRASS;
+      set(x, height[c], z, B.GRASS);
+    }
+    for (let z = z0 - 2; z <= z0 + 10; z++) for (let x = x1 + 2; x <= x1 + 3; x++) lane(x, z);
+    for (let x = x1 + 2; x <= 106; x++) for (let z = z0 + 9; z <= z0 + 10; z++) lane(x, z);
     return { x: inner + 1, y: y0, z: doors[1] };
   })();
 
