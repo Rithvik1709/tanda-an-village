@@ -50,7 +50,7 @@ export class Sky {
   readonly dome: THREE.Mesh;
   readonly hemi: THREE.HemisphereLight;
   readonly sun: THREE.DirectionalLight;
-  readonly clouds: THREE.InstancedMesh;
+  readonly clouds = new THREE.Group();
   private uniforms = {
     top: { value: new THREE.Color() },
     horizon: { value: new THREE.Color() },
@@ -58,7 +58,7 @@ export class Sky {
     sunColor: { value: new THREE.Color() },
     sunVisible: { value: 1 },
   };
-  private cloudMat: THREE.MeshLambertMaterial;
+  private cloudMats: THREE.SpriteMaterial[] = [];
   private cloudOffset = 0;
 
   constructor(private scene: THREE.Scene) {
@@ -89,14 +89,56 @@ export class Sky {
     scene.add(this.hemi, this.sun, this.sun.target);
     scene.fog = new THREE.Fog(0xffffff, 70, 240);
 
-    // blocky clouds: a noise field sampled on a coarse grid, one flat box per cell
-    const cells: [number, number][] = [];
-    for (let z = -260; z < 460; z += 12) for (let x = -260; x < 460; x += 12) if (fbm(x / 110, z / 110, 77, 3) > 0.58) cells.push([x, z]);
-    this.cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x444444, fog: false });
-    this.clouds = new THREE.InstancedMesh(new THREE.BoxGeometry(12, 4, 12), this.cloudMat, cells.length);
-    const m = new THREE.Matrix4();
-    cells.forEach(([x, z], i) => this.clouds.setMatrixAt(i, m.makeTranslation(x, 78 + (fbm(x / 40, z / 40, 5, 2) - 0.5) * 6, z)));
+    // soft painted clouds: a few canvas-drawn puffs as camera-facing sprites, drifting slowly
+    const puff = (seed: number) => {
+      const c = document.createElement("canvas");
+      c.width = 256;
+      c.height = 128;
+      const g = c.getContext("2d")!;
+      let r = seed;
+      const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647);
+      for (let i = 0; i < 22; i++) {
+        const x = 40 + rnd() * 176, y = 60 + (rnd() - 0.4) * 34, rad = 18 + rnd() * 34;
+        const grd = g.createRadialGradient(x, y, 0, x, y, rad);
+        grd.addColorStop(0, "rgba(255,255,255,0.55)");
+        grd.addColorStop(0.6, "rgba(255,255,255,0.25)");
+        grd.addColorStop(1, "rgba(255,255,255,0)");
+        g.fillStyle = grd;
+        g.beginPath();
+        g.arc(x, y, rad, 0, Math.PI * 2);
+        g.fill();
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    };
+    const textures = [puff(11), puff(29), puff(47), puff(83)];
+    for (let i = 0; i < 46; i++) {
+      const a = fbm(i * 3.1, 7, 77, 2) * Math.PI * 2 + i * 2.4;
+      const d = 90 + (i % 7) * 38;
+      const m = new THREE.SpriteMaterial({ map: textures[i % 4], transparent: true, depthWrite: false, fog: false, opacity: 0.9 });
+      this.cloudMats.push(m);
+      const sp = new THREE.Sprite(m);
+      const sz = 70 + (i % 5) * 28;
+      sp.scale.set(sz, sz * 0.42, 1);
+      sp.position.set(Math.cos(a) * d, 70 + (i % 4) * 14 + fbm(i, 3, 5, 2) * 20, Math.sin(a) * d);
+      this.clouds.add(sp);
+    }
     scene.add(this.clouds);
+
+    // soft shadows from the sun, in a box that follows the player
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    const sc = this.sun.shadow.camera;
+    sc.left = -45;
+    sc.right = 45;
+    sc.top = 45;
+    sc.bottom = -45;
+    sc.near = 10;
+    sc.far = 260;
+    this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.normalBias = 0.04;
+    this.sun.shadow.radius = 3;
   }
 
   update(hour: number, dt: number, focus: THREE.Vector3) {
@@ -109,16 +151,25 @@ export class Sky {
     this.uniforms.sunVisible.value = dir.y > -0.05 ? 1 : 0;
     this.hemi.color.copy(s.hemiSky);
     this.hemi.groundColor.copy(s.hemiGround);
-    this.hemi.intensity = s.hemiI * 1.6;
+    this.hemi.intensity = s.hemiI * 1.25;
     this.sun.color.copy(s.sun);
-    this.sun.intensity = Math.max(0, s.sunI) * 1.5 * Math.max(0, Math.min(1, dir.y * 4));
-    this.sun.position.copy(focus).addScaledVector(dir, 120);
-    this.sun.target.position.copy(focus);
+    this.sun.intensity = Math.max(0, s.sunI) * 2.6 * Math.max(0, Math.min(1, dir.y * 4));
     (this.scene.fog as THREE.Fog).color.copy(s.horizon);
     this.dome.position.copy(focus);
-    this.cloudMat.color.copy(s.cloud);
-    this.cloudMat.emissive.copy(s.cloud).multiplyScalar(0.35);
-    this.cloudOffset = (this.cloudOffset + dt * 1.2) % 720;
-    this.clouds.position.set(focus.x - 100 + this.cloudOffset - 360, 0, focus.z - 100);
+    for (const m of this.cloudMats) m.color.copy(s.cloud);
+    this.cloudOffset += dt * 0.6;
+    this.clouds.position.set(focus.x + Math.sin(this.cloudOffset * 0.01) * 30, 0, focus.z + this.cloudOffset * 0.2 % 60);
+    this.clouds.rotation.y = this.cloudOffset * 0.0015;
+    // keep the shadow box centred on the player, snapped to shadow texels so edges don't crawl
+    const snap = 90 / 2048;
+    const fx = Math.round(focus.x / snap) * snap, fz = Math.round(focus.z / snap) * snap;
+    this.sun.position.set(fx, focus.y, fz).addScaledVector(dir, 120);
+    this.sun.target.position.set(fx, focus.y, fz);
   }
+}
+
+/** The current sky colours, for the water's reflection. */
+export function skyColors(hour: number) {
+  const s = sample(((hour % 24) + 24) % 24);
+  return { top: s.top, horizon: s.horizon, sun: s.sun };
 }

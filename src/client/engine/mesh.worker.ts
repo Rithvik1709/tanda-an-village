@@ -5,15 +5,19 @@ import { meshChunk } from "./mesher";
 // The worker keeps its own copy of the world (regenerated from the seed — cheaper than copying 1.7 MB)
 // and applies every block edit the main thread makes, so remeshing never blocks rendering.
 let vox: Uint8Array | null = null;
+// the smooth terrain and water are drawn elsewhere now; the mesher only builds what stands on them
+let skip = new Set<number>();
 
 self.onmessage = (e: MessageEvent) => {
   const m = e.data;
   if (m.type === "init") {
     vox = generateWorld(m.seed).voxels;
+    skip = new Set(m.skipTerrain ?? []);
     for (const [x, y, z, b] of m.edits ?? []) vox[idx(x, y, z)] = b;
+    if (skip.size) for (let i = 0; i < vox.length; i++) if (skip.has(vox[i])) vox[i] = 0;
     (self as unknown as Worker).postMessage({ type: "ready" });
   } else if (m.type === "set" && vox) {
-    vox[idx(m.x, m.y, m.z)] = m.b;
+    vox[idx(m.x, m.y, m.z)] = skip.has(m.b) ? 0 : m.b;
   } else if (m.type === "mesh" && vox) {
     const t0 = performance.now();
     const cm = meshChunk(vox, m.cx, m.cz);

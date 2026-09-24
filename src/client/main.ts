@@ -4,7 +4,7 @@ import { advance, CROPS, msToRipe } from "../shared/crops";
 import { canCapacity, type Result } from "../shared/rules";
 import { newSave } from "../shared/save";
 import { clock, fmtHour, SEASON_DAYS, SEASON_NAMES } from "../shared/time";
-import { D, generateWorld, H, idx, W, WORLD_SEED } from "../shared/world";
+import { D, generateWorld, H, idx, W, WATER_LEVEL, WORLD_SEED } from "../shared/world";
 import { buildAtlasTexture } from "./engine/atlas";
 import { Sky } from "./engine/sky";
 import { WorldRenderer } from "./engine/world-renderer";
@@ -12,7 +12,15 @@ import { Game } from "./game";
 import { Net } from "./net";
 import { Controls } from "./player/controls";
 import { Hotbar } from "./player/hotbar";
-import { type Body, type Box, boxHits, type Hit, MOVE, PLAYER, raycast, step } from "./player/physics";
+import { type Box, boxHits, type Hit, MOVE, raycast } from "./player/physics";
+import { Heightfield, TERRAIN } from "./scene/heightfield";
+import { buildTerrain } from "./scene/terrain";
+import { Water } from "./scene/water";
+import { Post } from "./scene/post";
+import { FARMER, Figure } from "./scene/figure";
+import { Walker } from "./player/walker";
+import { CameraRig } from "./player/camera-rig";
+import { skyColors, sunDirection } from "./engine/sky";
 import { Hud } from "./ui/hud";
 import { Npc } from "./engine/npc";
 import { type PanelKind, Panels } from "./ui/panels";
@@ -49,6 +57,9 @@ const VIEWS = {
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+renderer.shadowMap.enabled = true;
+renderer.info.autoReset = false; // the composer renders in passes; count a whole frame
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
@@ -85,7 +96,17 @@ let booted_ = false;
 
 // ---- the player ----
 const spawn = world.landmarks.spawn;
-const body: Body = { pos: { x: spawn.x, y: spawn.y, z: spawn.z }, vel: { x: 0, y: 0, z: 0 }, onGround: false, inWater: false };
+// the ground is smooth now: a height field for walking; buildings and fences still block as solid blocks
+const hf = new Heightfield(world);
+const WATER_Y = WATER_LEVEL + 0.86;
+scene.add(buildTerrain(hf, WATER_Y));
+const water = new Water(hf, WATER_Y);
+scene.add(water.mesh);
+const walker = new Walker((x, z) => hf.at(x, z), (x, y, z) => { const id = get(x, y, z); return !TERRAIN.has(id) && block(id).solid; }, WATER_Y, W);
+walker.pos = { x: spawn.x, y: hf.at(spawn.x, spawn.z), z: spawn.z };
+const body = Object.defineProperty(walker, "inWater", { get: () => walker.wading > 0.3 }) as Walker & { readonly inWater: boolean };
+const farmer = new Figure(FARMER);
+scene.add(farmer.root);
 const controls = new Controls(canvas);
 controls.yaw = 0.25; // face up the north road, your first field off to the left
 const hotbar = new Hotbar();
@@ -301,13 +322,6 @@ function openStall(kind: PanelKind, tab?: string) {
   document.exitPointerLock?.();
 }
 
-function lookDir() {
-  const cp = Math.cos(controls.pitch);
-  return { x: -Math.sin(controls.yaw) * cp, y: Math.sin(controls.pitch), z: -Math.cos(controls.yaw) * cp };
-}
-function eye() {
-  return { x: body.pos.x, y: body.pos.y + PLAYER.eye, z: body.pos.z };
-}
 /** The watering can can aim at water (to fill up); everything else looks through it. */
 const pickWater = (x: number, y: number, z: number) => get(x, y, z) !== B.AIR;
 
@@ -442,6 +456,10 @@ controls.onEscape = () => {
   map.close();
 };
 controls.onMap = () => (map.open ? map.close() : showMap());
+controls.onView = () => {
+  rig.view = rig.view === "third" ? "first" : "third";
+  hud.toast(rig.view === "third" ? "Third person" : "First person");
+};
 controls.onRide = () => void (!panels.open && cartAction());
 controls.onFeed = () => void (!panels.open && feedBulls());
 // the pause panel sits over the canvas: a click on it (outside the account box) also starts play
@@ -475,9 +493,10 @@ controls.onLockChange = (locked) => {
   const R = 1200;
   const shape = new THREE.Shape([new THREE.Vector2(-R, -R), new THREE.Vector2(R + 192, -R), new THREE.Vector2(R + 192, R + 192), new THREE.Vector2(-R, R + 192)]);
   shape.holes.push(new THREE.Path([new THREE.Vector2(0, 0), new THREE.Vector2(0, 192), new THREE.Vector2(192, 192), new THREE.Vector2(192, 0)]));
-  const plain = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshLambertMaterial({ color: "#5f8a3a", side: THREE.DoubleSide }));
+  const plain = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshStandardMaterial({ color: "#7a8f48", roughness: 1, side: THREE.DoubleSide }));
   plain.rotation.x = Math.PI / 2; // shape (x, y) → world (x, z)
-  plain.position.y = 13.9;
+  plain.position.y = 15.2;
+  plain.receiveShadow = true;
   scene.add(plain);
 }
 
@@ -495,8 +514,11 @@ function view(name: keyof typeof VIEWS) {
   setCamera(VIEWS[name].pos, VIEWS[name].look);
 }
 
+const post = new Post(renderer, scene, camera);
+const rig = new CameraRig(camera, (x, z) => hf.at(x, z));
 function resize() {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
+  post.setSize(window.innerWidth, window.innerHeight);
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 }
@@ -519,7 +541,7 @@ renderer.setAnimationLoop(() => {
     controls.yaw += Math.atan2(Math.sin(farmyard.pos.heading - rideHeading), Math.cos(farmyard.pos.heading - rideHeading));
     rideHeading = farmyard.pos.heading;
     const seat = farmyard.seat();
-    Object.assign(body.pos, { x: seat.x, y: seat.y - PLAYER.eye + 0.4, z: seat.z });
+    Object.assign(body.pos, { x: seat.x, y: seat.y - 1.18, z: seat.z });
     Object.assign(body.vel, { x: 0, y: 0, z: 0 });
     camera.position.set(seat.x, seat.y + 0.45, seat.z);
     camera.rotation.set(controls.pitch, controls.yaw, 0, "YXZ");
@@ -528,12 +550,13 @@ renderer.setAnimationLoop(() => {
   } else if (mode === "play") {
     // fixed sub-steps keep collision stable when a frame hitches
     const n = Math.ceil(dt / (1 / 120));
-    for (let i = 0; i < n; i++) step(body, controls.input(), controls.yaw, dt / n, solidAt, waterAt);
-    const e = eye();
-    camera.position.set(e.x, e.y, e.z);
-    camera.rotation.set(controls.pitch, controls.yaw, 0, "YXZ");
+    for (let i = 0; i < n; i++) walker.step(controls.input(), controls.yaw, dt / n);
+    rig.update(dt, body.pos, controls.yaw, controls.pitch);
+    // aim along the crosshair; you can only reach what's near your farmer
+    const ray = rig.ray();
     const cur = hotbar.current;
-    target = raycast(e, lookDir(), MOVE.reach, cur.kind === "tool" && cur.tool === "can" ? pickWater : pickable, plantBox);
+    const hit = raycast({ x: ray.o.x, y: ray.o.y, z: ray.o.z }, { x: ray.d.x, y: ray.d.y, z: ray.d.z }, MOVE.reach + (rig.view === "third" ? rig.distance + 1 : 0), cur.kind === "tool" && cur.tool === "can" ? pickWater : pickable, plantBox);
+    target = hit && Math.hypot(hit.x + 0.5 - body.pos.x, hit.y + 0.5 - (body.pos.y + 1), hit.z + 0.5 - body.pos.z) <= MOVE.reach ? hit : null;
     outline.visible = !!target;
     if (target) outline.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5);
   } else if (mode === "title") {
@@ -560,11 +583,18 @@ renderer.setAnimationLoop(() => {
   }
   worldRenderer.cull(camera.position, mode === "title" ? 200 : settings.renderDistance);
   for (const s of STALLS) s.npc.update(dt, camera.position);
+  farmer.root.position.set(body.pos.x, body.pos.y, body.pos.z);
+  farmer.root.rotation.y = body.heading;
+  farmer.visible = mode !== "title" && (rig.view === "third" || !!farmyard.ride) && !farmyard.ride;
+  farmer.animate(dt, body.speed);
   worldRenderer.flush();
   const hour = hourOverride ?? (mode === "title" ? 17.4 : clock(game.now()).hour);
-  sky.update(hour, dt, camera.position);
+  sky.update(hour, dt, mode === "play" ? new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z) : camera.position);
+  const sc = skyColors(hour);
+  water.update(now / 1000, sunDirection(hour), sc.sun, sc.top, sc.horizon);
   if (mode !== "title") applyRenderDistance();
-  renderer.render(scene, camera);
+  renderer.info.reset();
+  post.render();
   if (hud.debugOn) hud.setDebug(debugText(dt));
 });
 
@@ -658,7 +688,7 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
       enterGame(false);
       mode = "play";
       hud.setPlaying(true); // scripted play counts as playing: hide the click prompt
-      Object.assign(body.pos, { x, y, z });
+      Object.assign(body.pos, { x, y: Math.max(y, walker.floorAt(x, z, y)), z });
       Object.assign(body.vel, { x: 0, y: 0, z: 0 });
       controls.yaw = yaw;
       controls.pitch = pitch;
@@ -719,6 +749,7 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
         }
       : {}),
     toggleDebug: () => hud.toggleDebug(),
+    setView: (v: "first" | "third") => (rig.view = v),
     title: () => ({ open: titleScreen.open, mode }),
     openSettings: () => settingsPanel.show(),
     audioSelfTest: async () => Object.fromEntries(await Promise.all(Object.keys(SOUNDS).map(async (k) => [k, Math.round((await renderRms(k)) * 1e4) / 1e4]))),
@@ -759,4 +790,4 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     plots: world.plots.length,
   });
 });
-worker.postMessage({ type: "init", seed: WORLD_SEED });
+worker.postMessage({ type: "init", seed: WORLD_SEED, skipTerrain: [...TERRAIN, B.WATER] });

@@ -20,6 +20,7 @@ export class Controls {
   onMap: () => void = () => {};
   onRide: () => void = () => {};
   onFeed: () => void = () => {};
+  onView: () => void = () => {};
   onLockChange: (locked: boolean) => void = () => {};
 
   constructor(el: HTMLElement) {
@@ -59,6 +60,7 @@ export class Controls {
       if (e.code === "KeyM" && !e.repeat) this.onMap();
       if (e.code === "KeyR" && !e.repeat) this.onRide();
       if (e.code === "KeyF" && !e.repeat) this.onFeed();
+      if (e.code === "KeyV" && !e.repeat) this.onView();
       if (this.locked) {
         this.held.add(e.code);
         if (e.code === "Space") e.preventDefault();
