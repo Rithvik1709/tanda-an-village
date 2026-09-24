@@ -1,8 +1,10 @@
 import type { Controls } from "./controls";
 
 /*
- * Phone and tablet controls (landscape): a joystick on the left to walk, drag anywhere on the right
- * to look, and thumb buttons for the actions a mouse and keyboard would do.
+ * Phone and tablet controls (landscape): a joystick under the left thumb to walk, a look pad under
+ * the right thumb (or drag anywhere on the right) to turn and look up and down, and three action
+ * buttons in an arc above it. Everything else — cart, feed, tie, plough, talk — appears as one
+ * tappable hint only when it can be done.
  */
 /** Is the game turned sideways (phone upright)? Screen deltas then map to game axes: x = dy, y = −dx. */
 const turned = () => document.documentElement.classList.contains("rotated");
@@ -17,6 +19,9 @@ export class TouchControls {
   private stickId: number | null = null;
   private lookId: number | null = null;
   private stickOrigin = { x: 0, y: 0 };
+  private pad: HTMLElement;
+  private padKnob: HTMLElement;
+  private padOrigin = { x: 0, y: 0 };
   private last = { x: 0, y: 0 };
   move = { forward: 0, right: 0 };
   run = false;
@@ -28,26 +33,20 @@ export class TouchControls {
     this.el.innerHTML = `
       <div class="t-look"></div>
       <div class="t-stick"><div class="t-knob"></div></div>
-      <div class="t-buttons">
-        <button data-a="use" class="t-big">Use</button>
-        <button data-a="harvest" class="t-mid">Harvest</button>
-        <button data-a="jump" class="t-sm">Jump</button>
-        <button data-a="talk" class="t-sm">Talk</button>
-      </div>
+      <div class="t-pad"><div class="t-pad-knob"></div><span>look</span></div>
+      <button data-a="use" class="t-act t-use">Use</button>
+      <button data-a="harvest" class="t-act t-harvest">Harvest</button>
+      <button data-a="jump" class="t-act t-jump">Jump</button>
       <div class="t-top">
-        <button data-a="view">View</button>
-        <button data-a="torch">Torch</button>
-        <button data-a="cart">Cart</button>
-        <button data-a="feed">Feed</button>
-        <button data-a="plough">Plough</button>
-        <button data-a="tie">Tie</button>
-        <button data-a="map">Map</button>
+        <button data-a="map" class="t-map">Map</button>
         <button data-a="menu" class="t-menu">☰</button>
       </div>`;
     parent.appendChild(this.el);
     this.stick = this.el.querySelector(".t-stick")!;
     this.knob = this.el.querySelector(".t-knob")!;
     const look = this.el.querySelector(".t-look") as HTMLElement;
+    this.pad = this.el.querySelector(".t-pad")!;
+    this.padKnob = this.el.querySelector(".t-pad-knob")!;
 
     // the joystick: touch anywhere in its zone, drag to walk; push to the edge to run
     this.stick.addEventListener("touchstart", (e) => {
@@ -58,19 +57,26 @@ export class TouchControls {
       this.onStick(t.clientX, t.clientY);
       e.preventDefault();
     }, { passive: false });
-    look.addEventListener("touchstart", (e) => {
-      const t = e.changedTouches[0];
-      this.lookId = t.identifier;
-      this.last = { x: t.clientX, y: t.clientY };
-      e.preventDefault();
-    }, { passive: false });
+    // look: drag on the pad (or anywhere free on the right) like a trackpad
+    for (const zone of [look, this.pad])
+      zone.addEventListener("touchstart", (e) => {
+        const t = e.changedTouches[0];
+        this.lookId = t.identifier;
+        this.last = { x: t.clientX, y: t.clientY };
+        this.padOrigin = { x: t.clientX, y: t.clientY };
+        this.pad.classList.add("on");
+        e.preventDefault();
+      }, { passive: false });
     window.addEventListener("touchmove", (e) => {
       for (const t of Array.from(e.changedTouches)) {
         if (t.identifier === this.stickId) this.onStick(t.clientX, t.clientY);
         if (t.identifier === this.lookId) {
           const d = toGame(t.clientX - this.last.x, t.clientY - this.last.y);
-          this.c.look(d.x * 1.7, d.y * 1.7);
+          this.c.look(d.x * 1.8, d.y * 1.8);
           this.last = { x: t.clientX, y: t.clientY };
+          // the pad's knob shows which way you're dragging
+          const o = toGame(t.clientX - this.padOrigin.x, t.clientY - this.padOrigin.y), r = Math.hypot(o.x, o.y), R = 30, k = r > R ? R / r : 1;
+          this.padKnob.style.transform = `translate(${o.x * k}px, ${o.y * k}px)`;
         }
       }
     }, { passive: true });
@@ -82,7 +88,7 @@ export class TouchControls {
           this.run = false;
           this.knob.style.transform = "";
         }
-        if (t.identifier === this.lookId) this.lookId = null;
+        if (t.identifier === this.lookId) this.endLook();
       }
     };
     window.addEventListener("touchend", end);
@@ -105,8 +111,26 @@ export class TouchControls {
     });
   }
 
+  private endLook() {
+    this.lookId = null;
+    this.pad.classList.remove("on");
+    this.padKnob.style.transform = "";
+  }
+
+  /** The action hint ("R Load the cart…") becomes a button: tapping it presses that key. */
+  bindHint(hint: HTMLElement) {
+    const keys: Record<string, () => void> = { E: this.c.onInteract, R: this.c.onRide, G: this.c.onTie, P: this.c.onPloughField, F: this.c.onFeed, T: this.c.onTorch };
+    hint.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      const k = hint.querySelector("kbd")?.textContent?.trim() ?? "";
+      hint.classList.add("down");
+      keys[k]?.call(this.c);
+    }, { passive: false });
+    hint.addEventListener("touchend", () => hint.classList.remove("down"));
+  }
+
   private onStick(x: number, y: number) {
-    const R = 52;
+    const R = 40;
     const g = toGame(x - this.stickOrigin.x, y - this.stickOrigin.y);
     let dx = g.x, dy = g.y;
     const d = Math.hypot(dx, dy);
@@ -125,7 +149,8 @@ export class TouchControls {
     this.el.hidden = !v;
     if (!v) {
       // let go of everything: a window opened under the player's thumbs
-      this.stickId = this.lookId = null;
+      this.stickId = null;
+      this.endLook();
       this.move = { forward: 0, right: 0 };
       this.run = false;
       this.knob.style.transform = "";

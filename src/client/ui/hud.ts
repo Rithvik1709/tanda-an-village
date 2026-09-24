@@ -103,6 +103,10 @@ export class Hud {
     setTimeout(() => t.remove(), 500);
   }
 
+  get hintEl() {
+    return this.hint;
+  }
+
   setHint(html: string) {
     if (this.hint.innerHTML !== html) this.hint.innerHTML = html;
     this.hint.hidden = !html || !this.prompt.hidden; // the pause panel says enough on its own

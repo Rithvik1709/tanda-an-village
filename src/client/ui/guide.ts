@@ -9,17 +9,17 @@ export const forDevice = (t: string) =>
   !TOUCH_UI
     ? t
     : t
-        .replace(/\(press E near (him|her)\)/g, "(tap Talk near $1)")
-        .replace(/\bE at the\b/g, "tap Talk at the")
-        .replace(/\(E\)/g, "(tap Talk)")
-        .replace(/, E\)/g, ", tap Talk)")
-        .replace(/load the cart with R/g, "tap Cart by your cart")
-        .replace(/\(F near the bulls\)/g, "(tap Feed near the bulls)")
+        .replace(/\(press E near (him|her)\)/g, "(walk up and tap the button that appears)")
+        .replace(/\bE at the\b/g, "tap the button at the")
+        .replace(/\(E\)/g, "(tap the button that appears)")
+        .replace(/, E\)/g, ", tap the button)")
+        .replace(/load the cart with R/g, "tap Load the cart by your cart")
+        .replace(/\(F near the bulls\)/g, "(tap Feed by the bulls)")
         .replace(/then F near the bulls/g, "then tap Feed near the bulls")
         .replace(/Shift \+ right-click with the hoe/g, "tap Use with the hoe, your bulls nearby")
-        .replace(/press P in your field/g, "tap Plough in your field")
-        .replace(/press E/gi, "tap Talk")
-        .replace(/Press <kbd>H<\/kbd> any time for the controls/g, "Tap ? any time for help");
+        .replace(/press P in your field/g, "tap the Plough button in your field")
+        .replace(/press E/gi, "tap the button that appears")
+        .replace(/Press <kbd>H<\/kbd> any time for the controls/g, "Tap ☰ any time for help");
 
 const seen = (id: string) => { try { return localStorage.getItem(`tanda.mission.${id}`) === "1"; } catch { return false; } };
 const markSeen = (id: string) => { try { localStorage.setItem(`tanda.mission.${id}`, "1"); } catch { /* ignore */ } };

@@ -326,27 +326,12 @@ kbd, .goal kbd, .help kbd, .welcome kbd, .tutorial kbd { background: rgba(255, 2
 .goal-arrow { color: var(--gold-2) !important; }
 
 /* ---- touch (phones & tablets, landscape) ---- */
-.touch { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
 .ui-title .touch { display: none; }
-.touch .t-look { position: absolute; left: 40%; right: 0; top: 0; bottom: 0; pointer-events: auto; touch-action: none; }
-.touch .t-stick { position: absolute; left: calc(env(safe-area-inset-left) + 34px); bottom: 34px; width: 132px; height: 132px; border-radius: 50%; background: rgba(28,19,12,0.45); border: 1px solid var(--line); pointer-events: auto; touch-action: none; display: grid; place-items: center; }
-.touch .t-knob { width: 58px; height: 58px; border-radius: 50%; background: rgba(246,234,210,0.85); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
-.touch .t-buttons { position: absolute; right: calc(env(safe-area-inset-right) + 26px); bottom: 26px; display: grid; grid-template-columns: auto auto; gap: 12px; align-items: end; pointer-events: auto; }
-.touch button { font: 800 14px system-ui; color: #fff6e8; border: 1px solid var(--line); background: rgba(28,19,12,0.6); border-radius: 50%; backdrop-filter: blur(8px); touch-action: none; }
-.touch button.down { background: var(--rust); }
-.touch .t-big { width: 86px; height: 86px; background: rgba(194,90,54,0.85); grid-column: 2; grid-row: 1 / span 2; }
-.touch .t-mid { width: 70px; height: 70px; grid-column: 1; grid-row: 2; }
-.touch .t-sm { width: 56px; height: 56px; }
-.touch .t-buttons .t-sm:first-of-type { grid-column: 1; grid-row: 1; }
-.touch .t-buttons .t-sm:last-of-type { grid-column: 2; grid-row: 3; justify-self: center; width: 60px; height: 44px; border-radius: 22px; }
-.touch .t-top { position: absolute; right: calc(env(safe-area-inset-right) + 12px); top: 56px; display: flex; gap: 6px; pointer-events: auto; }
-.touch .t-top button { border-radius: 10px; padding: 7px 10px; font-size: 12px; }
 .is-touch .play-prompt, .is-touch .title-keys, .is-touch .crosshair + .tip { }
 .is-touch .play-prompt { display: none !important; }
 .is-touch .goal { width: 250px; top: 50px; padding: 9px 11px; }
 .is-touch .goal span, .is-touch .goal small { display: none; }
 .is-touch .goal ul.objectives li { font-size: 12px; }
-.is-touch .hotbar { bottom: 8px; transform: translateX(-50%) scale(0.82); transform-origin: bottom center; }
 .is-touch .interact kbd { display: none; }
 .is-touch .title-keys { display: none; }
 .is-touch .goods { display: none; }
@@ -370,8 +355,6 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 .is-touch .info { font-size: 12px; gap: 8px; padding: 5px 10px; white-space: nowrap; top: 8px; }
 .is-touch .info .sync { display: none; }
 .is-touch .bulls-chip { display: none; }
-.is-touch .touch .t-top { top: 44px; }
-.is-touch .touch .t-top button { padding: 6px 9px; font-size: 11px; }
 .is-touch .goal { top: 44px; }
 .is-touch .goal-arrow { font-size: 11px; }
 
@@ -389,7 +372,6 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 .phone-menu .pm-restore { display: flex; gap: 8px; margin-top: 10px; }
 .phone-menu .pm-restore input { flex: 1; padding: 8px 10px; font: 14px ui-monospace, Menlo, monospace; }
 .phone-menu .pm-msg { min-height: 1em; font-size: 12px; color: var(--ink-2); margin-top: 6px; }
-.touch .t-menu { font-size: 18px !important; width: 44px; background: rgba(194,90,54,0.8) !important; }
 
 .is-touch .hud { font-size: 13px; }
 /* windows fill the screen, scroll inside, and close with a big ✕ */
@@ -415,22 +397,46 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 /* top info: one short line, centred */
 .is-touch .info { top: 8px !important; font-size: 11px; padding: 4px 10px !important; }
 .is-touch .info span:nth-child(n+5) { display: none; }
-.is-touch .touch .t-top { top: auto; bottom: calc(var(--app-h) - 86px); top: 8px; right: calc(env(safe-area-inset-right) + 8px); }
 .is-touch .info { left: 50%; transform: translateX(-50%); }
 /* hotbar tappable, hints and toasts clear of the thumbs */
-.is-touch .hotbar { pointer-events: auto; bottom: 6px; }
 .is-touch .interact { top: auto !important; bottom: 76px; font-size: 13px; }
 .is-touch .tip { top: calc(50% + 18px); font-size: 12px; }
 .is-touch .toasts { bottom: auto; top: 52px; }
 .is-touch .goal-arrow { font-size: 11px; padding: 3px 8px; }
-.is-touch .touch .t-stick { left: calc(env(safe-area-inset-left) + 22px); bottom: 20px; width: 120px; height: 120px; }
-.is-touch .touch .t-buttons { right: calc(env(safe-area-inset-right) + 18px); bottom: 14px; }
-@media (max-height: 380px) { .is-touch .touch .t-big { width: 74px; height: 74px; } .is-touch .touch .t-mid { width: 60px; height: 60px; } .is-touch .touch .t-sm { width: 50px; height: 50px; } }
-.is-touch .touch .t-top button { height: 38px; min-height: 0; padding: 0 12px !important; border-radius: 19px !important; font-size: 12px !important; }
-.is-touch .touch .t-top .t-menu { width: 44px; padding: 0 !important; }
 .is-touch .goal { max-width: 34%; }
 .is-touch .goal ul.objectives li { font-size: 11.5px !important; }
 .is-touch .goal b { font-size: 13px !important; }
 .is-touch .info { left: 50%; top: 52px !important; }
 .is-touch .title-screen .loading { bottom: 16px; left: auto; right: 24px; }
 .is-touch .dialogue .panel-foot, .is-touch .panel-foot { display: none; }
+
+
+/* ---- phone controls: walk stick (left thumb), look pad + three actions (right thumb) ---- */
+.touch { position: absolute; inset: 0; pointer-events: none; z-index: 5; --tb: rgba(28,19,12,0.5); }
+.touch .t-look { position: absolute; left: 45%; right: 0; top: 0; bottom: 0; pointer-events: auto; touch-action: none; }
+.touch .t-stick, .touch .t-pad { position: absolute; bottom: calc(env(safe-area-inset-bottom) + 16px); width: 104px; height: 104px; border-radius: 50%; background: var(--tb); border: 1px solid var(--line); pointer-events: auto; touch-action: none; display: grid; place-items: center; }
+.touch .t-stick { left: calc(env(safe-area-inset-left) + 18px); }
+.touch .t-pad { right: calc(env(safe-area-inset-right) + 16px); border-style: dashed; }
+.touch .t-pad.on { background: rgba(28,19,12,0.62); }
+.touch .t-pad span { position: absolute; bottom: 12px; font: 700 9px system-ui; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,246,232,0.5); }
+.touch .t-knob, .touch .t-pad-knob { width: 44px; height: 44px; border-radius: 50%; background: rgba(246,234,210,0.8); box-shadow: 0 3px 10px rgba(0,0,0,0.4); }
+.touch .t-pad-knob { width: 38px; height: 38px; background: rgba(246,234,210,0.35); border: 2px solid rgba(246,234,210,0.7); }
+.touch button { position: absolute; font: 800 12px system-ui; color: #fff6e8; border: 1px solid var(--line); background: var(--tb); border-radius: 50%; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); touch-action: none; pointer-events: auto; padding: 0; }
+.touch button.down { background: var(--rust); }
+.touch .t-use { width: 62px; height: 62px; right: calc(env(safe-area-inset-right) + 134px); bottom: calc(env(safe-area-inset-bottom) + 18px); background: rgba(194,90,54,0.85); font-size: 13px; }
+.touch .t-harvest { width: 52px; height: 52px; right: calc(env(safe-area-inset-right) + 118px); bottom: calc(env(safe-area-inset-bottom) + 92px); font-size: 11px; }
+.touch .t-jump { width: 46px; height: 46px; right: calc(env(safe-area-inset-right) + 46px); bottom: calc(env(safe-area-inset-bottom) + 132px); font-size: 11px; }
+.touch .t-top { position: absolute; top: 8px; right: calc(env(safe-area-inset-right) + 8px); display: flex; gap: 6px; pointer-events: auto; }
+.touch .t-top button { position: static; height: 34px; min-width: 34px; padding: 0 12px; border-radius: 17px; font-size: 12px; }
+.touch .t-top .t-menu { padding: 0; width: 38px; font-size: 16px; background: rgba(194,90,54,0.8); }
+.is-touch .hotbar { pointer-events: auto; bottom: calc(env(safe-area-inset-bottom) + 4px); transform: translateX(-50%) scale(0.62); transform-origin: bottom center; }
+/* the one contextual action ("Tie Sarja & Raja", "Load the cart"…) is a button you tap */
+.is-touch .interact { pointer-events: auto; top: auto !important; bottom: calc(env(safe-area-inset-bottom) + 60px) !important; font-size: 12px !important; padding: 8px 14px !important; border-radius: 18px; border: 1px solid var(--gold); background: rgba(28,19,12,0.78); max-width: 40%; text-align: center; }
+.is-touch .interact.down { background: var(--rust); }
+.is-touch .interact::after { content: " ›"; color: var(--gold); }
+.is-touch .goal { max-width: 30% !important; }
+.is-touch .goal b { font-size: 12px !important; }
+.is-touch .goal ul.objectives li { font-size: 10.5px !important; }
+.is-touch .info { top: 8px !important; font-size: 10.5px; padding: 4px 9px !important; }
+.is-touch .toasts { top: 40px; font-size: 12px; }
+.is-touch .goal-arrow { font-size: 10px !important; }

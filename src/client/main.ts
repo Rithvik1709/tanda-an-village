@@ -322,7 +322,7 @@ function closeWindows() {
 function windowOpen() {
   return !!ploughJob || WINDOWS().some((w) => w.open()) || guide.dialogueOpen || !!document.querySelector(".welcome, .fs-gate:not([hidden])");
 }
-phoneMenu.onPick = (what) => (what === "map" ? showMap() : what === "board" ? showBoard() : what === "help" ? controls.onHelp() : settingsPanel.show());
+phoneMenu.onPick = (what) => (what === "map" ? showMap() : what === "board" ? showBoard() : what === "help" ? controls.onHelp() : what === "view" ? controls.onView() : what === "torch" ? controls.onTorch() : settingsPanel.show());
 phoneMenu.onClose = () => resumePlay();
 phoneMenu.onRestore = async (code) => {
   const err = await net.restore(code);
@@ -348,6 +348,7 @@ if (touch) {
   controls.touch = touch;
   touch.onMenu = () => (phoneMenu.open ? phoneMenu.close() : (closeWindows(), phoneMenu.show()));
   document.body.classList.add("is-touch");
+  touch.bindHint(hud.hintEl);
   // first, full screen: one tap before the title (Android can also lock landscape; iPhone can't, so the game turns itself)
   const gate = document.createElement("div");
   gate.className = "fs-gate";
