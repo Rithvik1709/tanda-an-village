@@ -1,10 +1,10 @@
-import type { Planting } from "./crops";
-import { CAN_MAX } from "./crops";
-import type { GodownLot, Loan } from "./bank";
-import { type MissionState, newMissions } from "./missions";
-import type { Bulls } from "./bulls";
-import type { Listing } from "./land";
-import { LAYOUT, STARTER_PLOT, type World } from "./world";
+import type { Planting } from "./crops.js";
+import { CAN_MAX } from "./crops.js";
+import type { GodownLot, Loan } from "./bank.js";
+import { type MissionState, newMissions } from "./missions.js";
+import type { Bulls } from "./bulls.js";
+import type { Listing } from "./land.js";
+import { LAYOUT, STARTER_PLOT, type World } from "./world.js";
 
 /*
  * The save: everything that differs from the seeded world, plus the player's money and goods.

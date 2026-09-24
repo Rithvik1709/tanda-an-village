@@ -1,14 +1,14 @@
-import { B, block, isCropBlock } from "./blocks";
-import { advance, CAN_MAX, CROPS, type CropId, isCrop, stageOf, WET_MS, yieldOf } from "./crops";
-import { type Buyer, buyerPrice, LEDGER_DAYS, shopItem } from "./economy";
-import { askingPrice, clearPlot, forSale, offersFor, valuePlot } from "./land";
-import { carried, CARRY, creditLimit, GODOWN_CAPACITY, isOverdue, LENDERS, type Lender, type Loan, owed, rentFor, stored } from "./bank";
-import { begin, BANDH_PLOT, bump, complete, current, deadlineAt, since } from "./missions";
-import { BULL_NAMES, bullsNow, CART_CAPACITY, FEED, MIN_MOOD, newBulls, PLOUGH_COST, PLOUGH_ROW, TRIP_COST, TRIP_MS } from "./bulls";
-import { hash2 } from "./rng";
-import type { LedgerEntry, Save } from "./save";
-import { clock, DAY_MS } from "./time";
-import { D, H, idx, W, type World } from "./world";
+import { B, block, isCropBlock } from "./blocks.js";
+import { advance, CAN_MAX, CROPS, type CropId, isCrop, stageOf, WET_MS, yieldOf } from "./crops.js";
+import { type Buyer, buyerPrice, LEDGER_DAYS, shopItem } from "./economy.js";
+import { askingPrice, clearPlot, forSale, offersFor, valuePlot } from "./land.js";
+import { carried, CARRY, creditLimit, GODOWN_CAPACITY, isOverdue, LENDERS, type Lender, type Loan, owed, rentFor, stored } from "./bank.js";
+import { begin, BANDH_PLOT, bump, complete, current, deadlineAt, since } from "./missions.js";
+import { BULL_NAMES, bullsNow, CART_CAPACITY, FEED, MIN_MOOD, newBulls, PLOUGH_COST, PLOUGH_ROW, TRIP_COST, TRIP_MS } from "./bulls.js";
+import { hash2 } from "./rng.js";
+import type { LedgerEntry, Save } from "./save.js";
+import { clock, DAY_MS } from "./time.js";
+import { D, H, idx, W, type World } from "./world.js";
 
 /*
  * The rules of the game: the ONLY way a save changes. The client runs these for instant feedback;

@@ -1,7 +1,7 @@
-import { bullsNow } from "./bulls";
-import type { Save } from "./save";
-import { clock, DAY_MS } from "./time";
-import type { World } from "./world";
+import { bullsNow } from "./bulls.js";
+import type { Save } from "./save.js";
+import { clock, DAY_MS } from "./time.js";
+import type { World } from "./world.js";
 
 /*
  * The story of Ukhali Tanda, in ten missions. Progress is read from the save (state checks) and

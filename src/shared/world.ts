@@ -1,7 +1,7 @@
-import { B } from "./blocks";
-import { type RoadKind, UKHALI_ROADS } from "./ukhali-osm";
-import { fbm } from "./noise";
-import { hash2, mulberry32 } from "./rng";
+import { B } from "./blocks.js";
+import { type RoadKind, UKHALI_ROADS } from "./ukhali-osm.js";
+import { fbm } from "./noise.js";
+import { hash2, mulberry32 } from "./rng.js";
 
 /*
  * Deterministic world generation. The server regenerates the same world from the seed to validate

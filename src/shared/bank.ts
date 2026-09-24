@@ -1,10 +1,10 @@
-import { bullsNow } from "./bulls";
-import { CROP_IDS, CROPS, type CropId } from "./crops";
-import { marketPrice, shopItem } from "./economy";
-import { landValue, valuePlot } from "./land";
-import type { Save } from "./save";
-import { DAY_MS } from "./time";
-import type { World } from "./world";
+import { bullsNow } from "./bulls.js";
+import { CROP_IDS, CROPS, type CropId } from "./crops.js";
+import { marketPrice, shopItem } from "./economy.js";
+import { landValue, valuePlot } from "./land.js";
+import type { Save } from "./save.js";
+import { DAY_MS } from "./time.js";
+import type { World } from "./world.js";
 
 /*
  * Money tools: loans from the cooperative bank (cheap, secured by your land) or the sahukar

@@ -1,8 +1,8 @@
-import { authed, displayName, json, loadSave, publish, serverNow } from "./_lib/game";
-import { store } from "./_lib/store";
-import { netWorth } from "../src/shared/bank";
-import { clock } from "../src/shared/time";
-import { world } from "./_lib/game";
+import { authed, displayName, json, loadSave, publish, serverNow } from "./_lib/game.js";
+import { store } from "./_lib/store.js";
+import { netWorth } from "../src/shared/bank.js";
+import { clock } from "../src/shared/time.js";
+import { world } from "./_lib/game.js";
 
 /**
  * GET /api/leaderboard → { top: [...20], me?: { rank, total, entry } }

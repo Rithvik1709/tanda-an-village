@@ -1,4 +1,4 @@
-import { hash2 } from "./rng";
+import { hash2 } from "./rng.js";
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;

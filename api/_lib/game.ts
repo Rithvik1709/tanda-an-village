@@ -1,8 +1,8 @@
-import { migrate, type Save } from "../../src/shared/save";
-import { generateWorld, WORLD_SEED, type World } from "../../src/shared/world";
-import { netWorth, titleFor } from "../../src/shared/bank";
-import { clock } from "../../src/shared/time";
-import { store } from "./store";
+import { migrate, type Save } from "../../src/shared/save.js";
+import { generateWorld, WORLD_SEED, type World } from "../../src/shared/world.js";
+import { netWorth, titleFor } from "../../src/shared/bank.js";
+import { clock } from "../../src/shared/time.js";
+import { store } from "./store.js";
 
 /*
  * Server-side helpers shared by the endpoints: the (cached) world, players, tokens and saves.

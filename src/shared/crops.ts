@@ -1,5 +1,5 @@
-import { B } from "./blocks";
-import { DAY_MS, type Season } from "./time";
+import { B } from "./blocks.js";
+import { DAY_MS, type Season } from "./time.js";
 
 /*
  * Crop definitions and the growth model. Growth is integrated from timestamps, so a field keeps

@@ -1,9 +1,9 @@
-import { isCropBlock } from "./blocks";
-import { advance, CROPS } from "./crops";
-import { marketPrice, shopItem } from "./economy";
-import { hash2 } from "./rng";
-import type { Save } from "./save";
-import { D, W, type Plot, type World } from "./world";
+import { isCropBlock } from "./blocks.js";
+import { advance, CROPS } from "./crops.js";
+import { marketPrice, shopItem } from "./economy.js";
+import { hash2 } from "./rng.js";
+import type { Save } from "./save.js";
+import { D, W, type Plot, type World } from "./world.js";
 
 /*
  * Land: what a plot is worth, which plots the village has for sale, and the offers NPC buyers make

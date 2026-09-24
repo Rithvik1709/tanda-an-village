@@ -1,5 +1,5 @@
-import { begin } from "../src/shared/missions";
-import { authed, devClockAllowed, json, readJson, serverNow, unauthorized, updateSave } from "./_lib/game";
+import { begin } from "../src/shared/missions.js";
+import { authed, devClockAllowed, json, readJson, serverNow, unauthorized, updateSave } from "./_lib/game.js";
 
 /** POST /api/dev { skipMs?, money? } — dev only: fast-forward this save's clock, or grant money for tests. 404 in production. */
 export async function POST(req: Request): Promise<Response> {

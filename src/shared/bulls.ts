@@ -1,4 +1,4 @@
-import { DAY_MS } from "./time";
+import { DAY_MS } from "./time.js";
 
 /*
  * Your bull pair (a Khillari jodi): stamina for work, mood from care. Both change with time, and

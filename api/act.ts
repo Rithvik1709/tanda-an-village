@@ -1,7 +1,7 @@
-import { netWorth, TITLES, titleFor } from "../src/shared/bank";
-import { type Action, apply } from "../src/shared/rules";
-import { clock } from "../src/shared/time";
-import { authed, json, readJson, serverNow, unauthorized, updateSave, world } from "./_lib/game";
+import { netWorth, TITLES, titleFor } from "../src/shared/bank.js";
+import { type Action, apply } from "../src/shared/rules.js";
+import { clock } from "../src/shared/time.js";
+import { authed, json, readJson, serverNow, unauthorized, updateSave, world } from "./_lib/game.js";
 
 export const MAX_BATCH = 256;
 

@@ -1,7 +1,7 @@
-import { B, block } from "./blocks";
-import { CROP_IDS, CROPS, type CropId } from "./crops";
-import { hash2, hashStr } from "./rng";
-import { SEASON_DAYS, SEASONS, type Season } from "./time";
+import { B, block } from "./blocks.js";
+import { CROP_IDS, CROPS, type CropId } from "./crops.js";
+import { hash2, hashStr } from "./rng.js";
+import { SEASON_DAYS, SEASONS, type Season } from "./time.js";
 
 /*
  * Prices. Every crop has one "mandi" price per game day, the same for every player, computed from
