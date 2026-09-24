@@ -1,3 +1,4 @@
+import { hoursText } from "../../shared/hours";
 import { CROP_IDS, CROPS, type CropId } from "../../shared/crops";
 import { buyerPrice, LEDGER_DAYS, news, SHOP } from "../../shared/economy";
 import { block } from "../../shared/blocks";
@@ -188,7 +189,7 @@ export class Panels {
     this.el.innerHTML = `
       <div class="panel-card">
         <button class="x" data-do="close" title="Close (E)">✕</button>
-        ${who}
+        ${who}${hoursText(this.open) ? `<p class="hours-line">🕰 Open ${hoursText(this.open)}</p>` : ""}
         <div class="tabs" ${tabs.length ? "" : 'style="border:0"'}>${tabs.map(([k, n]) => `<button data-do="tab:${k}" class="${k === this.tab ? "on" : ""}">${n}</button>`).join("")}<span class="wallet">${rs(s.money)}</span></div>
         <div class="panel-body">${body}</div>
         <div class="panel-foot">E or Esc to close</div>

@@ -454,4 +454,6 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 .board-table .sk + br + .sk { height: 0.6em; margin-top: 6px; opacity: 0.7; }
 .board-me .sk { height: 1em; }
 @keyframes sk { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-@media (prefers-reduced-motion: reduce) { .sk, #boot .b-shine, #boot .b-cart { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sk, #boot .b-shine, #boot .b-wheel { animation: none; } }
+.interact small.hours { font-weight: 500; opacity: 0.7; font-size: 0.85em; }
+.panel-card .hours-line { margin: -4px 0 8px; font-size: 12px; color: var(--ink-2); }

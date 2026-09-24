@@ -17,12 +17,13 @@ export async function GET(req: Request): Promise<Response> {
     board.map(async (e) => {
       const save = await loadSave(e.id).catch(() => null);
       if (!save) return { ...e, parts: null as Parts | null };
+      if ((save as { devTouched?: boolean }).devTouched) return null; // a test farm
       const now = serverNow(save);
       const w = netWorth(world(), save, now, clock(now).day);
       return { ...e, worth: w.total, parts: { cash: w.money, land: w.land, goods: w.goods + w.livestock, debt: w.debt } as Parts | null };
     }),
   );
-  const list = live.sort((a, b) => b.worth - a.worth || a.updatedAt - b.updatedAt);
+  const list = live.filter((e): e is NonNullable<typeof e> => e !== null).sort((a, b) => b.worth - a.worth || a.updatedAt - b.updatedAt);
   // equal net worth shares a rank (1, 2, 2, 4…), matching "how many are worth more than you"
   const top = list.map((e, i) => ({ rank: list.findIndex((x) => x.worth === e.worth) + 1 || i + 1, name: e.name, worth: e.worth, parts: e.parts, title: e.title, missions: e.missions, sarpanch: e.sarpanch, you: false, id: e.id }));
   let me: { rank: number; total: number; name: string; worth: number; parts: Parts; title: string; missions: number } | undefined;

@@ -112,10 +112,17 @@ describe("two devices and the leaderboard", () => {
     const bad = await (await act(post({ actions: [{ t: "setName", name: "<script>" }] }, p1.token))).json();
     expect(bad.results[0].ok).toBe(false);
     await act(post({ actions: [{ t: "setName", name: "गजानन" }] }, p1.token));
-    await dev(post({ money: 50000 }, p2.token));
+    // Sitaram has sold well (money changed on the server, as a real sale would)
+    const { authed, updateSave } = await import("../api/_lib/game");
+    const id2 = (await authed(get(p2.token)))!;
+    await updateSave(id2, (s) => void (s.money += 50000));
     await act(post({ actions: [{ t: "setName", name: "Sitaram" }] }, p2.token));
+    // a test farm that used the dev tools (free money, time skips) is kept off the board
+    const p3 = await newPlayer();
+    await dev(post({ money: 900000 }, p3.token));
+    await act(post({ actions: [{ t: "setName", name: "Cheat" }] }, p3.token));
     const r = await (await board(get(p1.token))).json();
-    expect(r.top.map((x: { name: string }) => x.name).slice(0, 2)).toEqual(["Sitaram", "गजानन"]);
+    expect(r.top.map((x: { name: string }) => x.name)).toEqual(["Sitaram", "गजानन"]);
     expect(r.me).toMatchObject({ rank: 2, total: 2, name: "गजानन" });
     expect(r.top[1].you).toBe(true);
     expect(JSON.stringify(r)).not.toMatch(/token|recovery|[a-f0-9]{16}/); // no ids or secrets leak

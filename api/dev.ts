@@ -1,5 +1,5 @@
 import { begin } from "../src/shared/missions.js";
-import { authed, devClockAllowed, json, readJson, serverNow, unauthorized, updateSave } from "./_lib/game.js";
+import { authed, devClockAllowed, json, publish, readJson, serverNow, unauthorized, updateSave } from "./_lib/game.js";
 
 /** POST /api/dev { skipMs?, money? } — dev only: fast-forward this save's clock, or grant money for tests. 404 in production. */
 export async function POST(req: Request): Promise<Response> {
@@ -14,11 +14,13 @@ export async function POST(req: Request): Promise<Response> {
   if (!Number.isFinite(skip) || skip < 0 || skip > 30 * 24 * 3600e3 || !Number.isInteger(money) || money < 0 || money > 1e7) return json({ error: "bad request" }, 400);
   const done = await updateSave(id, (save) => {
     save.devSkew = (save.devSkew ?? 0) + skip;
+    (save as { devTouched?: boolean }).devTouched = true;
     save.money += money;
     if (jump !== null && Number.isInteger(jump) && jump >= 0) begin(save, jump, serverNow(save));
     if (rep !== null && Number.isFinite(rep)) save.rep = rep;
   });
   if (!done) return unauthorized();
   const { save } = done;
+  await publish(save).catch(() => {}); // takes this test farm off the leaderboard
   return json({ save, serverNow: serverNow(save) });
 }

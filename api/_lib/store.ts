@@ -26,6 +26,7 @@ export interface Store {
   /** Write only if the stored revision is still `rev` (null = only if it doesn't exist yet). */
   setVersioned<T>(key: string, value: T, rev: number | null): Promise<boolean>;
   boardUpsert(e: BoardEntry): Promise<void>;
+  boardRemove(id: string): Promise<void>;
   boardTop(n: number): Promise<BoardEntry[]>;
   /** How many players are worth more than `worth`, and how many are on the board. */
   boardRank(worth: number): Promise<{ above: number; total: number }>;
@@ -88,6 +89,9 @@ export class SupabaseStore implements Store {
     const row = { player_id: e.id, name: e.name, net_worth: Math.round(e.worth), title: e.title, missions: e.missions, sarpanch: e.sarpanch, updated_at: new Date(e.updatedAt).toISOString() };
     await this.ok(await this.req("leaderboard?on_conflict=player_id", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal", body: JSON.stringify(row) }), "board");
   }
+  async boardRemove(id: string) {
+    await this.ok(await this.req(`leaderboard?player_id=eq.${encodeURIComponent(id)}`, { method: "DELETE", prefer: "return=minimal" }), "board remove");
+  }
   async boardTop(n: number) {
     const r = await this.ok(await this.req(`leaderboard?select=*&order=net_worth.desc,updated_at.asc&limit=${Math.min(100, n)}`), "top");
     const rows = (await r.json()) as { player_id: string; name: string; net_worth: number; title: string; missions: number; sarpanch: boolean; updated_at: string }[];
@@ -141,6 +145,14 @@ abstract class LocalStore implements Store {
     await this.locked("__board", async () => {
       const b = ((await this.read("__board")) as Record<string, BoardEntry> | null) ?? {};
       b[e.id] = e;
+      await this.write("__board", b);
+    });
+  }
+  async boardRemove(id: string) {
+    await this.locked("__board", async () => {
+      const b = ((await this.read("__board")) as Record<string, BoardEntry> | null) ?? {};
+      if (!(id in b)) return;
+      delete b[id];
       await this.write("__board", b);
     });
   }

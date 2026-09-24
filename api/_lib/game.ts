@@ -47,7 +47,8 @@ export async function authed(req: Request): Promise<string | null> {
   return store().get<string>(`token:${await sha256(m[1])}`);
 }
 
-export type ServerSave = Save & { devSkew?: number };
+/** devTouched: a dev/test tool changed this farm (time skips, free money) — kept off the leaderboard. */
+export type ServerSave = Save & { devSkew?: number; devTouched?: boolean };
 
 export async function loadSave(id: string): Promise<ServerSave | null> {
   const s = await store().getVersioned<ServerSave>(`save:${id}`);
@@ -79,6 +80,7 @@ export const displayName = (s: Save) => s.name?.trim() || `Farmer ${s.id.slice(0
 
 /** Put this farmer on the leaderboard (net worth, title, story progress). */
 export async function publish(s: Save) {
+  if ((s as ServerSave).devTouched) return store().boardRemove(s.id); // test farms with free money don't compete with real ones
   const now = serverNow(s);
   const worth = netWorth(world(), s, now, clock(now).day).total;
   await store().boardUpsert({

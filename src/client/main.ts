@@ -47,6 +47,7 @@ import { current } from "../shared/missions";
 import { loadSettings, SettingsPanel, TitleScreen, Tutorial } from "./ui/screens";
 import { isTouch, TouchControls } from "./player/touch";
 import { FrameWatch, Q } from "./quality";
+import { closedText, hoursText, isOpen } from "../shared/hours";
 
 type Hooks = {
   ready: boolean;
@@ -993,6 +994,7 @@ controls.onInteract = () => {
   if (map.open) return map.close();
   if (panels.open) return panels.close();
   const s = nearStall();
+  if (s && !isOpen(s.kind, nowHour())) return hud.toast(closedText(s.kind), "bad");
   if (s) openStall(s.kind);
 };
 controls.onEscape = () => closeWindows();
@@ -1173,7 +1175,7 @@ renderer.setAnimationLoop(() => {
     refreshSigns();
     if (mode === "play") checkPlotEntry();
     const st = mode === "play" && !panels.open && !farmyard.ride ? nearStall() : undefined;
-    hud.setHint(farmyard.ride || panels.open || ploughJob ? "" : st ? `<kbd>E</kbd> ${st.label}` : cartHint() || (mode === "play" && canSleep() ? "<kbd>Z</kbd> Sleep till morning (you walk home)" : nightK > 0.6 && !torchOn && mode === "play" ? "<kbd>T</kbd> Switch on your torch" : ""));
+    hud.setHint(farmyard.ride || panels.open || ploughJob ? "" : st ? (isOpen(st.kind, nowHour()) ? `<kbd>E</kbd> ${st.label}${hoursText(st.kind) ? ` <small class="hours">· open till ${hoursText(st.kind).split(" – ")[1]}</small>` : ""}` : `🔒 ${closedText(st.kind)}`) : cartHint() || (mode === "play" && canSleep() ? "<kbd>Z</kbd> Sleep till morning (you walk home)" : nightK > 0.6 && !torchOn && mode === "play" ? "<kbd>T</kbd> Switch on your torch" : ""));
     hud.setBulls(bullsChip());
     // the watchdog: nothing may leave the player stuck — no pause panel on a phone, controls back when windows close
     if (TOUCH) {

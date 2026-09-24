@@ -24,18 +24,20 @@
       #boot .b-shine { position: absolute; top: 0; bottom: 0; width: 30%; background: linear-gradient(90deg, transparent, rgba(255, 244, 220, 0.45), transparent); animation: b-shine 1.3s ease-in-out infinite; }
       @keyframes b-shine { from { transform: translateX(-120%); } to { transform: translateX(420%); } }
       #boot .b-step { font-size: 13px; color: rgba(246, 234, 210, 0.75); min-height: 1.2em; }
-      #boot .b-cart { font-size: 26px; margin-top: 22px; display: inline-block; animation: b-cart 1.6s ease-in-out infinite; }
-      @keyframes b-cart { 0%, 100% { transform: translateX(-14px) rotate(-2deg); } 50% { transform: translateX(14px) rotate(2deg); } }
+      /* the logo: a bullock-cart wheel, rolling */
+      #boot .b-logo { width: 76px; height: 76px; margin: 0 auto 18px; border-radius: 18px; background: #e0703a; box-shadow: 0 10px 34px rgba(224, 112, 58, 0.35); display: grid; place-items: center; }
+      #boot .b-wheel { width: 56px; height: 56px; animation: b-roll 1.4s linear infinite; }
+      @keyframes b-roll { to { transform: rotate(360deg); } }
       #boot .b-err { display: none; margin-top: 14px; font-size: 13px; color: #ffb4a0; }
     </style>
   </head>
   <body>
     <div id="boot" role="status" aria-live="polite">
       <div class="b-in">
+        <div class="b-logo" aria-hidden="true"><svg class="b-wheel" viewBox="12 12 40 40"><circle cx="32" cy="32" r="17.5" fill="none" stroke="#f4ecd8" stroke-width="4.5"/><circle cx="32" cy="32" r="4.5" fill="#f4ecd8"/><g stroke="#f4ecd8" stroke-width="3.4" stroke-linecap="round"><path d="M32 15v34M15 32h34M20 20l24 24M44 20L20 44"/></g></svg></div>
         <div class="b-word">Tanda<span>उखळी तांडा · Ukhali Tanda</span></div>
         <div class="b-bar"><div class="b-fill"></div><div class="b-shine"></div></div>
         <div class="b-step">Loading the game…</div>
-        <div class="b-cart" aria-hidden="true">🐂</div>
         <div class="b-err">This is taking a while. Check your connection, or try reloading.</div>
       </div>
     </div>

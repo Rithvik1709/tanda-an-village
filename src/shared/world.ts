@@ -1,4 +1,5 @@
 import { B } from "./blocks.js";
+import { hoursText } from "./hours.js";
 import { type RoadKind, UKHALI_ROADS } from "./ukhali-osm.js";
 import { fbm } from "./noise.js";
 import { hash2, mulberry32 } from "./rng.js";
@@ -427,10 +428,11 @@ export function generateWorld(seed = WORLD_SEED): World {
   }
   const landOffice = house(89, 111, 6, 5, B.WHITEWASH, B.ROOF_TILE, "E");
   const bank = house(114, 125, 7, 6, B.BRICK, B.ROOF_TILE, "W");
-  plate(trader.x, trader.z - 1.2, trader.y, 0, ["गणपत शेठ · व्यापारी", "Ganpat Seth, Trader"]);
-  plate(seedShop.x, seedShop.z - 1.2, seedShop.y, 0, ["सीताबाई बी-बियाणे", "Sitabai Seeds & Tools"]);
-  plate(landOffice.x + 0.3, landOffice.z + 1.8, landOffice.y + 1.4, Math.PI / 2, ["नायक कचेरी", "Naik's Kacheri"]);
-  plate(bank.x - 0.3, bank.z - 1.8, bank.y + 1.4, -Math.PI / 2, ["सहकारी बँक, उखळी तांडा", "Sahakari Bank"], "#15803d");
+  // each board carries its opening hours
+  plate(trader.x, trader.z - 1.2, trader.y, 0, ["गणपत शेठ · व्यापारी", "Ganpat Seth, Trader", `Open ${hoursText("trader")}`]);
+  plate(seedShop.x, seedShop.z - 1.2, seedShop.y, 0, ["सीताबाई बी-बियाणे", "Sitabai Seeds & Tools", `Open ${hoursText("shop")}`]);
+  plate(landOffice.x + 0.3, landOffice.z + 1.8, landOffice.y + 1.4, Math.PI / 2, ["नायक कचेरी", "Naik's Kacheri", `Open ${hoursText("land")}`]);
+  plate(bank.x - 0.3, bank.z - 1.8, bank.y + 1.4, -Math.PI / 2, ["सहकारी बँक, उखळी तांडा", "Sahakari Bank", `Open ${hoursText("bank")}`], "#15803d");
 
   // wells: the village well by the chowk, and the round vihir out in the fields
   const makeWell = (cx: number, cz: number) => {
@@ -494,7 +496,11 @@ export function generateWorld(seed = WORLD_SEED): World {
         for (let xx = x - 1; xx <= x + w; xx++) for (let zz = z - 1; zz <= z + d; zz++) reserved[col(xx, zz)] = 1;
         continue;
       }
-      house(x, z, w, d, walls, roofs, bestSide);
+      // the neighbour just south of the aangan stood in front of Rathod Bhuvan's verandah: it sits a
+      // few metres further east (its first spot stays reserved, so the rest of the village is unchanged)
+      const blocksWada = x <= WADA.x0 + WADA.w + 6 && x + w - 1 >= WADA.x0 + WADA.w && z >= WADA.z0 + 10 && z <= WADA.z0 + WADA.d;
+      if (blocksWada) for (let xx = x - 1; xx <= x + w; xx++) for (let zz = z - 1; zz <= z + d; zz++) reserved[col(xx, zz)] = 1;
+      house(blocksWada ? x + 5 : x, z, w, d, walls, roofs, bestSide);
       houses++;
     }
 
