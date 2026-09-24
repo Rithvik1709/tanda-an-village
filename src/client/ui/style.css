@@ -343,12 +343,17 @@ kbd, .goal kbd, .help kbd, .welcome kbd, .tutorial kbd { background: rgba(255, 2
 /* phone upright: turn the game (canvas and all UI) a quarter clockwise, so it plays in landscape */
 html.rotated #game, html.rotated #ui { transform-origin: top left; transform: rotate(90deg) translateY(-100%); }
 @media (max-height: 500px), (max-width: 500px) {
-  .title-inner { top: 50%; }
-  .wordmark { font-size: 56px; }
-  .tagline { font-size: 14px; margin: 10px 0 6px; }
+  /* phones: a compact title that always fits (the script also scales it down to the screen) */
+  .title-inner { top: 50%; left: calc(env(safe-area-inset-left) + 28px); width: min(400px, calc(var(--app-w, 100vw) - 56px)); transform-origin: left center; }
+  .wordmark { font-size: 46px; margin-top: 0; }
+  .tagline { font-size: 12.5px; line-height: 1.45; margin: 8px 0 4px; max-width: 380px; }
   .eyebrow { display: none; }
-  .title-buttons { margin-top: 10px; gap: 8px; }
-  .title-buttons button.primary { padding: 10px 24px; font-size: 16px; }
+  .title-buttons { margin-top: 10px; gap: 7px; width: min(340px, 100%); }
+  .title-buttons button { font-size: 13px; padding: 8px 10px; border-radius: 10px; }
+  .title-buttons .title-row button { padding: 8px 6px; }
+  .title-buttons button.primary { padding: 10px 20px; font-size: 15px; }
+  .title-buttons button.link { font-size: 12px; padding: 2px 0; }
+  .title-credit { left: auto; right: calc(env(safe-area-inset-right) + 16px); bottom: 10px; font-size: 11px; }
   .panel-card { max-height: calc(var(--app-h, 100vh) - 30px) !important; padding: 12px 16px !important; }
   .panel { padding-bottom: 0; }
 }

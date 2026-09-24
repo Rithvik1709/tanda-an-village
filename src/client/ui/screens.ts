@@ -68,6 +68,16 @@ export class TitleScreen {
       <div class="title-credit">Created by <b>Gajanan Rathod</b></div>
       <div class="title-keys">WASD walk · mouse look · left click harvest · right click use · E talk · M map · V view · T torch · H help</div>
       <div class="loading">Preparing the village…</div>`);
+    // shrink the title block to fit short screens (a phone in landscape with the browser's bars)
+    const fit = () => {
+      const inner = this.el.querySelector(".title-inner") as HTMLElement;
+      inner.style.transform = "";
+      const room = this.el.clientHeight - 40, h = inner.offsetHeight;
+      if (h > room && room > 0) inner.style.transform = `translateY(-50%) scale(${Math.max(0.6, room / h).toFixed(3)})`;
+    };
+    addEventListener("resize", () => requestAnimationFrame(fit));
+    visualViewport?.addEventListener("resize", () => requestAnimationFrame(fit));
+    requestAnimationFrame(fit);
     this.el.addEventListener("click", (e) => {
       const t = (e.target as HTMLElement).closest("[data-t]") as HTMLElement | null;
       if (!t || this.el.classList.contains("busy")) return;
