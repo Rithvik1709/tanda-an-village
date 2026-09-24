@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { BANDH_PLOT, complete, current, MISSIONS } from "../src/shared/missions";
 import { apply, type Action } from "../src/shared/rules";
 import { newSave, type Save } from "../src/shared/save";
-import { DAY_MS, EPOCH, HOUR_MS } from "../src/shared/time";
+import { atHour, DAY_MS, HOUR_MS, msBetween } from "../src/shared/time";
 import { generateWorld } from "../src/shared/world";
 
 const world = generateWorld();
 const starter = world.plots.find((p) => p.starter)!;
 const wells = world.structures.filter((q) => q.kind === "well") as { x: number; y: number; z: number }[];
-let now = EPOCH + 4 * DAY_MS + 3 * HOUR_MS; // 9 am
+let now = atHour(4, 9);
 const ok = (s: Save, a: Action) => {
   const r = apply(world, s, a, now);
   if (!r.ok) throw new Error(`${a.t}: ${r.error}`);
@@ -77,12 +77,12 @@ describe("the ten missions", () => {
     ok(s, { t: "deliver", to: "mandir", item: "jowar", n: 10 });
     ok(s, { t: "deliver", to: "mandir", item: "onion", n: 10 });
     no(s, { t: "visit", place: "teej" });
-    now += 11 * HOUR_MS; // 8 pm
+    now += msBetween(9, 20); // 8 pm
     ok(s, { t: "visit", place: "teej" });
     ok(s, { t: "claimMission" });
     expect(s.inv.jhool).toBe(1);
     // 7 the caravan: sell 50 in town before 2 pm
-    now += 14 * HOUR_MS; // 10 am next day
+    now += msBetween(20, 10); // 10 am next day
     s.inv.cart = 1;
     s.inv.jowar = 60;
     ok(s, { t: "feed" });
@@ -200,12 +200,12 @@ describe("nights in the tanda", () => {
   it("sleep jumps this farm to 6 am, once a night; crops grow through the night; friends once an evening", async () => {
     const { clock } = await import("../src/shared/time");
     const s = newSave("n", world, now);
-    const at = (h: number) => EPOCH + 10 * DAY_MS + (h - 6) * HOUR_MS; // day 10 at hour h
+    const at = (h: number) => atHour(10, h);
     const t = at(22);
     expect(apply(world, s, { t: "sleep" }, at(14)).ok).toBe(false); // afternoon
     const r = apply(world, s, { t: "sleep" }, t);
     expect(r.ok).toBe(true);
-    expect(s.clockOffset).toBe(8 * HOUR_MS);
+    expect(s.clockOffset).toBe(Math.round(msBetween(22, 6)));
     expect(clock(t + s.clockOffset!).hour).toBeCloseTo(6);
     expect(apply(world, s, { t: "sleep" }, t + s.clockOffset!).ok).toBe(false); // it's morning now
     expect((apply(world, s, { t: "friends" }, at(20)) as { msg?: string }).msg).toMatch(/\+1 reputation/);

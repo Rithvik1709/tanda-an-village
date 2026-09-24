@@ -119,7 +119,7 @@ export class TouchControls {
 
   /** The action hint ("R Load the cart…") becomes a button: tapping it presses that key. */
   bindHint(hint: HTMLElement) {
-    const keys: Record<string, () => void> = { E: this.c.onInteract, R: this.c.onRide, G: this.c.onTie, P: this.c.onPloughField, F: this.c.onFeed, T: this.c.onTorch };
+    const keys: Record<string, () => void> = { E: this.c.onInteract, R: this.c.onRide, G: this.c.onTie, P: this.c.onPloughField, F: this.c.onFeed, T: this.c.onTorch, Z: this.c.onSleep };
     hint.addEventListener("touchstart", (e) => {
       e.preventDefault();
       const k = hint.querySelector("kbd")?.textContent?.trim() ?? "";

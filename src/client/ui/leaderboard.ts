@@ -2,8 +2,9 @@
  * The Ukhali leaderboard: the richest farmers of the tanda by net worth, your own rank, and an
  * optional name to show up as (no sign-up needed).
  */
-type Row = { rank: number; name: string; worth: number; title: string; missions: number; sarpanch: boolean; you: boolean };
-type Board = { top: Row[]; me?: { rank: number; total: number; name: string; worth: number } };
+type Parts = { cash: number; land: number; goods: number; debt: number };
+type Row = { rank: number; name: string; worth: number; parts?: Parts | null; title: string; missions: number; sarpanch: boolean; you: boolean };
+type Board = { top: Row[]; me?: { rank: number; total: number; name: string; worth: number; parts?: Parts } };
 
 export class Leaderboard {
   private el: HTMLElement;
@@ -38,17 +39,19 @@ export class Leaderboard {
     }
     const rs = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
     const medal = (r: number) => (r === 1 ? "🥇" : r === 2 ? "🥈" : r === 3 ? "🥉" : String(r));
+    // what the wealth is made of: cash in hand, land, crops & livestock, less loans
+    const parts = (p?: Parts | null) => (p ? `<small class="parts">cash ${rs(p.cash)} · land ${rs(p.land)} · crops &amp; bulls ${rs(p.goods)}${p.debt ? ` · owes ${rs(p.debt)}` : ""}</small>` : "");
     const rows = data.top
-      .map((r) => `<tr class="${r.you ? "you" : ""}"><td class="rank">${medal(r.rank)}</td><td><b>${esc(r.name)}</b>${r.you ? " <small>(you)</small>" : ""}<br><small>${r.sarpanch ? "🏛 Sarpanch · " : ""}${esc(r.title)} · ${r.missions} mission${r.missions === 1 ? "" : "s"}</small></td><td class="num"><b>${rs(r.worth)}</b></td></tr>`)
+      .map((r) => `<tr class="${r.you ? "you" : ""}"><td class="rank">${medal(r.rank)}</td><td><b>${esc(r.name)}</b>${r.you ? " <small>(you)</small>" : ""}<br><small>${r.sarpanch ? "🏛 Sarpanch · " : ""}${esc(r.title)} · ${r.missions} mission${r.missions === 1 ? "" : "s"}</small></td><td class="num"><b>${rs(r.worth)}</b>${parts(r.parts)}</td></tr>`)
       .join("");
     const me = data.me;
-    const mine = me && !data.top.some((r) => r.you) ? `<tr class="you sep"><td class="rank">${me.rank}</td><td><b>${esc(me.name)}</b> <small>(you)</small></td><td class="num"><b>${rs(me.worth)}</b></td></tr>` : "";
+    const mine = me && !data.top.some((r) => r.you) ? `<tr class="you sep"><td class="rank">${me.rank}</td><td><b>${esc(me.name)}</b> <small>(you)</small></td><td class="num"><b>${rs(me.worth)}</b>${parts(me.parts)}</td></tr>` : "";
     this.el.innerHTML = `<div class="panel-card">
       <button class="x" data-close>✕</button>
       <h2>Ukhali Tanda's leaderboard <small>श्रीमंत शेतकरी</small></h2>
-      <p class="lede">The farmers of the tanda, by net worth: cash, land, crops and bulls, less what they owe.</p>
-      ${me ? `<div class="board-me">You're <b>#${me.rank}</b> of ${me.total} farmers · ${rs(me.worth)}</div>` : ""}
-      <table class="board-table"><tbody>${rows || `<tr><td class="empty">No farmers yet — be the first!</td></tr>`}${mine}</tbody></table>
+      <p class="lede">The farmers of the tanda, by <b>wealth</b>: not just cash, but the cash, land, crops and bulls they own, less what they owe.</p>
+      ${me ? `<div class="board-me">You're <b>#${me.rank}</b> of ${me.total} farmers · wealth ${rs(me.worth)}${parts(me.parts)}</div>` : ""}
+      <table class="board-table"><thead><tr><th></th><th>Farmer</th><th class="num">Wealth</th></tr></thead><tbody>${rows || `<tr><td class="empty">No farmers yet — be the first!</td></tr>`}${mine}</tbody></table>
       ${me ? `<form class="name-form"><label>Your name on the board</label><div><input name="n" maxlength="20" value="${esc(me.name.startsWith("Farmer ") ? "" : me.name)}" placeholder="${esc(me.name)}"><button>Save</button></div><small class="name-msg">No sign-up needed. You can change it any time.</small></form>` : ""}
       <div class="panel-foot">Esc to close</div></div>`;
     const form = this.el.querySelector(".name-form") as HTMLFormElement | null;

@@ -96,14 +96,14 @@ export class Guide {
         <div><b>Harvest</b><span>Look at a ripe crop and tap <b>Harvest</b>.</span></div>
         <div><b>Talk &amp; trade</b><span>Tap <b>Talk</b> near a stall or person.</span></div>
         <div><b>Bulls &amp; cart</b><span><b>Plough</b> in your field · <b>Tie</b> behind your house · <b>Feed</b> near your bulls · <b>Cart</b> by your cart to ride to the mandi.</span></div>
-        <div><b>Other</b><span><b>Map</b> · <b>View</b> (first/third person) · <b>Torch</b> at night · 🏆 leaderboard</span></div>
+        <div><b>Other</b><span><b>Map</b> · <b>View</b> (first/third person) · <b>Torch</b> at night · at night, tap <b>Sleep till morning</b> · 🏆 leaderboard</span></div>
       </div><div hidden>` : ""}
         <div><b>Move</b><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump · mouse look</span></div>
         <div><b>Pick a tool</b><span><kbd>1</kbd> hand · <kbd>2</kbd> hoe · <kbd>3</kbd> watering can · <kbd>4</kbd><kbd>5</kbd><kbd>6</kbd> seeds (or mouse wheel)</span></div>
         <div><b>Use it</b><span><b>Right-click</b> the soil: plough, sow, water · <b>Left-click</b> a ripe crop: harvest</span></div>
         <div><b>Talk &amp; trade</b><span><kbd>E</kbd> near a stall or person</span></div>
         <div><b>Bulls &amp; cart</b><span><kbd>P</kbd> bulls plough your field · <kbd>G</kbd> tie / untie at home · <kbd>F</kbd> feed · <kbd>R</kbd> at the cart: load and ride to the town mandi</span></div>
-        <div><b>Other</b><span><kbd>L</kbd> leaderboard · <kbd>M</kbd> map · <kbd>V</kbd> first/third person · <kbd>T</kbd> torch at night · <kbd>H</kbd> this help · <kbd>Esc</kbd> pause</span></div>
+        <div><b>Other</b><span><kbd>L</kbd> leaderboard · <kbd>M</kbd> map · <kbd>V</kbd> first/third person · <kbd>T</kbd> torch at night · <kbd>Z</kbd> sleep till morning (at night) · <kbd>H</kbd> this help · <kbd>Esc</kbd> pause</span></div>
       </div>
       <p class="hint">The golden marker and the goal card (top left) always show what to do next. Your farm is saved online automatically.</p>
       <div class="big-acts"><button data-close>Got it</button></div></div>`;

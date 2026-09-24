@@ -26,6 +26,7 @@ export class Controls {
   onBoard: () => void = () => {};
   onPloughField: () => void = () => {};
   onTie: () => void = () => {};
+  onSleep: () => void = () => {};
   onLockChange: (locked: boolean) => void = () => {};
 
   constructor(el: HTMLElement) {
@@ -71,6 +72,7 @@ export class Controls {
       if (e.code === "KeyL" && !e.repeat) this.onBoard();
       if (e.code === "KeyP" && !e.repeat) this.onPloughField();
       if (e.code === "KeyG" && !e.repeat) this.onTie();
+      if (e.code === "KeyZ" && !e.repeat) this.onSleep();
       if (this.locked) {
         this.held.add(e.code);
         if (e.code === "Space") e.preventDefault();

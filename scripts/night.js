@@ -9,8 +9,11 @@
   await wait(500);
   document.querySelector(".dialogue button")?.click();
   // fast-forward the server clock to about 8:30 pm
-  const h0 = g.clockNow().hour;
-  await g.skip((((20.5 - h0 + 24) % 24) / 24) * 10 * 60 * 1000);
+  for (let i = 0; i < 60; i++) {
+    const h = g.clockNow().hour;
+    if (h >= 20.2 && h < 21.5) break;
+    await g.skip(15000);
+  }
   log.evening = g.clockNow();
   const { door, fire } = g.home();
   g.teleport(fire.x + 2.2, fire.y, fire.z + 2.4, Math.atan2(2.2, 2.4), -0.2);
@@ -32,7 +35,11 @@
   g.teleport(door.x, door.y, door.z, 0, -0.1);
   await wait(900);
   log.homeHint = document.querySelector(".interact")?.textContent;
-  g.key("KeyE");
+  // away from the door, the hint offers Z: sleep from anywhere (you walk home)
+  g.teleport(fire.x + 2.2, fire.y, fire.z + 6, 0, -0.1);
+  await wait(900);
+  log.awayHint = document.querySelector(".interact")?.textContent;
+  g.key("KeyZ");
   await wait(700);
   await window.__shot("night-door");
   await wait(3500);
@@ -40,7 +47,7 @@
   log.toasts = [...document.querySelectorAll(".toast")].map((t) => t.textContent);
   await g.sync();
   const s = await (await fetch("/api/state", { headers: { authorization: `Bearer ${localStorage.getItem("bailgaadi.token")}` } })).json();
-  log.server = { clockOffset: s.save.clockOffset, sleptDay: s.save.sleptDay, rep: s.save.rep, hour: ((s.serverNow - Date.UTC(2026, 8, 24)) / 600000 * 24 + 6) % 24 };
+  log.server = { clockOffset: s.save.clockOffset, sleptDay: s.save.sleptDay, rep: s.save.rep, hour: g.clockNow().hour };
   await wait(300);
   await window.__shot("night-dawn");
   return log;

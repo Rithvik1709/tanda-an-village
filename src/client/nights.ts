@@ -27,7 +27,11 @@ export class Nights {
     const aamrai = world.plots.find((p) => p.starter)!;
     const ac = { x: (aamrai.x0 + aamrai.x1) / 2, z: (aamrai.z0 + aamrai.z1) / 2 };
     const houses = world.structures.filter((s): s is House => s.kind === "house");
-    const h = houses.sort((a, b) => Math.hypot(a.x0 + a.w / 2 - ac.x, a.z0 + a.d / 2 - ac.z) - Math.hypot(b.x0 + b.w / 2 - ac.x, b.z0 + b.d / 2 - ac.z))[0];
+    // Rathod Bhuvan, if the village has it: your door is the middle one, in the wall behind the verandah
+    const wada = world.structures.find((s) => s.kind === "wada");
+    const h: House = wada
+      ? { kind: "house", x0: wada.x0, z0: Math.floor(wada.z0 + wada.d / 2), w: 4, d: 1, y: wada.y, walls: "whitewash", roof: "tile", door: "E" }
+      : houses.sort((a, b) => Math.hypot(a.x0 + a.w / 2 - ac.x, a.z0 + a.d / 2 - ac.z) - Math.hypot(b.x0 + b.w / 2 - ac.x, b.z0 + b.d / 2 - ac.z))[0];
     const side = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] }[h.door];
     const cx = h.x0 + h.w / 2, cz = h.z0 + h.d / 2;
     const dx = cx + side[0] * (h.w / 2 + 0.06), dz = cz + side[1] * (h.d / 2 + 0.06);

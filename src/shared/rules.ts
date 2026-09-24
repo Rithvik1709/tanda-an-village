@@ -8,7 +8,7 @@ import { FIELD_PLOUGH_MAX } from "./bulls.js";
 import { BULL_NAMES, bullsNow, CART_CAPACITY, FEED, MIN_MOOD, newBulls, PLOUGH_COST, PLOUGH_ROW, TRIP_COST, TRIP_MS } from "./bulls.js";
 import { hash2 } from "./rng.js";
 import type { LedgerEntry, Save } from "./save.js";
-import { clock, DAY_MS, HOUR_MS } from "./time.js";
+import { clock, DAY_MS, msBetween } from "./time.js";
 import { D, H, idx, W, type World } from "./world.js";
 
 /*
@@ -98,7 +98,7 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
 const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends", "tieBulls", "ploughField"]);
 export const isNight = (hour: number) => hour >= 19.5 || hour < 4;
 /** How long until 6 am, from a night hour (ms). */
-export const untilMorning = (hour: number) => ((hour >= 19.5 ? 30 : 6) - hour) * HOUR_MS;
+export const untilMorning = (hour: number) => msBetween(hour, 6);
 
 /** A leaderboard name: 2–20 letters (any script), digits, spaces, dots, dashes or apostrophes. */
 export function cleanName(raw: unknown): string | null {

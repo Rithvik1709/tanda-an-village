@@ -66,7 +66,7 @@ export class TitleScreen {
         <p class="about-note">Roads: © OpenStreetMap contributors. The houses, people and stories are imagined.</p>
       </aside>
       <div class="title-credit">Created by <b>Gajanan Rathod</b></div>
-      <div class="title-keys">WASD walk · mouse look · left click harvest · right click use · E talk · M map · V view · T torch · H help</div>
+      <div class="title-keys">WASD walk · mouse look · left click harvest · right click use · E talk · M map · V view · T torch · Z sleep · H help</div>
       <div class="loading">Preparing the village…</div>`);
     // shrink the title block to fit short screens (a phone in landscape with the browser's bars)
     const fit = () => {

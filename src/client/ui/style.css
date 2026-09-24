@@ -444,4 +444,5 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 .is-touch .goal ul.objectives li { font-size: 10.5px !important; }
 .is-touch .info { top: 8px !important; font-size: 10.5px; padding: 4px 9px !important; }
 .is-touch .toasts { top: 40px; font-size: 12px; }
-.is-touch .goal-arrow { font-size: 10px !important; }
+.is-touch .goal-arrow { font-size: 10px !important; }.board-table small.parts, .board-me small.parts { display: block; font-weight: 500; font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+.board-me small.parts { display: inline; margin-left: 8px; }

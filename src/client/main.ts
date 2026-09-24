@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { inject as injectAnalytics } from "@vercel/analytics";
 import { B, block, BLOCKS, isCropBlock } from "../shared/blocks";
 import { advance, CROPS, msToRipe } from "../shared/crops";
-import { canCapacity, isNight, type Result } from "../shared/rules";
+import { canCapacity, isNight, type Result, untilMorning } from "../shared/rules";
 import { newSave } from "../shared/save";
 import { clock, fmtHour, SEASON_DAYS, SEASON_NAMES } from "../shared/time";
 import { D, generateWorld, H, idx, W, WATER_LEVEL, WORLD_SEED } from "../shared/world";
@@ -935,7 +935,7 @@ async function goHomeToSleep() {
   game.skew += skip; // our clock jumps with the server's (it confirms on the next sync)
   nights.openDoor(true);
   audio.play("place");
-  hud.fade(true, "You sleep soundly at home…");
+  hud.fade(true, nearHome() ? "You sleep soundly at home…" : "You walk home to Rathod Bhuvan and sleep…");
   await new Promise((res) => setTimeout(res, 1600));
   Object.assign(body.pos, { x: nights.home.door.x, y: hf.at(nights.home.door.x, nights.home.door.z), z: nights.home.door.z });
   controls.yaw = nights.home.face + Math.PI;
@@ -947,6 +947,12 @@ async function goHomeToSleep() {
   audio.play("chirp");
   sleeping = false;
 }
+/** Can you still sleep tonight? (once a night, after 7:30 pm) */
+const canSleep = () => isNight(nowHour()) && game.save.sleptDay !== clock(game.now() + untilMorning(clock(game.now()).hour)).day;
+controls.onSleep = () => {
+  if (guide.dialogueOpen || windowOpen() || farmyard.ride) return;
+  void goHomeToSleep();
+};
 controls.onInteract = () => {
   if (guide.dialogueOpen) return;
   if (windowOpen() && !panels.open) return;
@@ -1155,7 +1161,7 @@ renderer.setAnimationLoop(() => {
     refreshSigns();
     if (mode === "play") checkPlotEntry();
     const st = mode === "play" && !panels.open && !farmyard.ride ? nearStall() : undefined;
-    hud.setHint(farmyard.ride || panels.open || ploughJob ? "" : st ? `<kbd>E</kbd> ${st.label}` : cartHint() || (nightK > 0.6 && !torchOn && mode === "play" ? "<kbd>T</kbd> Switch on your torch" : ""));
+    hud.setHint(farmyard.ride || panels.open || ploughJob ? "" : st ? `<kbd>E</kbd> ${st.label}` : cartHint() || (mode === "play" && canSleep() ? "<kbd>Z</kbd> Sleep till morning (you walk home)" : nightK > 0.6 && !torchOn && mode === "play" ? "<kbd>T</kbd> Switch on your torch" : ""));
     hud.setBulls(bullsChip());
     // the watchdog: nothing may leave the player stuck — no pause panel on a phone, controls back when windows close
     if (TOUCH) {

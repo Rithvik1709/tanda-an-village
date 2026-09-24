@@ -47,7 +47,10 @@ export type Structure =
   | { kind: "pir"; x: number; z: number; y: number } // the pir: a roof on four posts, open on all sides
   | { kind: "tank"; x: number; z: number; y: number }
   | { kind: "statue"; x: number; z: number; y: number; facing: number } // Vasantrao Naik, in bronze, in the chowk // the village's overhead water tank, on the tekdi top
-  | { kind: "plate"; x: number; z: number; y: number; facing: number; lines: string[]; color?: string };
+  | { kind: "plate"; x: number; z: number; y: number; facing: number; lines: string[]; color?: string }
+  /** Rathod Bhuvan: a long two-storey wooden wada, three homes under one roof, its back to the lane and
+   *  its carved verandah facing the village (east). The player's home. */
+  | { kind: "wada"; x0: number; z0: number; w: number; d: number; y: number; name: string };
 /** A tree: where it stands, how tall, how wide, and the trunk/root columns it occupies in the voxels. */
 export type Tree = { kind: "neem" | "banyan"; x: number; y: number; z: number; h: number; r: number; trunks: [number, number, number, number][] };
 
@@ -60,7 +63,7 @@ export type World = {
   chowk: { x0: number; z0: number; x1: number; z1: number; y: number };
   trees: Tree[];
   structures: Structure[];
-  landmarks: Record<"spawn" | "temple" | "hanuman" | "school" | "pir" | "tank" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat", Landmark>;
+  landmarks: Record<"spawn" | "temple" | "hanuman" | "school" | "pir" | "tank" | "home" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat", Landmark>;
 };
 
 export const idx = (x: number, y: number, z: number) => x + W * (z + D * y);
@@ -460,6 +463,14 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
     return true;
   };
+  // Rathod Bhuvan and its aangan (front courtyard), in the south-west corner of the gaothan. The houses
+  // that the generator would put here still "reserve" their ground, so the rest of the village is
+  // laid out exactly as before; they're just never built.
+  const WADA = { x0: 83, z0: 116, w: 6, d: 15 };
+  const inWadaZone = (x: number, z: number, w: number, d: number) => {
+    const hit = (ax0: number, az0: number, ax1: number, az1: number) => x <= ax1 && x + w - 1 >= ax0 && z <= az1 && z + d - 1 >= az0;
+    return hit(WADA.x0, WADA.z0, WADA.x0 + WADA.w - 1, WADA.z0 + WADA.d - 1) || hit(WADA.x0 + WADA.w, WADA.z0, WADA.x0 + WADA.w + 6, WADA.z0 + 10);
+  };
   const houseRng = mulberry32(seed ^ 0x40e);
   let houses = 0;
   for (let z = 72; z < 152; z += 1)
@@ -478,9 +489,40 @@ export function generateWorld(seed = WORLD_SEED): World {
           }
         }
       const roofs = houseRng() < 0.3 ? B.THATCH : B.ROOF_TILE;
-      house(x, z, w, d, houseRng() < 0.25 ? B.BRICK : B.WHITEWASH, roofs, bestSide);
+      const walls = houseRng() < 0.25 ? B.BRICK : B.WHITEWASH;
+      if (inWadaZone(x, z, w, d)) {
+        for (let xx = x - 1; xx <= x + w; xx++) for (let zz = z - 1; zz <= z + d; zz++) reserved[col(xx, zz)] = 1;
+        continue;
+      }
+      house(x, z, w, d, walls, roofs, bestSide);
       houses++;
     }
+
+  // Rathod Bhuvan: solid ground-floor walls (back, ends, and the inner front wall with a door for each
+  // of the three homes) and verandah posts, so you can walk the verandah and in at your own door
+  const wada = (() => {
+    const { x0, z0, w, d } = WADA, x1 = x0 + w - 1, z1 = z0 + d - 1, y0 = 16;
+    flatten(x0 - 1, z0 - 1, x1 + 7, z1 + 1, y0 - 1, B.DIRT);
+    for (let z = z0 - 1; z <= z1 + 1; z++) for (let x = x0 - 1; x <= x1 + 7; x++) {
+      for (let y = y0 - 4; y < y0; y++) set(x, y, z, B.DIRT);
+      for (let y = y0; y < y0 + 10; y++) set(x, y, z, B.AIR);
+    }
+    const inner = x0 + 3; // the front wall of the rooms; x0+4 .. x1 is the open verandah
+    const unit = d / 3;
+    const doors = [0, 1, 2].map((i) => Math.floor(z0 + unit * i + unit / 2));
+    for (let y = y0; y < y0 + 6; y++)
+      for (let z = z0; z <= z1; z++)
+        for (let x = x0; x <= inner; x++) {
+          const edge = x === x0 || x === inner || z === z0 || z === z1;
+          if (!edge) continue;
+          if (x === inner && y < y0 + 2 && doors.includes(z)) continue;
+          set(x, y, z, x === inner ? B.PLANKS : B.WHITEWASH);
+        }
+    for (let z = z0; z <= z1; z += 3) for (let y = y0; y < y0 + 3; y++) set(x1, y, z, B.LOG);
+    for (let y = y0; y < y0 + 3; y++) set(x1, y, z1, B.LOG);
+    structures.push({ kind: "wada", x0, z0, w, d, y: y0, name: "Rathod Bhuvan" });
+    return { x: inner + 1, y: y0, z: doors[1] };
+  })();
 
   // the town mandi, where the main road leaves for Jalna in the west
   const market = (() => {
@@ -623,6 +665,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       school: lm(school, "Z.P. school"),
       pir: lm(pir, "Pir Baba"),
       tank: lm(tank, "Water tank"),
+      home: lm(wada, "Rathod Bhuvan"),
       trader: lm(trader, "Trader"),
       seedShop: lm(seedShop, "Seed & tool shop"),
       landOffice: lm(landOffice, "Naik's kacheri"),

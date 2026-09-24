@@ -109,6 +109,7 @@ export class Village {
       else if (s.kind === "tank") this.tank(s, M);
       else if (s.kind === "statue") this.statue(s, M);
       else if (s.kind === "plate") this.plate(s);
+      else if (s.kind === "wada") this.wada(s, M);
     }
     for (const p of plots) this.fence(p, M, groundAt);
     for (const b of this.buckets.values()) {
@@ -527,6 +528,156 @@ export class Village {
   }
 
   /** A painted name board on two posts (Devanagari over English). */
+  /**
+   * Rathod Bhuvan: an old two-storey wooden wada, three homes in one long building. Downstairs, a deep
+   * verandah on pale posts with a wooden front wall and a door for each home; a painted scalloped
+   * frieze between the floors; upstairs, a balcony of carved green posts and cusped arches over
+   * wooden railings with cast-iron lattice panels; a low roof of corrugated metal sheets (patra).
+   */
+  private wada(s: Extract<Structure, { kind: "wada" }>, M: Record<string, () => THREE.Material>) {
+    const { x0, z0, w, d, y } = s;
+    const cz = z0 + d / 2, fx = x0 + w; // the front (east) edge
+    const g0 = y + 0.3, H1 = 2.85, slab = 0.25, g1 = g0 + H1 + slab, H2 = 2.55, top = g1 + H2;
+    const inner = x0 + 4; // the rooms' front wall downstairs
+    const solid = (c: string, o: THREE.MeshStandardMaterialParameters = {}) => () => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75, ...o });
+    Object.assign(M, {
+      post: solid("#e4d6dc"),
+      carved: solid("#3e8c7c", { side: THREE.DoubleSide }),
+      cream2: solid("#f1e2b8", { side: THREE.DoubleSide }),
+      pink: solid("#e39ab4", { side: THREE.DoubleSide }),
+      teal: solid("#2f8f96", { side: THREE.DoubleSide }),
+      lav: solid("#b7a3d6", { side: THREE.DoubleSide }),
+      oldWood: () => mat(TEX.wood(), { color: "#c89468" }),
+      sheet: () => new THREE.MeshStandardMaterial({ map: corrugated(), color: "#b8c2c8", metalness: 0.55, roughness: 0.45, side: THREE.DoubleSide }),
+      lattice: () => new THREE.MeshStandardMaterial({ map: lattice(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.7 }),
+    });
+    // plinth and verandah floor
+    this.box("stone", M.stone, w + 0.5, 0.35, d + 0.5, x0 + w / 2, y + 0.12, cz);
+    // plastered back and end walls, both floors
+    this.box("plaster", M.plaster, 0.3, H1 + slab + H2, d, x0 + 0.15, g0 + (H1 + slab + H2) / 2, cz);
+    for (const ez of [z0 + 0.15, z0 + d - 0.15]) {
+      this.box("plaster", M.plaster, inner - x0, H1, 0.3, (x0 + inner) / 2, g0 + H1 / 2, ez);
+      this.box("plaster", M.plaster, w, H2, 0.3, x0 + w / 2, g1 + H2 / 2, ez);
+    }
+    // downstairs: the wooden front wall, a door and two small windows for each of the three homes
+    this.box("oldWood", M.oldWood, 0.18, H1, d - 0.3, inner - 0.09, g0 + H1 / 2, cz);
+    const unit = d / 3;
+    for (let i = 0; i < 3; i++) {
+      const uz = z0 + unit * i + unit / 2;
+      this.box("dark", M.dark, 0.06, 2.1, 1.05, inner + 0.01, g0 + 1.05, uz);
+      this.box("wood", M.wood, 0.1, 2.25, 0.12, inner + 0.03, g0 + 1.12, uz - 0.58);
+      this.box("wood", M.wood, 0.1, 2.25, 0.12, inner + 0.03, g0 + 1.12, uz + 0.58);
+      this.box("wood", M.wood, 0.12, 0.14, 1.3, inner + 0.03, g0 + 2.25, uz);
+      for (const k of [-1, 1]) {
+        this.box("dark", M.dark, 0.05, 0.8, 0.7, inner + 0.01, g0 + 1.45, uz + k * 1.55);
+        this.put("lattice", M.lattice, new THREE.PlaneGeometry(0.7, 0.8).rotateY(Math.PI / 2), new THREE.Matrix4().makeTranslation(inner + 0.05, g0 + 1.45, uz + k * 1.55));
+      }
+      // a toran over each door, and the bulb
+      this.box("toran", M.toran, 0.1, 0.2, 1.2, inner + 0.08, g0 + 2.45, uz);
+      this.bulb(inner + 0.7, g0 + 2.5, uz);
+    }
+    // the wedding painting by the middle door (शुभविवाह, Ganesh, a kalash)
+    this.box("cream2", M.cream2, 0.04, 0.9, 1.0, inner + 0.03, g0 + 1.0, cz + 1.25);
+    this.box("sindoor", M.sindoor, 0.05, 0.12, 0.5, inner + 0.04, g0 + 1.25, cz + 1.25);
+    this.box("marigold", M.marigold, 0.05, 0.3, 0.2, inner + 0.04, g0 + 0.8, cz + 1.25);
+    // verandah posts, and the wooden stair up to the balcony at the north end
+    const bays = 6, bay = (d - 0.4) / bays;
+    const posts = Array.from({ length: bays + 1 }, (_, i) => z0 + 0.2 + i * bay);
+    for (const pz of posts) {
+      this.box("post", M.post, 0.22, H1, 0.22, fx - 0.25, g0 + H1 / 2, pz);
+      this.box("post", M.post, 0.34, 0.16, 0.34, fx - 0.25, g0 + 0.08, pz);
+    }
+    for (const k of [0, 1]) {
+      const rail = new THREE.BoxGeometry(0.08, 0.08, 3.9);
+      const at = new THREE.Matrix4().makeRotationX(-0.83).setPosition(inner + 0.35 + k * 0.7, g0 + H1 / 2, z0 + 0.35 + 1.3);
+      this.put("wood", M.wood, rail, at);
+    }
+    for (let i = 1; i < 11; i++) this.box("wood", M.wood, 0.78, 0.06, 0.22, inner + 0.7, g0 + i * (H1 / 11), z0 + 0.35 + 2.75 - i * (2.6 / 11));
+    // the floor between, with the painted frieze of scallops along its edge
+    this.box("oldWood", M.oldWood, w + 0.3, slab, d, x0 + w / 2 + 0.15, g0 + H1 + slab / 2, cz);
+    this.box("teal", M.teal, 0.06, 0.5, d, fx + 0.18, g0 + H1 - 0.05, cz);
+    const colours = ["pink", "cream2", "teal", "lav", "cream2"];
+    for (let i = 0, zz = z0 + 0.25; zz < z0 + d - 0.2; i++, zz += 0.5) {
+      const k = colours[i % colours.length];
+      this.put(k, M[k], new THREE.CircleGeometry(0.24, 12, Math.PI, Math.PI).rotateY(Math.PI / 2), new THREE.Matrix4().makeTranslation(fx + 0.22, g0 + H1 + 0.12, zz));
+    }
+    this.box("cream2", M.cream2, 0.05, 0.08, d, fx + 0.22, g0 + H1 + 0.17, cz);
+    // upstairs: wooden walls with lattice windows, set back behind the balcony
+    this.box("oldWood", M.oldWood, 0.16, H2, d - 0.3, inner + 0.3, g1 + H2 / 2, cz);
+    for (let i = 0; i < 3; i++) {
+      const uz = z0 + unit * i + unit / 2;
+      this.box("wood", M.wood, 0.06, 2.0, 1.0, inner + 0.4, g1 + 1.0, uz - 0.9);
+      this.box("dark", M.dark, 0.05, 1.1, 1.0, inner + 0.4, g1 + 1.35, uz + 0.8);
+      this.put("lattice", M.lattice, new THREE.PlaneGeometry(1.0, 1.1).rotateY(Math.PI / 2), new THREE.Matrix4().makeTranslation(inner + 0.44, g1 + 1.35, uz + 0.8));
+    }
+    // the balcony: carved green posts, railings with lattice panels, and cusped arches between the posts
+    for (const pz of posts) {
+      this.box("carved", M.carved, 0.2, H2, 0.2, fx - 0.1, g1 + H2 / 2, pz);
+      this.box("carved", M.carved, 0.3, 0.12, 0.3, fx - 0.1, g1 + 1.05, pz);
+      this.box("cream2", M.cream2, 0.3, 0.14, 0.3, fx - 0.1, top - 0.95, pz);
+    }
+    this.box("wood", M.wood, 0.14, 0.1, d, fx - 0.1, g1 + 1.0, cz);
+    this.box("wood", M.wood, 0.14, 0.1, d, fx - 0.1, g1 + 0.08, cz);
+    for (let i = 0; i < bays; i++) {
+      const mz = posts[i] + bay / 2, pw = bay - 0.3;
+      if (i % 2 === 0) this.put("lattice", M.lattice, new THREE.PlaneGeometry(pw, 0.86).rotateY(Math.PI / 2), new THREE.Matrix4().makeTranslation(fx - 0.1, g1 + 0.55, mz));
+      else for (let b = -pw / 2 + 0.1; b <= pw / 2 - 0.05; b += 0.16) this.box("cream2", M.cream2, 0.04, 0.86, 0.05, fx - 0.1, g1 + 0.55, mz + b);
+      const arch = new THREE.Shape();
+      const hw = bay / 2 - 0.1, ah = 0.95;
+      arch.moveTo(-hw, 0);
+      arch.lineTo(-hw, ah);
+      arch.lineTo(hw, ah);
+      arch.lineTo(hw, 0);
+      // a cusped arch: three little lobes along the curve
+      for (let k = 0; k <= 12; k++) {
+        const t = k / 12, a = t * Math.PI, lobe = 0.06 * Math.abs(Math.sin(t * Math.PI * 3));
+        arch.lineTo(Math.cos(a) * (hw - lobe), Math.sin(a) * (ah * 0.72 - lobe));
+      }
+      const geo = new THREE.ShapeGeometry(arch).rotateY(Math.PI / 2);
+      this.put("carved", M.carved, geo, new THREE.Matrix4().makeTranslation(fx - 0.02, top - ah - 0.05, mz));
+    }
+    this.box("oldWood", M.oldWood, 0.2, 0.18, d + 0.2, fx - 0.1, top - 0.02, cz);
+    // the roof: corrugated sheets on a low ridge, overhanging front and back
+    const ridgeX = x0 + w * 0.45, rise = 0.75;
+    for (const [a, b] of [[x0 - 0.45, ridgeX], [ridgeX, fx + 0.6]]) {
+      const run = b - a, len = Math.hypot(run, rise), tilt = Math.atan2(rise, run) * (a < ridgeX ? 1 : -1);
+      const sheet = new THREE.BoxGeometry(len, 0.04, d + 0.6);
+      this.put("sheet", M.sheet, sheet, new THREE.Matrix4().makeRotationZ(tilt).setPosition((a + b) / 2, top + 0.1 + rise / 2, cz));
+    }
+    for (const ez of [z0 + 0.15, z0 + d - 0.15]) {
+      const tri = new THREE.Shape([new THREE.Vector2(x0, 0), new THREE.Vector2(fx, 0), new THREE.Vector2(ridgeX, rise)]);
+      this.put("plaster", M.plaster, new THREE.ShapeGeometry(tri), new THREE.Matrix4().makeTranslation(0, top + 0.05, ez));
+    }
+    // the name board over the frieze: राठोड भुवन · Rathod Bhuvan
+    const c = document.createElement("canvas");
+    c.width = 512;
+    c.height = 128;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "#7a1f1f";
+    g.fillRect(0, 0, 512, 128);
+    g.strokeStyle = "#f1d58a";
+    g.lineWidth = 6;
+    g.strokeRect(7, 7, 498, 114);
+    g.fillStyle = "#fff4d6";
+    g.textAlign = "center";
+    g.font = "700 50px 'Noto Sans Devanagari', 'Kohinoor Devanagari', system-ui";
+    g.fillText("राठोड भुवन", 256, 62);
+    g.font = "600 28px Georgia, serif";
+    g.fillText("RATHOD BHUVAN", 256, 104);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.65), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
+    board.rotation.y = Math.PI / 2;
+    board.position.set(fx + 0.36, g0 + H1 + 0.02, cz);
+    this.group.add(board);
+    // the aangan: a tulsi vrindavan in front of the house
+    const tx = fx + 3, tz = cz;
+    this.box("cream", M.cream, 0.7, 0.9, 0.7, tx, y + 0.45, tz);
+    this.box("sindoor", M.sindoor, 0.72, 0.1, 0.72, tx, y + 0.85, tz);
+    for (let i = 0; i < 7; i++) this.put("sprouts", M.sprouts, new THREE.SphereGeometry(0.14, 8, 6), new THREE.Matrix4().makeTranslation(tx + Math.cos(i * 0.9) * 0.14, y + 1.05 + (i % 3) * 0.12, tz + Math.sin(i * 0.9) * 0.14));
+  }
+
   private plate(s: Extract<Structure, { kind: "plate" }>) {
     const c = document.createElement("canvas");
     c.width = 512;
@@ -663,4 +814,56 @@ function hipRoof(w: number, d: number, h: number, thick: number) {
   g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
   g.computeVertexNormals();
   return g;
+}
+
+/** Corrugated metal: bright and dark ribs, weathered in patches. */
+function corrugated() {
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 64;
+  const g = c.getContext("2d")!;
+  for (let x = 0; x < 256; x++) {
+    const v = 150 + Math.round(70 * Math.sin((x / 256) * Math.PI * 2 * 20));
+    g.fillStyle = `rgb(${v},${v + 6},${v + 12})`;
+    g.fillRect(x, 0, 1, 64);
+  }
+  g.fillStyle = "rgba(140,90,50,0.18)";
+  for (let i = 0; i < 12; i++) g.fillRect((i * 53) % 256, (i * 29) % 64, 30, 10);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.rotation = Math.PI / 2; // ribs run down the slope
+  return t;
+}
+
+/** A cast-iron grill of circles and scrolls, see-through between the bars. */
+function lattice() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d")!;
+  g.strokeStyle = "#6b4a30";
+  g.lineWidth = 5;
+  g.strokeRect(2, 2, 124, 124);
+  g.lineWidth = 3;
+  for (let y = 16; y < 128; y += 32)
+    for (let x = 16; x < 128; x += 32) {
+      g.beginPath();
+      g.arc(x, y, 12, 0, Math.PI * 2);
+      g.stroke();
+      g.fillStyle = "#f4efe6";
+      g.beginPath();
+      g.arc(x, y, 3.5, 0, Math.PI * 2);
+      g.fill();
+    }
+  g.beginPath();
+  for (let k = 32; k < 128; k += 32) {
+    g.moveTo(k, 0);
+    g.lineTo(k, 128);
+    g.moveTo(0, k);
+    g.lineTo(128, k);
+  }
+  g.stroke();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }

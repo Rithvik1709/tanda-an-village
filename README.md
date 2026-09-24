@@ -2,6 +2,8 @@
 
 **A cinematic farming game set in Ukhali Tanda, a Banjara village in Jalna, Maharashtra.**
 
+Your home is **Rathod Bhuvan**, an old two-storey wooden wada at the edge of the village.
+
 You come home from the city to your Dada's fallow field. Plough the black soil, grow jowar, onion
 and sugarcane, carry water from the vihir, cart your harvest to the mandi the old Banjara caravan
 way, buy land, stand in the panchayat election, and lead your bulls in the Bail Pola procession.
@@ -69,6 +71,8 @@ Created by **[Gajanan Rathod](https://github.com/gajanansr)**.
 | **T** | torch |
 | **R** | cart |
 | **F** | feed or decorate the bulls |
+| **G** / **P** | tie the bulls / let them plough the field |
+| **Z** | sleep till morning (at night, from anywhere) |
 | **H** | help |
 
 The goal card (top left) and the golden marker always show what to do next.

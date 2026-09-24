@@ -43,6 +43,11 @@ export class Panels {
     parent.appendChild(this.el);
     this.el.addEventListener("click", (e) => this.click(e));
     this.el.addEventListener("keydown", (e) => e.stopPropagation());
+    // a number you typed stays put while the panel redraws around it (it redraws on every save)
+    this.el.addEventListener("input", (e) => {
+      const t = e.target as HTMLInputElement;
+      if (t.tagName === "INPUT") t.dataset.dirty = "1";
+    });
   }
 
   show(kind: PanelKind, tab?: string) {
@@ -106,10 +111,20 @@ export class Panels {
       const input = this.el.querySelector("input[data-borrow]") as HTMLInputElement | null;
       const amount = b ? Number(b) : Math.round(Number(input?.value.replace(/[^0-9]/g, "")) / 100) * 100;
       r = this.ctx.act({ t: "borrow", lender: a as Lender, amount });
+      if (r.ok && input) delete input.dataset.dirty;
     } else if (what === "repay") {
       const loan = s.loans.find((l) => l.id === Number(a));
-      const amount = b === "all" && loan ? owed(loan, this.ctx.now()) : Number(b);
+      if (!loan) return this.ctx.toast("That loan is already paid off.", "ok");
+      const due = owed(loan, this.ctx.now());
+      const input = this.el.querySelector(`input[data-repay="${a}"]`) as HTMLInputElement | null;
+      const typed = Math.floor(Number(input?.value.replace(/[^0-9]/g, "")) || 0);
+      // "all": offer everything you have — the lender takes exactly what's owed at its own clock,
+      // so a few seconds' interest can't leave a rupee or two hanging on the loan
+      const amount = b === "all" ? s.money : b === "typed" ? typed : Number(b);
+      if (amount < 1) return this.ctx.toast("How much do you want to repay?", "bad");
+      if (b === "all" && s.money < due) return this.ctx.toast(`You owe ${rs(due)} but have ${rs(s.money)}.`, "bad");
       r = this.ctx.act({ t: "repay", loan: Number(a), amount: Math.min(amount, s.money) });
+      if (r.ok && input) delete input.dataset.dirty;
     } else if (what === "store" || what === "withdraw") {
       const input = this.el.querySelector(`input[data-gd="${a}"]`) as HTMLInputElement | null;
       const n = b === "all" ? (what === "store" ? (s.inv[a] ?? 0) : (s.godown[a]?.n ?? 0)) : Math.floor(Number(input?.value) || 0);
@@ -164,6 +179,12 @@ export class Panels {
           : `<h2>Sitabai's seeds &amp; tools <small>बी-बियाणे</small></h2><p class="lede">"Ram Ram! Good seed, good harvest. And my Khillari bulls pull a cart like our caravans of old."</p>`;
     const body =
       this.open === "kamlabai" || this.open === "shankar" ? `<p class="hint">${current(s)?.id === "election" ? "Listen to both candidates, attend the gram sabha at the school, then decide." : "The election is over."}</p>` : this.tab === "offer" ? this.offer(s) : this.tab === "loans" ? this.loans(s, day, this.open === "bank" ? "bank" : "sahukar") : this.tab === "godown" ? this.godown(s) : this.tab === "worth" ? this.worth(s, day) : this.tab === "load" ? this.load(s, day) : this.tab === "mandi" || this.tab === "sold" ? this.mandi(s, day) : this.tab === "sell" ? this.sell(s, day) : this.tab === "prices" ? this.prices(day) : this.tab === "ledger" ? this.ledger(s, day) : this.tab === "plots" ? this.plots(s, day) : this.tab === "mine" ? this.mine(s, day) : this.buy(s);
+    // keep what the player is typing (and where the cursor is) across the redraw
+    const keyOf = (i: HTMLInputElement) => [...i.attributes].filter((a) => a.name.startsWith("data-") && a.name !== "data-dirty").map((a) => `${a.name}=${a.value}`).join("&");
+    const typed = new Map<string, string>();
+    this.el.querySelectorAll<HTMLInputElement>("input[data-dirty]").forEach((i) => typed.set(keyOf(i), i.value));
+    const focus = document.activeElement instanceof HTMLInputElement && this.el.contains(document.activeElement) ? { key: keyOf(document.activeElement), at: document.activeElement.selectionStart } : null;
+    const scroll = this.el.querySelector(".panel-card")?.scrollTop ?? 0;
     this.el.innerHTML = `
       <div class="panel-card">
         <button class="x" data-do="close" title="Close (E)">✕</button>
@@ -172,6 +193,19 @@ export class Panels {
         <div class="panel-body">${body}</div>
         <div class="panel-foot">E or Esc to close</div>
       </div>`;
+    this.el.querySelectorAll<HTMLInputElement>("input").forEach((i) => {
+      const k = keyOf(i);
+      if (typed.has(k)) {
+        i.value = typed.get(k)!;
+        i.dataset.dirty = "1";
+      }
+      if (focus && focus.key === k) {
+        i.focus();
+        try { i.setSelectionRange(focus.at, focus.at); } catch { /* number inputs have no selection */ }
+      }
+    });
+    const card = this.el.querySelector(".panel-card");
+    if (card) card.scrollTop = scroll;
   }
 
   private sell(s: Save, day: number) {
@@ -276,7 +310,7 @@ export class Panels {
           const left = (l.dueAt - now) / DAY_MS;
           const when = left >= 0 ? `due in ${left < 1 ? "under a day" : `${Math.floor(left)} day${Math.floor(left) === 1 ? "" : "s"}`}` : `<b class="down">overdue ${Math.ceil(-left)} day${Math.ceil(-left) === 1 ? "" : "s"} — late fee and double interest</b>`;
           return `<div class="plot-card"><div class="plot-head"><b>${rs(l.principal)} borrowed</b><span>you owe <b>${rs(due)}</b></span></div><small>${when}</small>
-            <div class="acts"><button data-do="repay:${l.id}:1000" ${s.money >= 1 ? "" : "disabled"}>Repay ₹1,000</button><button data-do="repay:${l.id}:all" ${s.money >= due ? "" : "disabled"}>Pay it all off</button></div></div>`;
+            <div class="acts list-row">Repay <span class="rupee">₹</span><input data-repay="${l.id}" value="${Math.min(due, Math.max(0, s.money))}" inputmode="numeric"><button data-do="repay:${l.id}:typed" ${s.money >= 1 ? "" : "disabled"}>Repay</button><button data-do="repay:${l.id}:all" ${s.money >= due ? "" : "disabled"}>Pay it all off (${rs(due)})</button></div></div>`;
         }).join("")
       : `<p class="empty">No loans from ${L.name}.</p>`;
     const terms = `${Math.round(L.rate * 100)}% a day, due in ${L.termDays} days; late: ${Math.round(L.lateFee * 100)}% fee and double interest.`;
