@@ -1,0 +1,26 @@
+name: Bug report
+description: Something in the game is broken or wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead.
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we see it?
+      description: Where in the village, which mission, what you pressed.
+      placeholder: "1. Go to Aamrai  2. Press 3 for the can  3. Right-click the soil…"
+  - type: textarea
+    id: shot
+    attributes:
+      label: Screenshot
+      description: Paste one if you can. It helps a lot.
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and computer
+      placeholder: "Chrome 140 on a MacBook Air"

@@ -1,0 +1,15 @@
+name: Idea or feature
+description: A new crop, mission, festival, building, or anything else
+labels: [idea]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What should be in the game, and why would it be fun?
+    validations: { required: true }
+  - type: textarea
+    id: village
+    attributes:
+      label: How it is in a real tanda (optional)
+      description: If it's based on real village life, tell us how it really works or looks.

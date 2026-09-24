@@ -1,0 +1,15 @@
+name: Culture or accuracy correction
+description: Something about Banjara life, Ukhali or Marathwada looks or feels wrong
+labels: [culture]
+body:
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What's not right?
+      description: A name, clothing, a festival, a building, a word, how people do things…
+    validations: { required: true }
+  - type: textarea
+    id: right
+    attributes:
+      label: How it really is
+      description: Photos or references are welcome, but not required.
