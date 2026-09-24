@@ -484,3 +484,8 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 .play-prompt .code-fold { margin-top: 8px; font-size: 12px; }
 .play-prompt .code-fold summary { cursor: pointer; opacity: 0.75; }
 .account-card .big-code { display: block; margin-top: 10px; font: 700 20px ui-monospace, Menlo, monospace; color: var(--gold-2, #f1d58a); letter-spacing: 0.06em; }
+.title-credit .legal a { color: inherit; opacity: 0.75; text-decoration: none; pointer-events: auto; }
+.title-credit .legal a:hover { opacity: 1; text-decoration: underline; }
+.title-credit { pointer-events: auto; }
+.account-card .ac-legal { font-size: 11.5px; color: var(--ink-2); margin: 6px 0 0; }
+.account-card .ac-legal a { color: var(--ink-2); }

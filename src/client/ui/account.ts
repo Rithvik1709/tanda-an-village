@@ -104,6 +104,7 @@ export class AccountCard {
       <div class="ac-or"><span>or</span></div>
       <form class="ac-email"><input type="email" name="email" placeholder="you@example.com" autocomplete="email" inputmode="email" required><button>Email me a link</button></form>
       <div class="ac-msg"></div>
+      <p class="ac-legal">By signing in you agree to the <a href="/terms" target="_blank" rel="noopener">terms</a>. We keep only your email to save your farm: <a href="/privacy" target="_blank" rel="noopener">privacy</a>.</p>
       ${prompted ? `<button class="ac-later" data-later>Maybe later</button>` : ""}
       <details class="ac-code"><summary>Or keep your recovery code</summary><p>Without signing in, this code is the only way back to your farm: <code>${esc(code)}</code></p></details></div>`;
   }

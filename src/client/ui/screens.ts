@@ -66,7 +66,7 @@ export class TitleScreen {
         <p>The Banjaras once crossed the Deccan in ox caravans carrying salt and grain. Today the tanda farms jowar, onion and sugarcane with bulls and electric pumps and drip lines. It gathers at the Sevalal Maharaj mandir for Teej, and honours its bulls at Pola.</p>
         <p class="about-note">Roads: © OpenStreetMap contributors. The houses, people and stories are imagined.</p>
       </aside>
-      <div class="title-credit">Created by <b>Gajanan Rathod</b></div>
+      <div class="title-credit">Created by <b>Gajanan Rathod</b> <span class="legal">· <a href="/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="/terms" target="_blank" rel="noopener">Terms</a></span></div>
       <div class="title-keys">WASD walk · mouse look · left click harvest · right click use · E talk · M map · V view · T torch · Z sleep · H help</div>
       <div class="loading">Preparing the village…</div>`);
     // shrink the title block to fit short screens (a phone in landscape with the browser's bars)
