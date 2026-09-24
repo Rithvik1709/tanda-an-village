@@ -345,6 +345,8 @@ export function generateWorld(seed = WORLD_SEED): World {
     return { x: cx, y: y0 + 1, z: cz + 2 };
   };
   const well = makeWell(WELLS[0][0], WELLS[0][1]);
+  // an open clearing round the village well, where women gather to draw water
+  for (let dz = -5; dz <= 5; dz++) for (let dx = -5; dx <= 5; dx++) if (Math.hypot(dx, dz) <= 5.2) reserved[col(WELLS[0][0] + dx, WELLS[0][1] + dz)] = 2;
   const vihir = makeWell(WELLS[1][0], WELLS[1][1]);
 
   // the rest of the gaothan: houses packed along the lanes, each door facing the nearest lane
@@ -355,7 +357,7 @@ export function generateWorld(seed = WORLD_SEED): World {
         if (x < 1 || z < 1 || x >= W - 1 || z >= D - 1) return false;
         const c = col(x, z);
         const inner = x >= x0 && x < x0 + w && z >= z0 && z < z0 + d;
-        if (roadCells[c] || plotMap[c] >= 0 || !inVillage(x, z) || (inner && reserved[c])) return false;
+        if (roadCells[c] || plotMap[c] >= 0 || !inVillage(x, z) || (inner && reserved[c]) || (!inner && reserved[c] === 2)) return false;
       }
     return true;
   };

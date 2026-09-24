@@ -217,7 +217,7 @@ export class Figure {
 
   /** speed in m/s drives the gait; call every frame. */
   /** What a villager is doing: the arms and body pose on top of the walk. */
-  action: "none" | "hoe" | "bend" | "carry" | "sit" = "none";
+  action: "none" | "hoe" | "bend" | "carry" | "sit" | "draw" = "none";
   private props = new Map<string, THREE.Object3D>();
 
   /** Give the figure something to hold: a hoe (kudal) in the hands, or a clay pot (matka) on the head. */
@@ -282,6 +282,14 @@ export class Figure {
       // one hand steadies the pot on the head
       this.shoulders[0].rotation.x = -2.9;
       this.elbows[0].rotation.x = -0.9;
+    } else if (this.action === "draw") {
+      // hauling the bucket rope up hand over hand
+      const c = Math.sin(this.t * 3.2);
+      this.shoulders[0].rotation.x = -1.9 + c * 0.5;
+      this.shoulders[1].rotation.x = -1.9 - c * 0.5;
+      this.elbows[0].rotation.x = -0.6 - Math.max(0, c) * 0.5;
+      this.elbows[1].rotation.x = -0.6 - Math.max(0, -c) * 0.5;
+      this.body.rotation.x = 0.12 + Math.abs(c) * 0.05;
     } else if (this.action === "sit") {
       this.hips[0].rotation.x = this.hips[1].rotation.x = -1.5;
       this.knees[0].rotation.x = this.knees[1].rotation.x = 1.5;

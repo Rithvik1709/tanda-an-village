@@ -31,6 +31,12 @@ export class Heightfield {
         if (x >= ch.x0 && x <= ch.x1 && z >= ch.z0 && z <= ch.z1) colTop[x + W * z] = Math.max(colTop[x + W * z], ch.y + 1);
         this.surface[x + W * z] = v[x + W * (z + D * y)];
       }
+    // wells: the ground around the ring stays level (the shaft is inside the ring, not in the ground)
+    for (const st of world.structures)
+      if (st.kind === "well") for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+        const X = st.x + dx, Z = st.z + dz;
+        if (X >= 0 && Z >= 0 && X < W && Z < D) colTop[X + W * Z] = st.y;
+      }
     const n = this.n;
     const h = new Float32Array(n * n);
     const pinned = new Uint8Array(n * n);

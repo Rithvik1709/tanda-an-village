@@ -35,6 +35,7 @@ import { bullsMoodWord, bullsNow } from "../shared/bulls";
 import { isOverdue, netWorth, TITLES, titleFor } from "../shared/bank";
 import { Farmyard } from "./farmyard";
 import { Villagers } from "./villagers";
+import { Nav, separate } from "./player/nav";
 import { Audio, renderRms, SOUNDS } from "./audio";
 import { Guide } from "./ui/guide";
 import { isTouchOnly, loadSettings, SettingsPanel, showMobileNote, TitleScreen, Tutorial } from "./ui/screens";
@@ -273,7 +274,11 @@ const NEIGHBOURS = [
   new Npc({ kurta: "#f1ead9", dhoti: "#e9e1cd", hat: "#f2f2ee", hatTall: true }, 99.5, hf.at(99.5, 124), 124, 1.2), // under the banyan
 ];
 for (const n of NEIGHBOURS) scene.add(n.group);
-const villagers = new Villagers(world, (x, z) => hf.at(x, z));
+const nav = new Nav(vox, (x, z) => hf.at(x, z));
+const villagers = new Villagers(world, (x, z) => hf.at(x, z), nav);
+// stall keepers and the neighbours by the well stand still; everyone else keeps clear of them
+const fixedBodies = [...STALLS.map((s) => s.npc), ...NEIGHBOURS].map((n) => ({ pos: { x: n.group.position.x, z: n.group.position.z }, r: 0.34, fixed: true }));
+const playerBody = { pos: { x: 0, z: 0 }, r: 0.32 };
 scene.add(villagers.group);
 const panels = new Panels(document.getElementById("ui")!, {
   save: () => game.save,
@@ -615,7 +620,10 @@ function view(name: keyof typeof VIEWS) {
 }
 
 const post = new Post(renderer, scene, camera);
-const rig = new CameraRig(camera, (x, z) => hf.at(x, z));
+const rig = new CameraRig(camera, (x, z) => hf.at(x, z), (x, y, z) => {
+  const id = get(x, y, z);
+  return !!id && !TERRAIN.has(id) && block(id).solid && block(id).opaque;
+});
 function resize() {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   post.setSize(window.innerWidth, window.innerHeight);
@@ -704,6 +712,18 @@ renderer.setAnimationLoop(() => {
   const tv0 = performance.now();
   villagers.update(dt, now / 1000, hourOverride ?? clock(game.now()).hour, game.save, clock(game.now()).day, game.now(), camera.position);
   prof.villagers = prof.villagers * 0.95 + (performance.now() - tv0) * 0.05;
+  // nobody walks through anybody: villagers, the stall keepers, and you
+  if (mode === "play" && !farmyard.ride) {
+    playerBody.pos.x = body.pos.x;
+    playerBody.pos.z = body.pos.z;
+    const people = villagers.bodies();
+    separate([...people, ...fixedBodies, playerBody], nav);
+    for (const v of people) v.place((x, z) => hf.at(x, z));
+    if (!walker.blockedAt(playerBody.pos.x, playerBody.pos.z)) {
+      body.pos.x = playerBody.pos.x;
+      body.pos.z = playerBody.pos.z;
+    }
+  }
   farmer.root.position.set(body.pos.x, body.pos.y, body.pos.z);
   farmer.root.rotation.y = body.heading;
   farmer.visible = mode !== "title" && (rig.view === "third" || !!farmyard.ride);

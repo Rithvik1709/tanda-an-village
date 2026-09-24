@@ -99,6 +99,11 @@ export class Walker {
     if (this.wading <= 1.4 && this.pos.y < floor) this.pos.y = floor;
   }
 
+  /** Would a body standing at (x, z) at the current height overlap a wall? */
+  blockedAt(x: number, z: number) {
+    return this.hits(x, this.pos.y, z);
+  }
+
   get speed() {
     return Math.hypot(this.vel.x, this.vel.z);
   }
