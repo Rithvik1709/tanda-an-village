@@ -177,3 +177,22 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .tutorial { display: none !important; }
 .welcome { z-index: 30; background: rgba(20,14,10,0.55); }
 .map-credit { font-size: 10px; opacity: 0.55; margin-top: 4px; }
+.order-card { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 12px; margin-bottom: 10px; border-radius: 10px; background: #fbe3b8; font-size: 14px; }
+.order-card button { font: 600 13px system-ui; padding: 6px 12px; border-radius: 7px; border: 0; background: #b8553a; color: #fff; cursor: pointer; }
+.order-card button:disabled { background: #c8bca4; }
+.dialogue { z-index: 25; background: rgba(20,14,10,0.45); }
+.dialogue .dlg-who { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #9a6a10; }
+.dialogue h2 small { font-size: 13px; opacity: 0.6; margin-left: 6px; font-weight: 500; }
+.dialogue .dlg-text { font-size: 16px; line-height: 1.55; font-style: italic; margin: 12px 0; }
+.dialogue .big-acts { flex-wrap: wrap; }
+.dialogue .big-acts button small { display: block; font-size: 11px; font-weight: 500; opacity: 0.85; }
+.goal ul.objectives { list-style: none; padding: 0; margin: 6px 0 2px; display: flex; flex-direction: column; gap: 5px; }
+.goal ul.objectives li { font-size: 13.5px; line-height: 1.35; display: flex; gap: 7px; opacity: 0.6; }
+.goal ul.objectives li.now { opacity: 1; font-weight: 600; }
+.goal ul.objectives li.done { opacity: 0.55; text-decoration: line-through; }
+.goal ul.objectives li i { flex: 0 0 16px; height: 16px; border-radius: 4px; border: 2px solid #9a6a10; font-style: normal; font-size: 11px; line-height: 12px; text-align: center; color: #2f7a2f; }
+.goal ul.objectives em { font-style: normal; color: #9a6a10; margin-left: auto; font-weight: 700; }
+.goal b small { font-size: 11px; opacity: 0.6; font-weight: 500; }
+.goal-deadline { font-size: 13px; font-weight: 700; color: #b0452a; }
+.goal-missed { font-size: 12px; color: #b0452a; }
+.rep { color: #cfe8a8; font-weight: 700; }

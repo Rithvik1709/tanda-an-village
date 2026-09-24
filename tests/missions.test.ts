@@ -1,0 +1,139 @@
+import { describe, expect, it } from "vitest";
+import { BANDH_PLOT, complete, current, MISSIONS } from "../src/shared/missions";
+import { apply, type Action } from "../src/shared/rules";
+import { newSave, type Save } from "../src/shared/save";
+import { DAY_MS, EPOCH, HOUR_MS } from "../src/shared/time";
+import { generateWorld } from "../src/shared/world";
+
+const world = generateWorld();
+const starter = world.plots.find((p) => p.starter)!;
+const wells = world.structures.filter((q) => q.kind === "well") as { x: number; y: number; z: number }[];
+let now = EPOCH + 4 * DAY_MS + 3 * HOUR_MS; // 9 am
+const ok = (s: Save, a: Action) => {
+  const r = apply(world, s, a, now);
+  if (!r.ok) throw new Error(`${a.t}: ${r.error}`);
+  return r;
+};
+const no = (s: Save, a: Action) => expect(apply(world, s, a, now).ok).toBe(false);
+const cells = (n: number, row = 4) => Array.from({ length: n }, (_, i) => ({ x: starter.x0 + 2 + i, y: starter.y, z: starter.z0 + row }));
+const grow = (s: Save, crop: "onion" | "jowar", n: number, row: number) => {
+  s.inv[`seed:${crop}`] = (s.inv[`seed:${crop}`] ?? 0) + n;
+  for (const c of cells(n, row)) {
+    if (!s.farm[String(c.x + 192 * (c.z + 192 * c.y))]) ok(s, { t: "till", ...c });
+    ok(s, { t: "plant", ...c, crop });
+  }
+  now += 12 * DAY_MS; // long enough even dry
+  for (const c of cells(n, row)) ok(s, { t: "harvest", ...c });
+};
+
+describe("the ten missions", () => {
+  it("can be played through in order, with rewards granted only when complete", () => {
+    const s = newSave("m", world, now);
+    expect(current(s).id).toBe("homecoming");
+    no(s, { t: "claimMission" });
+    // 1 homecoming
+    ok(s, { t: "talk", npc: "naik" });
+    ok(s, { t: "visit", place: "aamrai" });
+    for (const c of cells(6)) ok(s, { t: "till", ...c });
+    const m0 = s.money;
+    ok(s, { t: "claimMission" });
+    expect(s.money).toBe(m0 + 200);
+    // 2 first crop: the sickle adds one to each harvest
+    grow(s, "onion", 6, 4);
+    ok(s, { t: "visit", place: "prices" });
+    ok(s, { t: "sell", item: "onion", n: 6, where: "village" });
+    ok(s, { t: "claimMission" });
+    expect(s.inv.sickle).toBe(1);
+    // 3 water: the village well is queued, the vihir works
+    s.inv.water = 0;
+    no(s, { t: "refill", x: wells[0].x, y: wells[0].y - 2, z: wells[0].z });
+    ok(s, { t: "refill", x: wells[1].x, y: wells[1].y - 2, z: wells[1].z });
+    s.inv.water = 32;
+    for (let i = 0; i < 16; i++) ok(s, { t: "water", ...cells(6)[i % 6] });
+    ok(s, { t: "claimMission" });
+    expect(s.inv.bigcan).toBe(1);
+    // 4 Sitabai's order — miss the deadline once, then make it
+    now += 4 * DAY_MS;
+    grow(s, "jowar", 4, 6); // any action after the deadline restarts the mission
+    expect(s.missions.flags.missed).toBe(true);
+    s.inv.jowar = 20;
+    ok(s, { t: "deliver", to: "sitabai", item: "jowar", n: 20 });
+    ok(s, { t: "claimMission" });
+    expect(s.perks).toContain("discount");
+    const before = s.money;
+    ok(s, { t: "buy", item: "seed:onion", n: 10 });
+    expect(before - s.money).toBe(48); // 20% off ₹60
+    // 5 the bulls
+    s.money += 10000;
+    ok(s, { t: "buy", item: "bulls", n: 1 });
+    ok(s, { t: "buy", item: "plough", n: 1 });
+    ok(s, { t: "buy", item: "fodder", n: 5 });
+    ok(s, { t: "feed" });
+    ok(s, { t: "plough", x: starter.x0 + 2, y: starter.y, z: starter.z0 + 10, dir: "x+" });
+    ok(s, { t: "claimMission" });
+    // 6 Teej: offerings, and the night gathering (refused by day)
+    s.inv.jowar = 10;
+    s.inv.onion = 10;
+    ok(s, { t: "deliver", to: "mandir", item: "jowar", n: 10 });
+    ok(s, { t: "deliver", to: "mandir", item: "onion", n: 10 });
+    no(s, { t: "visit", place: "teej" });
+    now += 11 * HOUR_MS; // 8 pm
+    ok(s, { t: "visit", place: "teej" });
+    ok(s, { t: "claimMission" });
+    expect(s.inv.jhool).toBe(1);
+    // 7 the caravan: sell 50 in town before 2 pm
+    now += 14 * HOUR_MS; // 10 am next day
+    s.inv.cart = 1;
+    s.inv.jowar = 60;
+    ok(s, { t: "feed" });
+    ok(s, { t: "startTrip", load: { jowar: 60 } });
+    now += 60_000;
+    ok(s, { t: "sellTown" });
+    ok(s, { t: "claimMission" });
+    expect(s.perks).toContain("townContact");
+    // 8 the debt: help Ramu kaka
+    const rep = s.rep;
+    ok(s, { t: "choose", option: "help" });
+    no(s, { t: "choose", option: "refuse" }); // decided already
+    ok(s, { t: "claimMission" });
+    expect(s.rep).toBe(rep + 30);
+    // 9 the land deal: Bandh is on sale for this mission, whatever the week
+    s.money += 100_000;
+    ok(s, { t: "buyPlot", plot: BANDH_PLOT });
+    ok(s, { t: "claimMission" });
+    // 10 Pola: happy, painted, then the procession
+    no(s, { t: "visit", place: "pola" });
+    ok(s, { t: "feed" });
+    ok(s, { t: "feed" });
+    ok(s, { t: "buy", item: "gerua", n: 1 });
+    ok(s, { t: "decorate" });
+    ok(s, { t: "visit", place: "pola" });
+    expect(complete(s, { world, now })).toBe(true);
+    ok(s, { t: "claimMission" });
+    expect(s.perks).toContain("polaChampion");
+    expect(s.missions.i).toBe(MISSIONS.length);
+    no(s, { t: "claimMission" });
+  });
+
+  it("refusing Ramu costs reputation; delivering what nobody asked for is refused", () => {
+    const s = newSave("r", world, now);
+    s.rep = 20;
+    s.missions.i = 7;
+    ok(s, { t: "choose", option: "refuse" });
+    expect(s.rep).toBe(10);
+    s.inv.jowar = 5;
+    no(s, { t: "deliver", to: "sitabai", item: "jowar", n: 5 });
+  });
+
+  it("drip irrigation keeps a whole field watered", () => {
+    const s = newSave("d", world, now);
+    s.money = 10000;
+    ok(s, { t: "till", ...cells(1)[0] });
+    no(s, { t: "installDrip", plot: starter.id }); // no set yet
+    ok(s, { t: "buy", item: "drip", n: 1 });
+    ok(s, { t: "installDrip", plot: starter.id });
+    ok(s, { t: "till", ...cells(2)[1] });
+    for (const c of Object.values(s.farm)) expect(c.wetUntil).toBeGreaterThan(now + 1000 * DAY_MS);
+    no(s, { t: "installDrip", plot: 0 }); // not my field
+  });
+});

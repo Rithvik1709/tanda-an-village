@@ -3,6 +3,7 @@ import { advance, CAN_MAX, CROPS, type CropId, isCrop, stageOf, WET_MS, yieldOf 
 import { type Buyer, buyerPrice, LEDGER_DAYS, shopItem } from "./economy";
 import { askingPrice, clearPlot, forSale, offersFor, valuePlot } from "./land";
 import { carried, CARRY, creditLimit, GODOWN_CAPACITY, isOverdue, LENDERS, type Lender, type Loan, owed, rentFor, stored } from "./bank";
+import { begin, BANDH_PLOT, bump, complete, current, deadlineAt } from "./missions";
 import { BULL_NAMES, bullsNow, CART_CAPACITY, FEED, MIN_MOOD, newBulls, PLOUGH_COST, PLOUGH_ROW, TRIP_COST, TRIP_MS } from "./bulls";
 import { hash2 } from "./rng";
 import type { LedgerEntry, Save } from "./save";
@@ -36,7 +37,14 @@ export type Action =
   | { t: "borrow"; lender: Lender; amount: number }
   | { t: "repay"; loan: number; amount: number }
   | { t: "store"; item: CropId; n: number }
-  | { t: "withdraw"; item: CropId; n: number };
+  | { t: "withdraw"; item: CropId; n: number }
+  | { t: "talk"; npc: string }
+  | { t: "visit"; place: string }
+  | { t: "deliver"; to: "sitabai" | "mandir"; item: CropId; n: number }
+  | { t: "choose"; option: string }
+  | { t: "claimMission" }
+  | { t: "decorate" }
+  | { t: "installDrip"; plot: number };
 
 export type Result = { ok: true; msg?: string; gained?: Record<string, number> } | { ok: false; error: string };
 
@@ -81,7 +89,117 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
-const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw"]);
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip"]);
+const FOREVER = 8.64e15; // drip-irrigated soil never dries
+
+/** Story actions: talking, visiting, deliveries, choices, rewards — and the drip set. */
+function story(world: World, save: Save, a: Extract<Action, { t: "talk" | "visit" | "deliver" | "choose" | "claimMission" | "decorate" | "installDrip" }>, now: number): Result {
+  const m = current(save);
+  const ms = save.missions;
+  switch (a.t) {
+    case "talk":
+      if (!["naik", "ganpat", "sitabai", "motilal", "haribhau", "joshi", "ramu"].includes(a.npc)) return fail("Who?");
+      bump(save, `talk:${a.npc}`);
+      return { ok: true };
+    case "visit": {
+      if (!["aamrai", "prices", "teej", "pola"].includes(a.place)) return fail("Where?");
+      if (a.place === "teej") {
+        const h = clock(now).hour;
+        if (m?.id !== "teej" || !(h >= 19 || h < 4)) return fail("The gathering is after dark, during Teej.");
+      }
+      if (a.place === "pola") {
+        if (m?.id !== "pola") return fail("Pola hasn't come yet.");
+        if (!save.bulls || bullsNow(save.bulls, now).mood < 80 || !ms.flags.decorated) return fail("Sarja and Raja aren't ready for the procession yet.");
+      }
+      bump(save, `visit:${a.place}`);
+      return { ok: true };
+    }
+    case "deliver": {
+      const wants = (m?.id === "order" && a.to === "sitabai" && a.item === "jowar") || (m?.id === "teej" && a.to === "mandir" && (a.item === "jowar" || a.item === "onion"));
+      if (!wants) return fail("Nobody's asking for that right now.");
+      if (!qty(a.n) || (save.inv[a.item] ?? 0) < a.n) return fail(`You don't have ${a.n} ${a.item}.`);
+      save.inv[a.item] -= a.n;
+      if (!save.inv[a.item]) delete save.inv[a.item];
+      bump(save, `deliver:${a.to}:${a.item}`, a.n);
+      return { ok: true, msg: a.to === "mandir" ? `Offered ${a.n} ${a.item} at the mandir` : `Gave Sitabai ${a.n} ${a.item}` };
+    }
+    case "choose": {
+      if (!m?.choices || ms.choice) return fail("Nothing to decide.");
+      if (a.option === "help") {
+        if (save.money < 1500) return fail("You'd need ₹1,500 — you have ₹" + save.money + ".");
+        save.money -= 1500;
+        save.stats.spent += 1500;
+        save.rep += 30;
+        record(save, { day: clock(now).day, kind: "buy", item: "ramu-debt", n: 1, amount: 1500 });
+      } else if (a.option === "refuse") save.rep = Math.max(0, save.rep - 10);
+      else return fail("Pick one.");
+      ms.choice = a.option;
+      return { ok: true, msg: a.option === "help" ? "Ramu kaka's field is safe. He touches your feet; you stop him." : "You walk on. The chowk goes quiet as you pass." };
+    }
+    case "claimMission": {
+      if (!m) return fail("The story is complete.");
+      if (!complete(save, { world, now })) return fail("Not done yet.");
+      const r = m.reward;
+      if (r.money) {
+        save.money += r.money;
+        save.stats.earned += r.money;
+      }
+      for (const [k, n] of Object.entries(r.items ?? {})) {
+        if (k === "bigcan" && save.inv.bigcan) {
+          save.money += 450; // already had one: take its value instead
+          continue;
+        }
+        save.inv[k] = (save.inv[k] ?? 0) + n;
+      }
+      if (r.rep) save.rep += r.rep;
+      if (r.perk && !save.perks.includes(r.perk)) save.perks.push(r.perk);
+      const line = m.id === "debt" ? (ms.choice === "help" ? "Ramu kaka will never forget this." : "Motilal took Ramu kaka's field. People remember.") : m.done;
+      begin(save, ms.i + 1, now);
+      return { ok: true, msg: `${m.title} complete! ${r.text}`, gained: {}, ...(line ? { line } : {}) } as Result;
+    }
+    case "decorate": {
+      if (!save.bulls) return fail("You have no bulls to decorate.");
+      if (!save.inv.gerua) return fail("You need gerua horn paint — Sitabai sells it.");
+      take(save, "gerua");
+      ms.flags.decorated = true;
+      return { ok: true, msg: "Sarja and Raja's horns shine with gerua" + (save.inv.jhool ? ", in their mirror-work jhools" : "") };
+    }
+    case "installDrip": {
+      const p = Number.isInteger(a.plot) ? world.plots[a.plot] : undefined;
+      if (!p || !save.plots.includes(p.id)) return fail("You can only install drip lines on your own field.");
+      if (save.drip.includes(p.id)) return fail("That field already has drip irrigation.");
+      if (!save.inv.drip) return fail("Buy a drip set at Sitabai's first.");
+      take(save, "drip");
+      save.drip.push(p.id);
+      for (const [k, cell] of Object.entries(save.farm)) if (plotOfKey(world, k) === p.id) {
+        if (cell.plant) cell.plant = advance(cell.plant, cell.wetUntil, now);
+        cell.wetUntil = FOREVER;
+      }
+      return { ok: true, msg: `The motor hums: drip lines now water ${p.name}` };
+    }
+  }
+}
+
+const take = (save: Save, item: string, n = 1) => {
+  save.inv[item] = (save.inv[item] ?? 0) - n;
+  if (save.inv[item] <= 0) delete save.inv[item];
+};
+function plotOfKey(world: World, k: string) {
+  const i = Number(k), x = i % W, z = Math.floor(i / W) % D;
+  return world.plotMap[x + W * z];
+}
+/** Missed a deadline? The mission starts over (the order goes elsewhere; a new one comes). */
+function checkDeadline(world: World, save: Save, now: number) {
+  const dl = deadlineAt(save);
+  if (dl && now > dl && !complete(save, { world, now })) {
+    begin(save, save.missions.i, now);
+    save.missions.flags.missed = true;
+  }
+}
+/** During "The land deal", Bandh is for sale until Deshmukh saheb buys it. */
+export const missionForSale = (save: Save, plotId: number, now: number) =>
+  current(save)?.id === "land" && plotId === BANDH_PLOT && now - save.missions.startedAt < 6 * DAY_MS && !save.plots.includes(plotId);
+export const repBonus = (save: Save) => 1 + Math.min(0.1, (save.rep ?? 0) / 400);
 
 /** The bank, the sahukar and the godown. */
 function finance(world: World, save: Save, a: Extract<Action, { t: "borrow" | "repay" | "store" | "withdraw" }>, now: number): Result {
@@ -156,6 +274,7 @@ function livestock(save: Save, a: Extract<Action, { t: "feed" | "startTrip" | "s
     save.inv.fodder--;
     if (!save.inv.fodder) delete save.inv.fodder;
     save.bulls = { ...b, stamina: Math.min(100, b.stamina + FEED.stamina), mood: Math.min(100, b.mood + FEED.mood), fedAt: now };
+    bump(save, "feed");
     return { ok: true, msg: `${BULL_NAMES.join(" & ")} munch happily` };
   }
   if (a.t === "startTrip") {
@@ -189,7 +308,8 @@ function livestock(save: Save, a: Extract<Action, { t: "feed" | "startTrip" | "s
   const lines: string[] = [];
   for (const [item, n] of Object.entries(trip.load)) {
     const crop = item as CropId;
-    const amount = Math.round(buyerPrice(crop, day, "town") * n);
+    const amount = Math.round(buyerPrice(crop, day, "town") * n * (save.perks.includes("townContact") ? 1.15 : 1));
+    if (clock(now).hour < 14) bump(save, "town:early", n);
     const village = Math.round(buyerPrice(crop, day, "village") * n);
     save.money += amount;
     save.stats.earned += amount;
@@ -211,7 +331,7 @@ function land(world: World, save: Save, a: Extract<Action, { t: "buyPlot" | "lis
   switch (a.t) {
     case "buyPlot": {
       if (mine) return fail("You already own it.");
-      if (!forSale(p, day)) return fail(`${p.name} isn't for sale this week.`);
+      if (!forSale(p, day) && !missionForSale(save, p.id, now)) return fail(`${p.name} isn't for sale this week.`);
       const price = askingPrice(p, day);
       if (save.money < price) return fail(`${p.name} costs ₹${price.toLocaleString("en-IN")} — you have ₹${save.money.toLocaleString("en-IN")}.`);
       save.money -= price;
@@ -245,6 +365,7 @@ function land(world: World, save: Save, a: Extract<Action, { t: "buyPlot" | "lis
       save.stats.earned += offer.amount;
       save.plots = save.plots.filter((id) => id !== p.id);
       delete save.listings[key];
+      save.drip = save.drip.filter((d) => d !== p.id); // the drip lines go with the land
       clearPlot(save, p);
       record(save, { day, kind: "sell", item: `plot:${p.id}`, n: 1, amount: offer.amount, where: offer.buyer });
       return { ok: true, msg: `Sold ${p.name} to ${offer.buyer} for ₹${offer.amount.toLocaleString("en-IN")}` };
@@ -271,7 +392,8 @@ function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: numbe
     if (!isCrop(a.item)) return fail("The trader doesn't buy that.");
     if (a.where !== "village") return fail("You can only sell here at the village stall."); // the town trip arrives with the cart
     if ((save.inv[a.item] ?? 0) < a.n) return fail(`You don't have ${a.n} ${CROPS[a.item].name.toLowerCase()}.`);
-    const amount = Math.round(buyerPrice(a.item, day, a.where) * a.n);
+    const amount = Math.round(buyerPrice(a.item, day, a.where) * a.n * repBonus(save));
+    bump(save, `sell:${a.item}`, a.n);
     save.inv[a.item] -= a.n;
     if (!save.inv[a.item]) delete save.inv[a.item];
     save.money += amount;
@@ -282,7 +404,7 @@ function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: numbe
   const item = shopItem(a.item);
   if (!item) return fail("The shop doesn't sell that.");
   if (item.max && (save.inv[item.id] ?? 0) + a.n > item.max) return fail(`You already have the ${item.name.toLowerCase()}.`);
-  const amount = item.price * a.n;
+  const amount = Math.round(item.price * a.n * (item.id.startsWith("seed:") && save.perks.includes("discount") ? 0.8 : 1));
   if (save.money < amount) return fail(`That costs ₹${amount} — you have ₹${save.money}.`);
   save.money -= amount;
   save.inv[item.id] = (save.inv[item.id] ?? 0) + a.n;
@@ -294,6 +416,12 @@ function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: numbe
 
 export function apply(world: World, save: Save, a: Action, now: number): Result {
   if (!a || typeof a !== "object" || !KNOWN.has(a.t)) return fail("Unknown action.");
+  if (save.missions) checkDeadline(world, save, now);
+  if (a.t === "talk" || a.t === "visit" || a.t === "deliver" || a.t === "choose" || a.t === "claimMission" || a.t === "decorate" || a.t === "installDrip") {
+    const r = story(world, save, a, now);
+    if (r.ok) save.updatedAt = now;
+    return r;
+  }
   if (a.t === "borrow" || a.t === "repay" || a.t === "store" || a.t === "withdraw") {
     const r = finance(world, save, a, now);
     if (r.ok) save.updatedAt = now;
@@ -331,7 +459,12 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       for (let dy = -2; dy <= 2 && !near; dy++)
         for (let dz = -2; dz <= 2 && !near; dz++)
           for (let dx = -2; dx <= 2 && !near; dx++) near = !!block(blockAt(world, save, x + dx, y + dy, z + dz, now)).liquid;
-      if (!near) return fail("Fill the can at the river or the well.");
+      if (!near) return fail("Fill the can at the well or the vihir.");
+      // which well? (the village well is the first, the field vihir the second)
+      const wells = world.structures.filter((q) => q.kind === "well") as { x: number; z: number }[];
+      const nearest = wells.map((q, i) => ({ i, d: Math.hypot(q.x - x, q.z - z) })).sort((p, q) => p.d - q.d)[0];
+      if (nearest?.i === 0 && current(save)?.id === "water") return fail("The village well is running low and the women are queuing — take your can to the vihir in the fields.");
+      if (nearest?.i === 1) bump(save, "refill:vihir");
       inv.water = canCapacity(save);
       r = { ok: true, msg: "Can filled" };
       break;
@@ -380,7 +513,7 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       if (above !== B.AIR && !(block(above).shape === "cross" && !isCropBlock(above))) return fail("Clear the block above first.");
       if (above !== B.AIR) save.edits[key(x, y + 1, z)] = B.AIR;
       const q = soilQuality(world, x, z, here);
-      save.farm[k] = { baseQ: q, q, wetUntil: 0, restedAt: now };
+      save.farm[k] = { baseQ: q, q, wetUntil: save.drip.includes(plotOfKey(world, k)) ? FOREVER : 0, restedAt: now };
       delete save.edits[k]; // the farm cell now defines this block
       r = { ok: true };
       break;
@@ -410,7 +543,8 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       if (!cell) return fail("Water tilled soil.");
       if (!has("water")) return fail("The can is empty — fill it at the river or the well.");
       if (cell.plant) cell.plant = advance(cell.plant, cell.wetUntil, now);
-      cell.wetUntil = now + WET_MS[season];
+      cell.wetUntil = Math.max(cell.wetUntil, now + WET_MS[season]);
+      bump(save, "water");
       take("water");
       r = { ok: true };
       break;
@@ -435,12 +569,13 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
         if (above !== B.AIR && !(block(above).shape === "cross" && !isCropBlock(above))) continue;
         if (above !== B.AIR) save.edits[key(cx, y + 1, cz)] = B.AIR;
         const q = soilQuality(world, cx, cz, b0);
-        save.farm[ck] = { baseQ: q, q, wetUntil: 0, restedAt: now };
+        save.farm[ck] = { baseQ: q, q, wetUntil: save.drip.includes(plotOfKey(world, ck)) ? FOREVER : 0, restedAt: now };
         delete save.edits[ck];
         save.bulls = { ...save.bulls, stamina: save.bulls.stamina - PLOUGH_COST };
         done++;
       }
       if (!done) return fail(save.bulls.stamina < PLOUGH_COST ? "The bulls are tired." : "Nothing to plough there.");
+      bump(save, "plough");
       r = { ok: true, msg: `Ploughed ${done} with ${BULL_NAMES.join(" & ")}`, gained: { ploughed: done } };
       break;
     }
@@ -451,7 +586,8 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       if (!ownedPlot(world, save, x, z)) return fail("That isn't your field.");
       const p = advance(cell.plant, cell.wetUntil, now);
       if (p.progress < 1) return fail(`Not ripe yet — ${Math.floor(p.progress * 100)}% grown.`);
-      const n = yieldOf(p, cell.q);
+      const n = yieldOf(p, cell.q) + (inv.sickle ? 1 : 0);
+      bump(save, `harvest:${p.crop}`);
       if (carried(save) + n > CARRY) return fail(`Your sacks are full (${CARRY}) — sell, load the cart, or store it in the godown.`);
       give(p.crop, n);
       cell.q = Math.max(0.45, cell.q - 0.04);

@@ -1,5 +1,10 @@
 import * as THREE from "three";
-import { netWorth, titleFor } from "../../shared/bank";
+import { complete, current, deadlineAt, MISSIONS, progress } from "../../shared/missions";
+import type { Action, Result } from "../../shared/rules";
+import { DAY_MS } from "../../shared/time";
+
+const seen = (id: string) => { try { return localStorage.getItem(`tanda.mission.${id}`) === "1"; } catch { return false; } };
+const markSeen = (id: string) => { try { localStorage.setItem(`tanda.mission.${id}`, "1"); } catch { /* ignore */ } };
 import type { Save } from "../../shared/save";
 import type { World } from "../../shared/world";
 
@@ -7,69 +12,34 @@ import type { World } from "../../shared/world";
  * Making the game easy to follow: a welcome card, a chain of goals (each checked from the save),
  * a golden marker in the world with an on-screen arrow and distance, and a help card (H).
  */
-type Goal = {
-  id: string;
-  title: string;
-  how: string; // what to press, in plain words
-  done: (s: Save, c: Ctx) => boolean;
-  progress?: (s: Save, c: Ctx) => string;
-  where?: (c: Ctx) => { x: number; y: number; z: number; label: string } | null;
-};
 type Ctx = { world: World; now: number; day: number; onOwnLand: boolean };
+type Where = { x: number; y: number; z: number; label: string };
 
-const cells = (s: Save) => Object.values(s.farm);
-const GOALS: Goal[] = [
-  {
-    id: "field", title: "Walk to your field, Aamrai", how: "Follow the golden marker. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to walk, mouse to look, <kbd>Shift</kbd> to run.",
-    done: (s, c) => c.onOwnLand || cells(s).length > 0,
-    where: (c) => { const p = c.world.plots.find((q) => q.starter)!; return { x: p.gate!.x + 0.5, y: p.y + 1, z: p.gate!.z + 0.5, label: "Your field" }; },
-  },
-  {
-    id: "till", title: "Plough 6 patches of soil", how: "Press <kbd>2</kbd> for the hoe, look at the soil, <b>right-click</b>.",
-    done: (s) => cells(s).length >= 6, progress: (s) => `${Math.min(6, cells(s).length)} / 6`,
-    where: (c) => { const p = c.world.plots.find((q) => q.starter)!; return { x: (p.x0 + p.x1) / 2, y: p.y + 1, z: (p.z0 + p.z1) / 2, label: "Your field" }; },
-  },
-  {
-    id: "sow", title: "Sow seeds in the ploughed soil", how: "Press <kbd>4</kbd> jowar, <kbd>5</kbd> onion or <kbd>6</kbd> sugarcane, <b>right-click</b> ploughed soil. Onion is quickest.",
-    done: (s) => cells(s).filter((c) => c.plant).length >= 6 || s.stats.harvested > 0, progress: (s) => `${Math.min(6, cells(s).filter((c) => c.plant).length)} / 6`,
-  },
-  {
-    id: "water", title: "Fetch water and water your crops", how: "Press <kbd>3</kbd> for the can. Right-click the well (marker) to fill it, then right-click your sown soil. Watered crops grow 3× faster.",
-    done: (s, c) => cells(s).some((x) => x.wetUntil > c.now) || s.stats.harvested > 0,
-    where: (c) => ({ x: c.world.landmarks.well.x + 0.5, y: 17, z: c.world.landmarks.well.z - 1.5, label: "Well" }),
-  },
-  {
-    id: "harvest", title: "Harvest when the crop is ripe", how: "Crops take a few minutes (they keep growing while you're away). Look at a ripe one: <b>left-click</b>. The text under the crosshair tells you how long is left.",
-    done: (s) => s.stats.harvested > 0,
-  },
-  {
-    id: "sell", title: "Sell your harvest to Ganpat Seth", how: "Walk to his saffron stall in the square and press <kbd>E</kbd>, then <b>Sell all</b>.",
-    done: (s) => s.stats.earned > 0,
-    where: (c) => ({ x: c.world.landmarks.trader.x + 0.5, y: 17, z: c.world.landmarks.trader.z - 0.5, label: "Ganpat's stall" }),
-  },
-  {
-    id: "save", title: "Save up ₹8,000", how: "Keep planting, watering and selling. Check prices at Ganpat's (<b>Prices</b> tab) and sell when they're high. Need cash sooner? The bank lends.",
-    done: (s) => s.money >= 8000 || !!s.bulls, progress: (s) => `₹${s.money.toLocaleString("en-IN")} / ₹8,000`,
-  },
-  {
-    id: "bulls", title: "Buy Sarja & Raja, your bulls, and a cart", how: "At Sitabai's blue stall, press <kbd>E</kbd>. Bulls plough a whole row at once (<kbd>Shift</kbd> + right-click with the hoe).",
-    done: (s) => !!s.bulls && !!s.inv.cart,
-    where: (c) => ({ x: c.world.landmarks.seedShop.x + 0.5, y: 17, z: c.world.landmarks.seedShop.z - 0.5, label: "Sitabai's stall" }),
-  },
-  {
-    id: "town", title: "Cart a harvest to the town mandi", how: "Stand by your cart and press <kbd>R</kbd>. The town pays about 30% more than the village.",
-    done: (s) => s.ledger.some((l) => l.where === "town"),
-  },
-  {
-    id: "land", title: "Buy a second field", how: "Visit Naik Dhavlu at his kacheri (<kbd>E</kbd>). Fields near water and the road cost more and grow better.",
-    done: (s) => s.plots.length >= 2,
-    where: (c) => ({ x: c.world.landmarks.landOffice.x + 3, y: 17, z: c.world.landmarks.landOffice.z + 0.5, label: "Naik's kacheri" }),
-  },
-  {
-    id: "kisan", title: "Become a Bada Kisan", how: "Grow your net worth to ₹1,00,000: more land, better crops, smart selling.",
-    done: (s, c) => titleFor(netWorth(c.world, s, c.now, c.day).total).name !== "Small farmer" && titleFor(netWorth(c.world, s, c.now, c.day).total).name !== "Kisan",
-  },
-];
+/** Where each objective happens, for the golden marker. */
+function whereFor(mission: string, objective: string, c: Ctx, save: Save): Where | null {
+  const L = c.world.landmarks;
+  const at = (p: { x: number; z: number }, label: string, dx = 0.5, dz = 0.5): Where => ({ x: p.x + dx, y: 17, z: p.z + dz, label });
+  const field = () => {
+    const p = c.world.plots.find((q) => q.starter)!;
+    return { x: (p.x0 + p.x1) / 2, y: p.y + 1, z: (p.z0 + p.z1) / 2, label: "Aamrai, your field" };
+  };
+  const key = `${mission}:${objective}`;
+  switch (key) {
+    case "homecoming:talk": return at({ x: L.landOffice.x + 3, z: L.landOffice.z }, "Naik Dhavlu");
+    case "homecoming:visit": case "homecoming:till": case "firstcrop:harvest": return field();
+    case "firstcrop:prices": case "firstcrop:sell": return at({ x: L.trader.x, z: L.trader.z - 1 }, "Ganpat's stall");
+    case "water:vihir": return at({ x: L.ghat.x, z: L.ghat.z - 2 }, "The vihir");
+    case "water:water": return field();
+    case "order:deliver": return save.inv.jowar >= 20 ? at({ x: L.seedShop.x, z: L.seedShop.z - 1 }, "Sitabai's stall") : field();
+    case "bulls:buy": return at({ x: L.seedShop.x, z: L.seedShop.z - 1 }, "Sitabai's stall");
+    case "teej:offerJ": case "teej:offerO": case "teej:night": return at({ x: L.temple.x, z: L.temple.z - 1 }, "Sevalal mandir");
+    case "land:buy": return at({ x: L.landOffice.x + 3, z: L.landOffice.z }, "Naik's kacheri");
+    case "pola:paint": return save.inv.gerua ? null : at({ x: L.seedShop.x, z: L.seedShop.z - 1 }, "Sitabai (gerua)");
+    case "pola:procession": { const ch = c.world.chowk; return { x: (ch.x0 + ch.x1) / 2, y: 17, z: (ch.z0 + ch.z1) / 2, label: "The chowk" }; }
+    case "debt:choose": return at({ x: 99.5, z: 124 }, "Ramu kaka");
+  }
+  return null;
+}
 
 export class Guide {
   private card: HTMLElement;
@@ -79,7 +49,12 @@ export class Guide {
   private marker: THREE.Group;
   private beam: THREE.Mesh;
   private target: { x: number; y: number; z: number; label: string } | null = null;
-  private lastGoal = "";
+  private shownFor = "";
+  private choiceAsked = "";
+  private claiming = "";
+  /** Set by the game when you're standing near the person who asks you to choose. */
+  nearChoice = false;
+  onToast: (m: string, k: "ok" | "bad") => void = () => {};
   private cardHtml = "";
   helpOpen = false;
   onGoalDone: (title: string) => void = () => {};
@@ -161,23 +136,75 @@ export class Guide {
     this.help.hidden = !on;
   }
 
-  update(save: Save, c: Ctx, camera: THREE.Camera, t: number, hidden: boolean) {
-    const i = GOALS.findIndex((g) => !g.done(save, c));
-    const g = GOALS[i];
-    if (this.lastGoal && g?.id !== this.lastGoal) {
-      const prev = GOALS.find((x) => x.id === this.lastGoal);
-      if (prev) this.onGoalDone(prev.title);
+  /** Show a story card: the mission's opening, its closing line, or a choice. */
+  dialogue(who: string, title: string, text: string, buttons: { label: string; sub?: string; onClick: () => void }[]) {
+    this.dlg?.remove();
+    const d = el("div", "panel dialogue", this.card.parentElement!);
+    this.dlg = d;
+    d.innerHTML = `<div class="panel-card"><div class="dlg-who">${who}</div><h2>${title}</h2><p class="dlg-text">“${text}”</p><div class="big-acts"></div></div>`;
+    const acts = d.querySelector(".big-acts")!;
+    for (const b of buttons) {
+      const btn = document.createElement("button");
+      btn.innerHTML = b.label + (b.sub ? `<small>${b.sub}</small>` : "");
+      btn.addEventListener("click", () => {
+        d.remove();
+        this.dlg = null;
+        b.onClick();
+      });
+      acts.appendChild(btn);
     }
-    this.lastGoal = g?.id ?? "all";
+    this.onDialogue(true);
+  }
+  private dlg: HTMLElement | null = null;
+  onDialogue: (open: boolean) => void = () => {};
+  /** Send an action; the guide calls this to claim rewards and make choices. */
+  act: (a: Action) => Result = () => ({ ok: false, error: "offline" });
+  get dialogueOpen() {
+    return !!this.dlg;
+  }
+
+  update(save: Save, c: Ctx, camera: THREE.Camera, t: number, hidden: boolean) {
+    const m = current(save);
+    const mc = { world: c.world, now: c.now };
+    // a new mission: show its story once
+    if (m && !hidden && !this.dlg && this.shownFor !== m.id) {
+      this.shownFor = m.id;
+      if (!seen(m.id)) {
+        markSeen(m.id);
+        this.dialogue(`${m.who} · Mission ${save.missions.i + 1} of ${MISSIONS.length}`, `${m.title} <small>${m.local}</small>`, m.story, [{ label: "Let's do it", onClick: () => this.onDialogue(false) }]);
+      }
+    }
+    // a choice to make
+    if (m?.choices && !save.missions.choice && !hidden && !this.dlg && this.choiceAsked !== m.id && this.nearChoice) {
+      this.choiceAsked = m.id;
+      this.dialogue(m.who, m.title, m.story, m.choices.map((ch) => ({ label: ch.label, sub: ch.effect, onClick: () => { this.onDialogue(false); const r = this.act({ t: "choose", option: ch.id }); if (!r.ok) { this.choiceAsked = ""; this.onToast(r.error, "bad"); } else this.onToast(r.msg ?? "", "ok"); } })));
+    }
+    // done: claim the reward and hear the closing line
+    if (m && complete(save, mc) && !this.dlg && !hidden && this.claiming !== m.id) {
+      this.claiming = m.id;
+      const r = this.act({ t: "claimMission" }) as Result & { line?: string };
+      if (r.ok) {
+        this.onGoalDone(m.title);
+        const line = (r as { line?: string }).line ?? m.done;
+        this.dialogue(`Mission complete · ${m.who}`, `${m.title} ✓`, line, [{ label: `Collect: ${m.reward.text}`, onClick: () => this.onDialogue(false) }]);
+      } else this.claiming = "";
+    }
     this.card.hidden = hidden;
     let html: string;
-    if (!g) {
-      html = `<div class="goal-head">All goals done</div><b>You're a Bada Kisan of Ukhali Tanda!</b><span>Aim for Zamindar: buy land and keep farming.</span>`;
+    if (!m) {
+      html = `<div class="goal-head">The story is complete</div><b>Pola champion of Ukhali Tanda!</b><span>Keep farming, buy land and aim for Zamindar.</span>`;
       this.target = null;
     } else {
-      const prog = g.progress?.(save, c);
-      html = `<div class="goal-head">Goal ${i + 1} of ${GOALS.length}${prog ? ` · ${prog}` : ""}</div><b>${g.title}</b><span>${g.how}</span><small>Press <kbd>H</kbd> for all controls</small>`;
-      this.target = g.where?.(c) ?? null;
+      const ps = progress(save, mc);
+      const next = ps.find((o) => o.got < o.need);
+      const dl = deadlineAt(save);
+      const left = dl ? Math.max(0, (dl - c.now) / DAY_MS) : null;
+      const deadline = left !== null ? `<div class="goal-deadline">⏳ ${left >= 1 ? `${Math.floor(left)} day${Math.floor(left) === 1 ? "" : "s"} ${Math.round((left % 1) * 24)} h` : `${Math.round(left * 24)} hours`} left</div>` : "";
+      const missed = save.missions.flags.missed && m.deadlineDays ? `<div class="goal-missed">You missed the last deadline — here's another chance.</div>` : "";
+      html = `<div class="goal-head">Mission ${save.missions.i + 1} of ${MISSIONS.length} · ${m.who}</div><b>${m.title} <small>${m.local}</small></b>${deadline}${missed}
+        <ul class="objectives">${ps.map((o) => `<li class="${o.got >= o.need ? "done" : o === next ? "now" : ""}"><i>${o.got >= o.need ? "✓" : ""}</i>${o.text}${o.need > 1 ? ` <em>${o.got}/${o.need}</em>` : ""}</li>`).join("")}</ul>
+        <small>Reward: ${m.reward.text} · <kbd>H</kbd> controls</small>`;
+      this.target = next ? whereFor(m.id, next.id, c, save) : null;
     }
     if (html !== this.cardHtml) this.card.innerHTML = this.cardHtml = html;
     // the marker and the edge-of-screen arrow

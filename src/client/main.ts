@@ -35,9 +35,11 @@ import { bullsMoodWord, bullsNow } from "../shared/bulls";
 import { isOverdue, netWorth, TITLES, titleFor } from "../shared/bank";
 import { Farmyard } from "./farmyard";
 import { Villagers } from "./villagers";
+import { Infrastructure } from "./scene/infrastructure";
 import { Nav, separate } from "./player/nav";
 import { Audio, renderRms, SOUNDS } from "./audio";
 import { Guide } from "./ui/guide";
+import { current } from "../shared/missions";
 import { isTouchOnly, loadSettings, SettingsPanel, showMobileNote, TitleScreen, Tutorial } from "./ui/screens";
 
 type Hooks = {
@@ -116,6 +118,25 @@ const trees = new Trees(world.trees, (x, z) => hf.at(x, z));
 scene.add(trees.group);
 const village = new Village(world.structures, world.plots, (x, z) => hf.at(x, z));
 scene.add(village.group);
+// pumps: at the vihir, and borewells by three fields (their sheds and tanks are solid)
+const VH = world.landmarks.ghat; // the vihir (its landmark is the path beside it)
+const PUMPS: { x: number; z: number; tankDir: [number, number] }[] = [
+  { x: VH.x + 3.5, z: VH.z - 0.5, tankDir: [0, -1] },
+  { x: 94.5, z: 163.5, tankDir: [1, 0] },
+  { x: 56, z: 52.5, tankDir: [1, 0] },
+];
+for (const p of PUMPS) {
+  const solid = (x0: number, z0: number, x1: number, z1: number) => {
+    for (let z = Math.floor(z0); z <= Math.floor(z1); z++)
+      for (let x = Math.floor(x0); x <= Math.floor(x1); x++) {
+        const g = Math.floor(hf.at(x + 0.5, z + 0.5) + 0.05);
+        if (!TERRAIN.has(vox[idx(x, g, z)])) vox[idx(x, g, z)] = B.BRICK;
+      }
+  };
+  solid(p.x - 0.9, p.z - 0.9, p.x + 0.9, p.z + 0.9);
+  const tx = p.x + p.tankDir[0] * 2.6, tz = p.z + p.tankDir[1] * 2.6;
+  solid(tx - 0.9, tz - 0.9, tx + 0.9, tz + 0.9);
+}
 const grass = new Grass(
   hf,
   (x, z) => {
@@ -176,6 +197,12 @@ const titleScreen = new TitleScreen(uiRoot);
 const settingsPanel = new SettingsPanel(uiRoot, settings);
 const tutorial = new Tutorial(uiRoot);
 const guide = new Guide(uiRoot, scene, (x, z) => hf.at(x, z));
+guide.act = (a) => game.act(a);
+guide.onToast = (m, k) => hud.toast(m, k);
+guide.onDialogue = (open) => {
+  if (open) document.exitPointerLock?.();
+  hud.setPlaying(open || titleScreen.open);
+};
 guide.onGoalDone = (title) => {
   hud.toast(`✓ Done: ${title}`);
   audio.play("cash");
@@ -246,6 +273,12 @@ const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: N
     label: "Buy & sell land with Naik Dhavlu, the tanda's headman",
   },
   {
+    kind: "mandir",
+    at: { x: world.landmarks.temple.x + 0.5, y: world.landmarks.temple.y, z: world.landmarks.temple.z - 0.5 },
+    npc: new Npc({ kurta: "#f4f0e4", dhoti: "#f0ead8", hat: "#f6f4ec", hatTall: true, skin: "#8f5a3a" }, world.landmarks.temple.x + 2.2, world.landmarks.temple.y, world.landmarks.temple.z - 1, Math.PI),
+    label: "Visit the Sevalal Maharaj mandir",
+  },
+  {
     kind: "bank",
     at: { x: world.landmarks.bank.x + 0.5, y: world.landmarks.bank.y, z: world.landmarks.bank.z - 0.3 },
     npc: new Npc({ kurta: "#dfe6ee", dhoti: "#3a3a44", hat: "#2a2a30", skin: "#b07a52" }, world.landmarks.bank.x + 0.5, world.landmarks.bank.y, world.landmarks.bank.z + 1.3, Math.PI),
@@ -274,6 +307,8 @@ const NEIGHBOURS = [
   new Npc({ kurta: "#f1ead9", dhoti: "#e9e1cd", hat: "#f2f2ee", hatTall: true }, 99.5, hf.at(99.5, 124), 124, 1.2), // under the banyan
 ];
 for (const n of NEIGHBOURS) scene.add(n.group);
+const infra = new Infrastructure((x, z) => hf.at(x, z), (x, z) => world.plotMap[Math.floor(x) + W * Math.floor(z)] >= 0 || !!block(get(Math.floor(x), Math.floor(hf.at(x, z) + 0.05), Math.floor(z))).solid, PUMPS);
+scene.add(infra.group);
 const nav = new Nav(vox, (x, z) => hf.at(x, z));
 const villagers = new Villagers(world, (x, z) => hf.at(x, z), nav);
 // stall keepers and the neighbours by the well stand still; everyone else keeps clear of them
@@ -292,6 +327,9 @@ const panels = new Panels(document.getElementById("ui")!, {
   world,
   showMap: () => showMap(),
   ride: (dest) => startRide(dest),
+  onTab: (tab) => {
+    if (tab === "prices" && current(game.save)?.id === "firstcrop") game.act({ t: "visit", place: "prices" });
+  },
 });
 panels.onClose = () => hud.setPlaying(false);
 
@@ -356,6 +394,11 @@ function cartAction() {
 }
 function feedBulls() {
   if (!nearBulls()) return;
+  if (game.save.inv.gerua && current(game.save)?.id === "pola" && !game.save.missions.flags.decorated) {
+    const d = game.act({ t: "decorate" });
+    hud.toast(d.ok ? (d.msg ?? "") : d.error, d.ok ? "ok" : "bad");
+    return;
+  }
   const r = game.act({ t: "feed" });
   hud.toast(r.ok ? (r.msg ?? "Fed") : r.error, r.ok ? "ok" : "bad");
 }
@@ -364,6 +407,8 @@ function cartHint(): string {
     if (game.save.trip) return cartInTown() ? "<kbd>R</kbd> Sell the load at the mandi" : "<kbd>R</kbd> Continue to the town mandi";
     return cartInTown() ? "<kbd>R</kbd> Ride home" : "<kbd>R</kbd> Load the cart for the town mandi";
   }
+  if (polaHere()) return "<kbd>E</kbd> Lead Sarja & Raja in the Pola procession";
+  if (nearBulls() && game.save.inv.gerua && current(game.save)?.id === "pola" && !game.save.missions.flags.decorated) return "<kbd>F</kbd> Paint Sarja & Raja's horns with gerua";
   if (nearBulls()) return `<kbd>F</kbd> Feed Sarja & Raja (${game.save.inv.fodder ?? 0} kadba)`;
   return "";
 }
@@ -385,6 +430,7 @@ function checkPlotEntry() {
   const p = world.plots[id];
   const day = clock(game.now()).day;
   const mine = game.save.plots.includes(id);
+  if (world.plots[id].starter && current(game.save)?.id === "homecoming") game.act({ t: "visit", place: "aamrai" });
   hud.toast(mine ? `${p.name} · your land` : forSale(p, day) ? `${p.name} · for sale, ₹${askingPrice(p, day).toLocaleString("en-IN")}` : `${p.name} · a neighbour's field`);
 }
 
@@ -401,7 +447,10 @@ function nearStall() {
   }
   return best;
 }
+const TALK: Partial<Record<PanelKind, string>> = { land: "naik", trader: "ganpat", shop: "sitabai", sahukar: "motilal", town: "haribhau", bank: "joshi" };
 function openStall(kind: PanelKind, tab?: string) {
+  const who = TALK[kind];
+  if (who && booted_) game.act({ t: "talk", npc: who });
   panels.show(kind, tab);
   hud.setPlaying(true); // hide the click-to-play panel under it
   hud.setHint("");
@@ -524,7 +573,7 @@ function refreshStatus() {
   if (s.bestTitle > lastTitle && lastTitle >= 0) hud.toast(`You are now a ${TITLES[s.bestTitle].name}! · ${TITLES[s.bestTitle].local}`);
   if (booted_) lastTitle = s.bestTitle;
   const saved = { saved: "✓ saved", saving: "saving…", offline: "offline — retrying" }[net.status];
-  hud.setInfo(`<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${title.name}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${overdue ? `<span class="debt">loan overdue!</span>` : ""}<span class="sync ${net.status}">${saved}</span><span>${fmtHour(hourOverride ?? c.hour)}</span><span>${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}</span>`);
+  hud.setInfo(`<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${title.name}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${s.rep ? `<span class="rep" title="Reputation with the tanda: better prices from Ganpat">★ ${s.rep}</span>` : ""}${overdue ? `<span class="debt">loan overdue!</span>` : ""}<span class="sync ${net.status}">${saved}</span><span>${fmtHour(hourOverride ?? c.hour)}</span><span>${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}</span>`);
 }
 game.onChange(refreshStatus);
 game.onChange(() => syncFields());
@@ -541,7 +590,18 @@ controls.onScroll = (d) => {
   hud.refresh();
 };
 controls.onToggleDebug = () => hud.toggleDebug();
+/** Pola: lead the bulls into the chowk. */
+function polaHere() {
+  const ch = world.chowk;
+  return current(game.save)?.id === "pola" && !!game.save.bulls && body.pos.x > ch.x0 - 2 && body.pos.x < ch.x1 + 2 && body.pos.z > ch.z0 - 2 && body.pos.z < ch.z1 + 2 && farmyard.distTo(body.pos, farmyard.pos.x, farmyard.pos.z) < 12;
+}
 controls.onInteract = () => {
+  if (polaHere() && !nearStall()) {
+    const r = game.act({ t: "visit", place: "pola" });
+    hud.toast(r.ok ? "The procession begins! Drums, gulal, and the whole tanda cheering." : r.error, r.ok ? "ok" : "bad");
+    if (r.ok) celebrate();
+    return;
+  }
   if (map.open) return map.close();
   if (panels.open) return panels.close();
   const s = nearStall();
@@ -697,13 +757,16 @@ renderer.setAnimationLoop(() => {
     const st = mode === "play" && !panels.open && !farmyard.ride ? nearStall() : undefined;
     hud.setHint(farmyard.ride || panels.open ? "" : st ? `<kbd>E</kbd> ${st.label}` : cartHint() || (nightK > 0.6 && !torchOn && mode === "play" ? "<kbd>T</kbd> Switch on your torch" : ""));
     hud.setBulls(bullsChip());
+    infra.setDrip([...game.save.drip.map((id) => world.plots[id]), ...villagers.dripPlots().map((id) => world.plots[id])]);
+    farmyard.rig.setDecor({ jhool: !!game.save.inv.jhool, gerua: !!game.save.missions.flags.decorated, garland: game.save.perks.includes("polaChampion") });
     // point the pool of bulb lights at the bulbs nearest to you
     if (nightK > 0) {
       const here = camera.position;
-      const near = [...village.lamps].sort((a, b) => a.distanceToSquared(here) - b.distanceToSquared(here));
+      const near = [...village.lamps, ...infra.lamps].sort((a, b) => a.distanceToSquared(here) - b.distanceToSquared(here));
       BULB_LIGHTS.forEach((l, i) => near[i] && l.position.copy(near[i]));
     }
     BULB_LIGHTS.forEach((l) => (l.intensity = nightK * 9));
+    guide.nearChoice = Math.hypot(body.pos.x - 99.5, body.pos.z - 124) < 5;
     if (!titleScreen.open) tutorial.update(game.save, game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]), now);
   }
   worldRenderer.cull(camera.position, mode === "title" ? 200 : settings.renderDistance);
@@ -740,9 +803,22 @@ renderer.setAnimationLoop(() => {
   water.update(now / 1000, sunDirection(hour), sc.sun, sc.top, sc.horizon);
   trees.update(now / 1000);
   village.update(dt);
+  for (let i = confetti.length - 1; i >= 0; i--) {
+    const c = confetti[i];
+    c.v.y -= 6 * dt;
+    c.v.multiplyScalar(1 - dt * 1.2);
+    c.m.position.addScaledVector(c.v, dt);
+    c.m.rotation.x += dt * 5;
+    c.m.rotation.y += dt * 3;
+    if ((c.life -= dt) <= 0) {
+      scene.remove(c.m);
+      confetti.splice(i, 1);
+    }
+  }
   // how dark it is: bulbs come on at dusk, off at dawn
   nightK = Math.max(0, Math.min(1, (0.1 - sunDirection(hour).y) / 0.22));
   village.setNight(nightK);
+  infra.update(now / 1000, nightK, (() => { const h = hourOverride ?? clock(game.now()).hour; return h > 6.5 && h < 18.5; })());
   torchModel.visible = torchOn;
   torch.intensity = torchOn ? 70 : 0;
   if (torchOn) {
@@ -766,10 +842,23 @@ renderer.setAnimationLoop(() => {
   if (hud.debugOn) hud.setDebug(debugText(dt));
   if (booted_) {
     const c = clock(game.now());
-    guide.update(game.save, { world, now: game.now(), day: c.day, onOwnLand: game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]) }, camera, now / 1000, mode === "title" || !!panels.open || map.open || !!farmyard.ride);
+    guide.update(game.save, { world, now: game.now(), day: c.day, onOwnLand: game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]) }, camera, now / 1000, mode === "title" || !!panels.open || map.open || !!farmyard.ride || guide.helpOpen);
   }
 });
 
+/** Gulal and marigold petals in the air. */
+const confetti: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
+function celebrate() {
+  const cols = ["#e8327a", "#f2a01e", "#f6e04a", "#e8662a", "#ffffff"];
+  for (let i = 0; i < 160; i++) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.12), new THREE.MeshBasicMaterial({ color: cols[i % 5], side: THREE.DoubleSide }));
+    m.position.set(body.pos.x + (Math.random() - 0.5) * 3, body.pos.y + 1.5, body.pos.z + (Math.random() - 0.5) * 3);
+    scene.add(m);
+    confetti.push({ m, v: new THREE.Vector3((Math.random() - 0.5) * 6, 4 + Math.random() * 5, (Math.random() - 0.5) * 6), life: 4 + Math.random() * 2 });
+  }
+  audio.play("cash");
+  audio.play("bells");
+}
 let lastTick = 0;
 const prof = { villagers: 0, frame: 0, render: 0 };
 let fpsAvg = 60;

@@ -195,10 +195,15 @@ export class Villagers {
         for (let x = p.x0 + 2; x < p.x1 - 1; x++) {
           // a continuous furrow along the row, a plant on every other cell
           const plant: Planting = { crop, plantedAt: now, progress: Math.min(1, progress + hash2(x, z, 3) * 0.1), wetMs: 1, dryMs: 0, updatedAt: now, speed: 1 };
-          farm[String(idx(x, p.y, z))] = { baseQ: 1, q: 1, wetUntil: 0, restedAt: now, plant: (x - p.x0) % 2 ? undefined : plant };
+          farm[String(idx(x, p.y, z))] = { baseQ: 1, q: 1, wetUntil: id % 3 === 0 ? now + 1e9 : 0, restedAt: now, plant: (x - p.x0) % 2 ? undefined : plant };
         }
     }
     this.fields.sync({ farm } as Save, now, this.ground);
+  }
+
+  /** Neighbours' fields that are drip-irrigated (every third worked field — the tanda is modern). */
+  dripPlots() {
+    return this.worked.filter((id) => id % 3 === 0);
   }
 
   /** Everyone who is out and about, for keeping bodies apart. */

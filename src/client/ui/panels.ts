@@ -7,6 +7,7 @@ import { askingPrice, forSale, offersFor, valuePlot } from "../../shared/land";
 import { BULL_NAMES, bullsMoodWord, bullsNow, CART_CAPACITY, TRIP_COST } from "../../shared/bulls";
 import { carried, CARRY, creditLimit, GODOWN_CAPACITY, GODOWN_RENT, isOverdue, LENDERS, type Lender, netWorth, owed, rentFor, stored, titleFor } from "../../shared/bank";
 import { DAY_MS } from "../../shared/time";
+import { current } from "../../shared/missions";
 import { clock } from "../../shared/time";
 import type { World } from "../../shared/world";
 
@@ -14,7 +15,7 @@ import type { World } from "../../shared/world";
  * The trader's and shopkeeper's panels. They only ever call `act` — the same actions the server
  * re-checks — and re-render from the save after each one.
  */
-export type PanelKind = "trader" | "shop" | "land" | "cart" | "town" | "bank" | "sahukar";
+export type PanelKind = "trader" | "shop" | "land" | "cart" | "town" | "bank" | "sahukar" | "mandir";
 type Ctx = {
   save: () => Save;
   now: () => number;
@@ -23,6 +24,7 @@ type Ctx = {
   world: World;
   showMap: () => void;
   ride: (dest: "town" | "home") => void;
+  onTab: (tab: string) => void;
 };
 
 const CROP_COLOR: Record<CropId, string> = { jowar: "#e0b060", onion: "#e07a9a", sugarcane: "#9ccf5a" };
@@ -45,7 +47,8 @@ export class Panels {
 
   show(kind: PanelKind, tab?: string) {
     this.open = kind;
-    this.tab = tab ?? (kind === "trader" ? "sell" : kind === "land" ? "plots" : kind === "cart" ? "load" : kind === "town" ? "mandi" : kind === "bank" ? "loans" : kind === "sahukar" ? "loans" : "buy");
+    this.tab = tab ?? (kind === "trader" ? "sell" : kind === "land" ? "plots" : kind === "cart" ? "load" : kind === "town" ? "mandi" : kind === "bank" ? "loans" : kind === "sahukar" ? "loans" : kind === "mandir" ? "offer" : "buy");
+    this.ctx.onTab(this.tab);
     this.el.hidden = false;
     this.render();
   }
@@ -89,6 +92,7 @@ export class Panels {
     }
     if (what === "tab") {
       this.tab = a;
+      this.ctx.onTab(a);
       return this.render();
     }
     const s = this.ctx.save();
@@ -111,7 +115,10 @@ export class Panels {
       const n = b === "all" ? (what === "store" ? (s.inv[a] ?? 0) : (s.godown[a]?.n ?? 0)) : Math.floor(Number(input?.value) || 0);
       if (n < 1) return this.ctx.toast("Nothing to move.", "bad");
       r = this.ctx.act({ t: what, item: a as CropId, n: what === "withdraw" ? Math.min(n, CARRY - carried(s)) : n });
-    } else if (what === "buyPlot") r = this.ctx.act({ t: "buyPlot", plot: Number(a) });
+    } else if (what === "deliver") r = this.ctx.act({ t: "deliver", to: a as "sitabai" | "mandir", item: b as CropId, n: Math.min(Number(t.dataset.n), s.inv[b] ?? 0) });
+    else if (what === "teej") r = this.ctx.act({ t: "visit", place: "teej" });
+    else if (what === "drip") r = this.ctx.act({ t: "installDrip", plot: Number(a) });
+    else if (what === "buyPlot") r = this.ctx.act({ t: "buyPlot", plot: Number(a) });
     else if (what === "delist") r = this.ctx.act({ t: "delist", plot: Number(a) });
     else if (what === "accept") r = this.ctx.act({ t: "acceptOffer", plot: Number(a), day: Number(b) });
     else if (what === "list") {
@@ -128,7 +135,7 @@ export class Panels {
     const s = this.ctx.save();
     const day = clock(this.ctx.now()).day;
     const tabs =
-      this.open === "cart" || this.open === "town"
+      this.open === "cart" || this.open === "town" || this.open === "mandir"
         ? []
         : this.open === "bank"
           ? [["loans", "Loans"], ["godown", "Godown"], ["worth", "Your worth"]]
@@ -138,7 +145,9 @@ export class Panels {
     const who =
       this.open === "trader"
         ? `<h2>Ganpat Seth <small>village trader · व्यापारी</small></h2><p class="lede">"I pay fair, and I pay today. For more, you'd have to cart it to the town mandi."</p>`
-        : this.open === "bank"
+        : this.open === "mandir"
+          ? `<h2>Sevalal Maharaj mandir <small>संत सेवालाल महाराज</small></h2><p class="lede">White flags flutter over the shrine. The tanda brings its first harvest here.</p>`
+          : this.open === "bank"
           ? `<h2>Sahakari Bank &amp; godown <small>Joshi saheb, manager · सहकारी बँक</small></h2><p class="lede">"We lend at one rupee in a hundred a day, against your land. Pay on time and we're friends for life."</p>`
           : this.open === "sahukar"
             ? `<h2>Sahukar Motilal <small>moneylender · सावकार</small></h2><p class="lede">"No papers, no waiting. Money today — five in a hundred a day, mind you, and I don't like waiting."</p>`
@@ -150,7 +159,7 @@ export class Panels {
           ? `<h2>Naik Dhavlu's kacheri <small>the tanda's headman · नायक</small></h2><p class="lede">"Ram Ram! The tanda settled here for this black soil. Buy land near water, bhai — it feeds you every season."</p>`
           : `<h2>Sitabai's seeds &amp; tools <small>बी-बियाणे</small></h2><p class="lede">"Ram Ram! Good seed, good harvest. And my Khillari bulls pull a cart like our caravans of old."</p>`;
     const body =
-      this.tab === "loans" ? this.loans(s, day, this.open === "bank" ? "bank" : "sahukar") : this.tab === "godown" ? this.godown(s) : this.tab === "worth" ? this.worth(s, day) : this.tab === "load" ? this.load(s, day) : this.tab === "mandi" || this.tab === "sold" ? this.mandi(s, day) : this.tab === "sell" ? this.sell(s, day) : this.tab === "prices" ? this.prices(day) : this.tab === "ledger" ? this.ledger(s, day) : this.tab === "plots" ? this.plots(s, day) : this.tab === "mine" ? this.mine(s, day) : this.buy(s);
+      this.tab === "offer" ? this.offer(s) : this.tab === "loans" ? this.loans(s, day, this.open === "bank" ? "bank" : "sahukar") : this.tab === "godown" ? this.godown(s) : this.tab === "worth" ? this.worth(s, day) : this.tab === "load" ? this.load(s, day) : this.tab === "mandi" || this.tab === "sold" ? this.mandi(s, day) : this.tab === "sell" ? this.sell(s, day) : this.tab === "prices" ? this.prices(day) : this.tab === "ledger" ? this.ledger(s, day) : this.tab === "plots" ? this.plots(s, day) : this.tab === "mine" ? this.mine(s, day) : this.buy(s);
     this.el.innerHTML = `
       <div class="panel-card">
         <button class="x" data-do="close" title="Close (E)">✕</button>
@@ -235,6 +244,20 @@ export class Panels {
     const cost = [...byDay.values()].reduce((a, v) => a + v.costs, 0);
     return `<table class="ledger"><thead><tr><th>Day</th><th class="num">Income</th><th class="num">Costs</th><th class="num">Profit</th></tr></thead><tbody>${rows}</tbody>
       <tfoot><tr><td>Last ${LEDGER_DAYS} days</td><td class="num up">+${rs(inc)}</td><td class="num down">−${rs(cost)}</td><td class="num"><b>${inc - cost >= 0 ? "+" : "−"}${rs(Math.abs(inc - cost))}</b></td></tr></tfoot></table>`;
+  }
+
+  private offer(s: Save) {
+    const m = current(s);
+    if (m?.id !== "teej") return `<p class="empty">Ram Ram. You bow to Sevalal Maharaj. (During Teej, the tanda brings offerings here.)</p>`;
+    const now = this.ctx.now();
+    const h = clock(now).hour;
+    const row = (c: CropId) => {
+      const have = s.inv[c] ?? 0;
+      return `<tr><td><i class="dot" style="background:${CROP_COLOR[c]}"></i>${CROPS[c].name}</td><td class="num">${have}</td><td class="acts"><button data-do="deliver:mandir:${c}" data-n="10" ${have ? "" : "disabled"}>Offer ${Math.min(10, have) || 10}</button></td></tr>`;
+    };
+    const night = h >= 19 || h < 4;
+    return `<table><thead><tr><th>Offering</th><th class="num">You have</th><th></th></tr></thead><tbody>${row("jowar")}${row("onion")}</tbody></table>
+      <div class="big-acts"><button data-do="teej" ${night ? "" : "disabled"}>${night ? "Join the Teej gathering" : "The gathering begins after 7 pm"}</button></div>`;
   }
 
   private loans(s: Save, day: number, lender: Lender) {
@@ -356,23 +379,31 @@ export class Panels {
         } else {
           action = `<div class="acts list-row">Ask <span class="rupee">₹</span><input data-price="${id}" value="${Math.round((v.total * 1.05) / 100) * 100}" inputmode="numeric"><button data-do="list:${id}">List for sale</button></div>`;
         }
-        return `<div class="plot-card"><div class="plot-head"><b>${p.name}</b><span>worth about <b>${rs(v.total)}</b></span></div><small>${parts}</small>${action}</div>`;
+        const drip = s.drip.includes(id) ? `<div class="acts"><span class="up">💧 Drip irrigation installed</span></div>` : s.inv.drip ? `<div class="acts"><button data-do="drip:${id}">Install the drip set here</button></div>` : "";
+        return `<div class="plot-card"><div class="plot-head"><b>${p.name}</b><span>worth about <b>${rs(v.total)}</b></span></div><small>${parts}</small>${drip}${action}</div>`;
       })
       .join("");
   }
 
   private buy(s: Save) {
+    const m = current(s);
+    const order = m?.id === "order" ? `<div class="order-card"><b>Sitabai's order for Teej</b> — 20 jowar for the feast. You have ${s.inv.jowar ?? 0}.
+      <button data-do="deliver:sitabai:jowar" data-n="20" ${(s.inv.jowar ?? 0) >= 20 ? "" : "disabled"}>Deliver 20 jowar</button></div>` : "";
+    return order + this.buyTable(s);
+  }
+
+  private buyTable(s: Save) {
     const section = (i: { id: string }) =>
-      i.id.startsWith("seed:") ? "Seeds" : i.id.startsWith("block:") ? "Building" : ["bulls", "cart", "fodder"].includes(i.id) ? "Bulls & cart" : "Tools";
+      i.id.startsWith("seed:") ? "Seeds" : i.id.startsWith("block:") ? "Building" : ["bulls", "cart", "fodder", "gerua"].includes(i.id) ? "Bulls & cart" : i.id === "drip" ? "Irrigation" : "Tools";
     let last = "";
-    const rows = SHOP.map((i) => {
+    const rows = SHOP.filter((i) => !i.id.startsWith("block:")).map((i) => {
       const head = section(i) !== last ? `<tr class="section"><td colspan="4">${(last = section(i))}</td></tr>` : "";
       const have = s.inv[i.id] ?? 0;
       const one = i.max === 1;
       const owned = one && have >= 1;
       const afford = (n: number) => (s.money >= i.price * n ? "" : "disabled");
-      const icon = i.id === "bulls" ? "🐂" : i.id === "cart" ? "🛞" : i.id === "fodder" ? "🌾" : i.id === "plough" ? "⛏" : i.id.startsWith("block:") ? `<i class="dot sq" style="background:${blockColor(Number(i.id.slice(6)))}"></i>` : i.id.startsWith("seed:") ? `<i class="dot" style="background:${CROP_COLOR[i.id.slice(5) as CropId]}"></i>` : "🪣";
-      return `${head}<tr><td>${icon} ${i.name}${i.note ? `<br><small>${i.note}</small>` : ""}</td><td class="num">${one ? (owned ? "owned" : "—") : have}</td><td class="num">${rs(i.price)}</td>
+      const icon = i.id === "drip" ? "💧" : i.id === "gerua" ? "🎨" : i.id === "bulls" ? "🐂" : i.id === "cart" ? "🛞" : i.id === "fodder" ? "🌾" : i.id === "plough" ? "⛏" : i.id.startsWith("block:") ? `<i class="dot sq" style="background:${blockColor(Number(i.id.slice(6)))}"></i>` : i.id.startsWith("seed:") ? `<i class="dot" style="background:${CROP_COLOR[i.id.slice(5) as CropId]}"></i>` : "🪣";
+      return `${head}<tr><td>${icon} ${i.name}${i.note ? `<br><small>${i.note}</small>` : ""}</td><td class="num">${one ? (owned ? "owned" : "—") : have}</td><td class="num">${i.id.startsWith("seed:") && s.perks.includes("discount") ? `<s>${rs(i.price)}</s> ${rs(i.price * 0.8)}` : rs(i.price)}</td>
         <td class="acts">${owned ? "" : `<button data-do="buy" data-item="${i.id}" data-n="1" ${afford(1)}>Buy${one ? "" : " 1"}</button>`}${one ? "" : `<button data-do="buy" data-item="${i.id}" data-n="10" ${afford(10)}>10</button>`}</td></tr>`;
     }).join("");
     return `<table><thead><tr><th>Item</th><th class="num">You have</th><th class="num">Price</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;

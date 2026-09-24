@@ -1,6 +1,7 @@
 import type { Planting } from "./crops";
 import { CAN_MAX } from "./crops";
 import type { GodownLot, Loan } from "./bank";
+import { type MissionState, newMissions } from "./missions";
 import type { Bulls } from "./bulls";
 import type { Listing } from "./land";
 import type { World } from "./world";
@@ -9,7 +10,7 @@ import type { World } from "./world";
  * The save: everything that differs from the seeded world, plus the player's money and goods.
  * Stored as JSON by the server. Keys of `edits` and `farm` are voxel indices (x + W*(z + D*y)).
  */
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 export type FarmCell = {
   baseQ: number; // the soil's natural quality, 0..1
@@ -38,6 +39,10 @@ export type Save = {
   nextLoanId: number;
   godown: Record<string, GodownLot>; // produce stored at the cooperative's godown
   bestTitle: number; // the highest title reached (index into TITLES), for the ceremony toast
+  missions: MissionState; // the story
+  rep: number; // reputation with the tanda
+  perks: string[]; // earned in missions: discount, townContact, polaChampion
+  drip: number[]; // plots with drip irrigation installed
 };
 
 export type Trip = { startedAt: number; load: Record<string, number> };
@@ -70,6 +75,10 @@ export function newSave(id: string, world: World, now: number): Save {
     nextLoanId: 1,
     godown: {},
     bestTitle: 0,
+    missions: newMissions(now),
+    rep: 0,
+    perks: [],
+    drip: [],
   };
 }
 
@@ -95,6 +104,11 @@ export function migrate(s: Save): Save {
   if (s.version === 4) {
     Object.assign(s, { loans: [], nextLoanId: 1, godown: {}, bestTitle: 0 }); // v5: money tools
     s.version = 5;
+  }
+  if (s.version === 5) {
+    // v6: the story (existing farmers start at mission 1 too), reputation, drip irrigation
+    Object.assign(s, { missions: newMissions(s.updatedAt), rep: 0, perks: [], drip: [] });
+    s.version = 6;
   }
   return s;
 }
