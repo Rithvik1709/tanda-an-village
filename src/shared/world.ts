@@ -45,6 +45,7 @@ export type Structure =
   | { kind: "hanuman"; x0: number; z0: number; y: number } // a small open shrine, facing west
   | { kind: "school"; x0: number; z0: number; w: number; d: number; y: number } // the ZP school, verandah facing west
   | { kind: "pir"; x: number; z: number; y: number } // the pir: a roof on four posts, open on all sides
+  | { kind: "tank"; x: number; z: number; y: number } // the village's overhead water tank, on the tekdi top
   | { kind: "plate"; x: number; z: number; y: number; facing: number; lines: string[]; color?: string };
 /** A tree: where it stands, how tall, how wide, and the trunk/root columns it occupies in the voxels. */
 export type Tree = { kind: "neem" | "banyan"; x: number; y: number; z: number; h: number; r: number; trunks: [number, number, number, number][] };
@@ -58,7 +59,7 @@ export type World = {
   chowk: { x0: number; z0: number; x1: number; z1: number; y: number };
   trees: Tree[];
   structures: Structure[];
-  landmarks: Record<"spawn" | "temple" | "hanuman" | "school" | "pir" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat", Landmark>;
+  landmarks: Record<"spawn" | "temple" | "hanuman" | "school" | "pir" | "tank" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat", Landmark>;
 };
 
 export const idx = (x: number, y: number, z: number) => x + W * (z + D * y);
@@ -382,9 +383,9 @@ export function generateWorld(seed = WORLD_SEED): World {
     plate(x0 - 1.4, z0 + 3, y0 + 1.6, -Math.PI / 2, ["जिल्हा परिषद प्राथमिक शाळा", "उखळी तांडा, ता. जि. जालना", "Z.P. Primary School, Ukhali Tanda"], "#1d4ed8");
     return { x: x0 - 2, y: y0, z: z0 + 3 };
   })();
-  // the pir on the front of the tekdi: a roof on four posts over the mazar, a tree beside it
+  // the pir on top of the tekdi: a roof on four posts over the mazar, a tree beside it
   const pir = (() => {
-    const x = 137, z = 84;
+    const x = 151, z = 73;
     let y = 0;
     for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) y = Math.max(y, height[col(x + dx, z + dz)]);
     pad(x - 3, z - 3, x + 3, z + 3, y);
@@ -393,6 +394,16 @@ export function generateWorld(seed = WORLD_SEED): World {
     structures.push({ kind: "pir", x, z, y: y + 1 });
     plate(x - 3.2, z + 2.2, y + 1, -Math.PI / 2, ["पीर बाबा", "Pir Baba"], "#15803d");
     return { x: x - 3, y: y + 1, z };
+  })();
+  // the pani ki tanki beside it: the tanda's water tank, standing tall on the hilltop
+  const tank = (() => {
+    const x = 157, z = 78;
+    let y = 0;
+    for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) y = Math.max(y, height[col(x + dx, z + dz)]);
+    pad(x - 3, z - 3, x + 3, z + 3, y);
+    for (const [dx, dz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) for (let k = 1; k <= 3; k++) set(x + dx, y + k, z + dz, B.COBBLE);
+    structures.push({ kind: "tank", x, z, y: y + 1 });
+    return { x: x - 4, y: y + 1, z };
   })();
   plate(school.x + 0.2, school.z + 4, school.y, -Math.PI / 2, ["→ शाळा · मंदिर · पीर", "School · Mandir · Pir"]);
 
@@ -599,6 +610,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       hanuman: lm(hanuman, "Hanuman mandir"),
       school: lm(school, "Z.P. school"),
       pir: lm(pir, "Pir Baba"),
+      tank: lm(tank, "Water tank"),
       trader: lm(trader, "Trader"),
       seedShop: lm(seedShop, "Seed & tool shop"),
       landOffice: lm(landOffice, "Naik's kacheri"),

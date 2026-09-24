@@ -106,6 +106,7 @@ export class Village {
       else if (s.kind === "hanuman") this.hanuman(s, M);
       else if (s.kind === "school") this.school(s, M);
       else if (s.kind === "pir") this.pir(s, M);
+      else if (s.kind === "tank") this.tank(s, M);
       else if (s.kind === "plate") this.plate(s);
     }
     for (const p of plots) this.fence(p, M, groundAt);
@@ -387,6 +388,55 @@ export class Village {
     this.group.add(f);
     this.flagCloth.push(f);
     this.lamps.push(new THREE.Vector3(cx, y + 2.5, cz));
+  }
+
+  /** The overhead water tank: a concrete bowl on eight columns with a ladder, "Ukhali Tanda" painted round it. */
+  private tank(s: Extract<Structure, { kind: "tank" }>, M: Record<string, () => THREE.Material>) {
+    const cx = s.x + 0.5, cz = s.z + 0.5, y = s.y - 1;
+    const concrete = () => new THREE.MeshStandardMaterial({ color: "#d9d4c7", roughness: 0.9 });
+    this.box("stone", M.stone, 7, 0.4, 7, cx, y + 0.2, cz);
+    const H = 11;
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      this.put("tankC", concrete, new THREE.CylinderGeometry(0.22, 0.26, H, 8), new THREE.Matrix4().makeTranslation(cx + Math.cos(a) * 2.5, y + H / 2, cz + Math.sin(a) * 2.5));
+    }
+    for (const hy of [H * 0.35, H * 0.7]) {
+      const ring = new THREE.TorusGeometry(2.5, 0.12, 4, 8).rotateX(Math.PI / 2).rotateY(Math.PI / 8);
+      this.put("tankC", concrete, ring, new THREE.Matrix4().makeTranslation(cx, y + hy, cz));
+    }
+    // the bowl: a cone underneath, a painted drum, and a domed lid
+    this.put("tankC", concrete, new THREE.CylinderGeometry(3.4, 1.8, 1.6, 24), new THREE.Matrix4().makeTranslation(cx, y + H + 0.8, cz));
+    const c = document.createElement("canvas");
+    c.width = 2048;
+    c.height = 256;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "#e9e4d6";
+    g.fillRect(0, 0, 2048, 256);
+    g.fillStyle = "#1d4ed8";
+    g.fillRect(0, 0, 2048, 26);
+    g.fillRect(0, 230, 2048, 26);
+    g.textAlign = "center";
+    // the name four times round, so it reads from every side of the village
+    for (let i = 0; i < 4; i++) {
+      const en = i % 2 === 1;
+      g.fillStyle = en ? "#1d4ed8" : "#b91c1c";
+      g.font = en ? "800 84px system-ui" : "800 96px 'Noto Sans Devanagari', 'Kohinoor Devanagari', system-ui";
+      g.fillText(en ? "UKHALI TANDA" : "उखळी तांडा", 256 + i * 512, 162);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, 2.8, 32, 1, true), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
+    drum.position.set(cx, y + H + 3, cz);
+    drum.castShadow = true;
+    this.group.add(drum);
+    this.put("tankC", concrete, new THREE.SphereGeometry(3.45, 24, 8, 0, Math.PI * 2, 0, Math.PI / 5).scale(1, 0.6, 1), new THREE.Matrix4().makeTranslation(cx, y + H + 3.4, cz));
+    // the ladder up one column, and a railing round the top
+    for (let k = 0; k < H + 1; k += 0.5) this.box("dark", M.dark, 0.5, 0.04, 0.04, cx + 2.8, y + k, cz);
+    for (const dz of [-0.25, 0.25]) this.box("dark", M.dark, 0.04, H + 1.5, 0.04, cx + 2.8, y + (H + 1.5) / 2, cz + dz);
+    const rail = new THREE.TorusGeometry(3.45, 0.04, 4, 32).rotateX(Math.PI / 2);
+    this.put("dark", M.dark, rail, new THREE.Matrix4().makeTranslation(cx, y + H + 4.9, cz));
+    this.lamps.push(new THREE.Vector3(cx, y + H + 5.5, cz));
   }
 
   /** A painted name board on two posts (Devanagari over English). */

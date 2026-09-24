@@ -34,7 +34,7 @@ class Villager {
   private goal: Pt | null = null;
   private workLeft = 0;
   private leg = 0;
-  private speed = 1.3;
+  private speed = 0.95; // an easy village pace (you walk at 3.4)
   private path: Pt[] = [];
   private stuck = 0;
 
@@ -44,7 +44,7 @@ class Villager {
     this.pos = { ...start };
     if (role.kind === "farmer") this.fig.hold("hoe");
     if (role.kind === "water") this.fig.hold("pot");
-    if (role.kind === "child") this.speed = 2.8;
+    if (role.kind === "child") this.speed = 1.8;
   }
 
   update(dt: number, t: number, day: boolean, world: World, ground: (x: number, z: number) => number, rnd: () => number, nav: Nav) {
@@ -116,9 +116,9 @@ class Villager {
       }
     } else {
       // children chase each other in wobbly circles
-      const a = t * 0.9 + this.scale * 10;
+      const a = t * 0.35 + this.scale * 10;
       // (a short hop each frame, not a routed walk: they skirt obstacles by simply not entering them)
-      step({ x: r.center.x + Math.cos(a) * r.r * (1 + 0.3 * Math.sin(t * 0.7)), z: r.center.z + Math.sin(a) * r.r }, 3.2);
+      step({ x: r.center.x + Math.cos(a) * r.r * (1 + 0.3 * Math.sin(t * 0.7)), z: r.center.z + Math.sin(a) * r.r }, 1.8);
       fig.action = "none";
     }
     this.place(ground);
@@ -215,7 +215,7 @@ export class Villagers {
     return { worked: this.worked, visible: this.people.filter((p) => p.fig.root.visible).length, plants: this.fields.group.children.map((c) => (c as THREE.InstancedMesh).count).filter(Boolean) };
   }
 
-  update(dt: number, t: number, hour: number, save: Save, day: number, now: number, near: THREE.Vector3) {
+  update(dt: number, t: number, hour: number, save: Save, day: number, now: number, _near: THREE.Vector3) {
     this.refreshFields(save, day, now);
     const daytime = hour > 6.2 && hour < 19.3;
     this.fields.update(t);
@@ -226,9 +226,7 @@ export class Villagers {
         if (!v.fig.root.visible) continue;
       }
       // people far away don't need animating every frame
-      const far = Math.hypot(v.pos.x - near.x, v.pos.z - near.z) > 90;
-      if (far && Math.random() > 0.2) continue;
-      v.update(far ? dt * 5 : dt, t, daytime, this.world, this.ground, this.rnd, this.nav);
+      v.update(dt, t, daytime, this.world, this.ground, this.rnd, this.nav);
     }
   }
 }
