@@ -92,11 +92,11 @@ another device. Google sign-in is a v2 item.
 - [x] *Done when:* screenshots at noon and sunset look warm and readable, 60 fps on the test machine.
 
 ### M2 · Walking and building
-- [ ] First-person controls with pointer lock, WASD, jump, sprint; AABB collision with blocks.
-- [ ] Voxel raycast (DDA) with a block outline; dig (left click) and place (right click).
-- [ ] Hotbar (1–9, mouse wheel) with tools and blocks; crosshair; FPS/coords debug toggle (F3).
-- [ ] Chunk remesh on edit is instant (< 16 ms for one chunk).
-- [ ] *Done when:* scripted headless test digs and places a block and the screenshot shows it.
+- [x] First-person controls with pointer lock, WASD, jump, sprint; AABB collision with blocks.
+- [x] Voxel raycast (DDA) with a block outline; dig (left click) and place (right click).
+- [x] Hotbar (1–9, mouse wheel) with tools and blocks; crosshair; FPS/coords debug toggle (F3).
+- [x] Chunk remesh on edit is instant (< 16 ms for one chunk).
+- [x] *Done when:* scripted headless test digs and places a block and the screenshot shows it.
 
 ### M3 · Farming
 - [ ] Crops: jowar, onion, sugarcane (v1), with seasons, growth days, water need, yield; unit tests.
@@ -155,3 +155,4 @@ _(one line per loop iteration: date · task · how it was verified · commit)_
 
 - 2026-09-24 · M0 scaffold · `tsc` clean, vitest 1/1, `vite build` ok, `/api/health` → FileStore ok, headless Chrome screenshot shows a lit WebGL cube, no page errors
 - 2026-09-24 · M1 world · 27 blocks, canvas atlas, seeded world (6 vitest: determinism, 16 non-overlapping plots, one starter, river water, spawn), worker mesher with AO (0.8 ms/chunk, whole world 0.1–0.3 s), sky + day–night; screenshots at noon / golden hour / 5 views looked at and fixed (market pit, river framing, map edge ring, soil and sunset tone); 60 fps (16.6 ms median, p95 17.6 ms, 270 draw calls worst view)
+- 2026-09-24 · M2 walking and building · 5 new vitest (landing, no tunnelling from y 47, wall stop, 1.25-block jump, DDA faces); scripted headless play: walked 3 blocks, jumped 1.25, dug a 3-block trench in the road and stacked bricks (screenshots m2-before/after/wide looked at), swam out of the river onto the bank, outline visible; edit → new geometry 1.3–2.5 ms; outline strengthened after first look

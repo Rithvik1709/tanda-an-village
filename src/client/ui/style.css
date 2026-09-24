@@ -2,3 +2,22 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: #bcd4de; font-family: ui-sans-serif, system-ui, sans-serif; }
 #game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
 #ui { position: fixed; inset: 0; pointer-events: none; }
+
+.hud { position: absolute; inset: 0; font-size: 14px; color: #fff; }
+.crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; transform: translate(-50%, -50%); }
+.crosshair::before, .crosshair::after { content: ""; position: absolute; background: rgba(255,255,255,0.9); box-shadow: 0 0 2px rgba(0,0,0,0.6); }
+.crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
+.crosshair::after { top: 8px; left: 0; height: 2px; width: 18px; }
+.hotbar { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 4px; padding: 5px; background: rgba(30, 24, 20, 0.55); border-radius: 10px; backdrop-filter: blur(4px); }
+.slot { position: relative; width: 52px; height: 52px; border-radius: 7px; background: rgba(255,255,255,0.08); border: 2px solid transparent; display: grid; place-items: center; }
+.slot.on { border-color: #f4ecd8; background: rgba(255, 236, 200, 0.22); }
+.slot canvas { width: 40px; height: 40px; image-rendering: pixelated; }
+.slot .key { position: absolute; left: 4px; top: 1px; font-size: 10px; opacity: 0.7; }
+.hand-icon { font-size: 26px; filter: grayscale(0.2); }
+.slot-label { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); padding: 3px 10px; border-radius: 6px; background: rgba(30,24,20,0.5); opacity: 0; transition: opacity 0.3s; }
+.slot-label.show { opacity: 1; }
+.debug { position: absolute; left: 10px; top: 10px; margin: 0; padding: 8px 10px; font: 12px/1.45 ui-monospace, Menlo, monospace; background: rgba(0,0,0,0.5); border-radius: 6px; }
+.play-prompt { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 18px; border-radius: 10px; background: rgba(30,24,20,0.6); text-align: center; }
+.play-prompt b { font-size: 18px; }
+.play-prompt span { font-size: 12px; opacity: 0.85; }
+[hidden] { display: none !important; }

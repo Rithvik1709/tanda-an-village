@@ -10,6 +10,9 @@ export class WorldRenderer {
   private req = 0;
   readonly materials: { opaque: THREE.Material; cutout: THREE.Material; water: THREE.Material };
   lastMeshMs = 0;
+  /** Round-trip time (edit → new geometry on screen) of the latest block edit. */
+  lastEditMs = 0;
+  private dirty = new Set<string>();
 
   constructor(private worker: Worker, atlas: THREE.Texture) {
     this.materials = {
@@ -42,6 +45,35 @@ export class WorldRenderer {
     const jobs: Promise<unknown>[] = [];
     for (let cz = 0; cz < D / CHUNK; cz++) for (let cx = 0; cx < W / CHUNK; cx++) jobs.push(this.mesh(cx, cz));
     return Promise.all(jobs);
+  }
+
+  /**
+   * Change one block: tell the worker, then remesh its chunk plus any neighbour whose faces or
+   * ambient occlusion can see the change (the block sits on that chunk's border).
+   */
+  setBlock(vox: Uint8Array, x: number, y: number, z: number, b: number) {
+    vox[x + W * (z + D * y)] = b;
+    this.worker.postMessage({ type: "set", x, y, z, b });
+    const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
+    const lx = x - cx * CHUNK, lz = z - cz * CHUNK;
+    const dxs = [0, lx === 0 ? -1 : lx === CHUNK - 1 ? 1 : 0];
+    const dzs = [0, lz === 0 ? -1 : lz === CHUNK - 1 ? 1 : 0];
+    for (const dx of new Set(dxs)) for (const dz of new Set(dzs)) {
+      const nx = cx + dx, nz = cz + dz;
+      if (nx >= 0 && nz >= 0 && nx < W / CHUNK && nz < D / CHUNK) this.dirty.add(`${nx},${nz}`);
+    }
+  }
+
+  /** Remesh every chunk touched since the last flush (called once per frame, so edits batch up). */
+  flush(): Promise<unknown> | null {
+    if (!this.dirty.size) return null;
+    const t0 = performance.now();
+    const jobs = [...this.dirty].map((k) => {
+      const [cx, cz] = k.split(",").map(Number);
+      return this.mesh(cx, cz);
+    });
+    this.dirty.clear();
+    return Promise.all(jobs).then(() => (this.lastEditMs = performance.now() - t0));
   }
 
   private geometry(d: MeshData) {
