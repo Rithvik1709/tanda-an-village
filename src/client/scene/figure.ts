@@ -235,11 +235,22 @@ export class Figure {
       part(new THREE.SphereGeometry(0.014, 8, 6), "#1c1410", h, s * 0.042, 0.14, 0.102, 0.4);
       part(new THREE.SphereGeometry(0.022, 8, 6), look.skin, h, s * 0.112, 0.11, 0);
     }
-    // a short modern cut: fuller on top, faded sides, and a trimmed beard line
-    const hair = part(new THREE.SphereGeometry(0.122, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2.1), look.hat, h, 0, 0.14, -0.01);
-    hair.scale.set(1, 0.9, 1.05);
-    part(new THREE.SphereGeometry(0.07, 12, 8), look.hat, h, 0.02, 0.24, 0.05).scale.set(1.3, 0.55, 1);
-    part(new THREE.TorusGeometry(0.085, 0.018, 6, 16, Math.PI), "#1f1712", h, 0, 0.075, 0.03).rotation.z = Math.PI;
+    // a clean-shaven face and a modern cut: short faded back and sides, textured and pushed up at the front
+    // the hair shell is tilted back: it covers the crown and the back of the head low, the forehead high
+    const cap = part(new THREE.SphereGeometry(0.122, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), look.hat, h, 0, 0.115, -0.006);
+    cap.rotation.x = -0.45;
+    cap.scale.set(1.02, 1, 1.03);
+    // a short side-parted fringe at the front
+    const fringe = part(new THREE.SphereGeometry(0.06, 12, 8), look.hat, h, 0.03, 0.205, 0.07);
+    fringe.scale.set(1.5, 0.45, 0.8);
+    // wayfarer sunglasses
+    const shades = "#101216";
+    for (const s2 of [-1, 1]) {
+      const lens = part(new THREE.BoxGeometry(0.068, 0.04, 0.012), shades, h, s2 * 0.043, 0.138, 0.112, 0.2);
+      lens.rotation.y = s2 * 0.12;
+      part(new THREE.BoxGeometry(0.008, 0.012, 0.12), shades, h, s2 * 0.1, 0.145, 0.055, 0.3); // the arms back to the ears
+    }
+    part(new THREE.BoxGeometry(0.03, 0.01, 0.01), shades, h, 0, 0.148, 0.114, 0.3); // the bridge
   }
 
   private woman(look: Look) {

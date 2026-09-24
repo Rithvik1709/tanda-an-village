@@ -47,9 +47,11 @@ class Villager {
   movedF = 0;
   blockedF = 0;
 
-  constructor(look: Look, public role: Role, start: Pt, private scale = 1) {
+  constructor(look: Look, public role: Role, start: Pt, private scale = 0) {
     this.fig = new Figure(look);
-    this.fig.root.scale.setScalar(scale);
+    // adults vary a little (±4%), never more; children are older kids, a bit shorter
+    if (!scale) this.scale = 0.96 + ((Math.abs(Math.sin(start.x * 12.9 + start.z * 78.2)) * 43758) % 1) * 0.08;
+    this.fig.root.scale.setScalar(this.scale);
     this.pos = { ...start };
     if (role.kind === "farmer") this.fig.hold("hoe");
     if (role.kind === "water") this.fig.hold("pot");
@@ -198,7 +200,7 @@ export class Villagers {
     });
     // children in the square
     const ch = w.chowk;
-    for (let i = 0; i < 3; i++) this.add(new Villager(i % 2 ? woman(i + 2) : man(i + 1), { kind: "child", center: { x: (ch.x0 + ch.x1) / 2 + 2, z: (ch.z0 + ch.z1) / 2 }, r: 2.5 + i }, { x: ch.x0 + 6 + i, z: ch.z0 + 6 }, 0.62 + i * 0.04));
+    for (let i = 0; i < 3; i++) this.add(new Villager(i % 2 ? woman(i + 2) : man(i + 1), { kind: "child", center: { x: (ch.x0 + ch.x1) / 2 + 2, z: (ch.z0 + ch.z1) / 2 }, r: 2.5 + i }, { x: ch.x0 + 6 + i, z: ch.z0 + 6 }, 0.84 + i * 0.03));
     // farmers for every neighbour's field (made visible when that field is worked)
     for (const p of w.plots) {
       if (p.starter) continue;
