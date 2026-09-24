@@ -1,5 +1,7 @@
 import { migrate, type Save } from "../../src/shared/save";
 import { generateWorld, WORLD_SEED, type World } from "../../src/shared/world";
+import { netWorth, titleFor } from "../../src/shared/bank";
+import { clock } from "../../src/shared/time";
 import { store } from "./store";
 
 /*
@@ -45,11 +47,50 @@ export async function authed(req: Request): Promise<string | null> {
   return store().get<string>(`token:${await sha256(m[1])}`);
 }
 
-export async function loadSave(id: string): Promise<(Save & { devSkew?: number }) | null> {
-  const s = await store().get<Save>(`save:${id}`);
-  return s ? migrate(s) : null;
+export type ServerSave = Save & { devSkew?: number };
+
+export async function loadSave(id: string): Promise<ServerSave | null> {
+  const s = await store().getVersioned<ServerSave>(`save:${id}`);
+  return s ? migrate(s.value) : null;
 }
-export const writeSave = (s: Save) => store().set(`save:${s.id}`, s);
+
+/** Create a brand-new save (fails if one exists). */
+export const createSave = (s: Save) => store().setVersioned(`save:${s.id}`, s, null);
+
+/**
+ * Load → change → write, safely: if another device wrote in between, reload and run `change`
+ * again on the fresh save (the rules are deterministic, so replaying is safe).
+ */
+export async function updateSave<R>(id: string, change: (s: ServerSave) => R | Promise<R>): Promise<{ save: ServerSave; result: R } | null> {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const cur = await store().getVersioned<ServerSave>(`save:${id}`);
+    if (!cur) return null;
+    const save = migrate(cur.value) as ServerSave;
+    const result = await change(save);
+    if (await store().setVersioned(`save:${id}`, save, cur.rev)) {
+      await publish(save).catch((e) => console.error("[board]", e)); // the board is best-effort; the save is what matters
+      return { save, result };
+    }
+  }
+  throw new Error("save is busy — too many devices writing at once");
+}
+
+export const displayName = (s: Save) => s.name?.trim() || `Farmer ${s.id.slice(0, 4).toUpperCase()}`;
+
+/** Put this farmer on the leaderboard (net worth, title, story progress). */
+export async function publish(s: Save) {
+  const now = serverNow(s);
+  const worth = netWorth(world(), s, now, clock(now).day).total;
+  await store().boardUpsert({
+    id: s.id,
+    name: displayName(s),
+    worth,
+    title: s.perks?.includes("sarpanch") ? "Sarpanch" : titleFor(worth).name,
+    missions: s.missions?.i ?? 0,
+    sarpanch: !!s.perks?.includes("sarpanch"),
+    updatedAt: s.updatedAt,
+  });
+}
 
 export const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "cache-control": "no-store" } });
 export const unauthorized = () => json({ error: "not signed in" }, 401);

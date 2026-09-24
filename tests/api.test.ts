@@ -91,3 +91,33 @@ describe("saves", () => {
     expect((await act(post({ actions: Array(300).fill({ t: "water", ...at() }) }, p.token))).status).toBe(400);
   });
 });
+
+describe("two devices and the leaderboard", () => {
+  it("two devices acting at the same moment both land (no lost moves)", async () => {
+    const p = await newPlayer();
+    const other = await (await session(post({ recoveryCode: p.recoveryCode }))).json();
+    const a = at(starter, 3, 3), b = at(starter, 6, 3);
+    await Promise.all([
+      act(post({ actions: [{ t: "till", ...a }] }, p.token)),
+      act(post({ actions: [{ t: "till", ...b }] }, other.token)),
+    ]);
+    const s = await (await state(get(p.token))).json();
+    expect(Object.keys(s.save.farm)).toHaveLength(2);
+  });
+
+  it("names are validated, and the board ranks farmers by net worth", async () => {
+    const { GET: board } = await import("../api/leaderboard");
+    const p1 = await newPlayer();
+    const p2 = await newPlayer();
+    const bad = await (await act(post({ actions: [{ t: "setName", name: "<script>" }] }, p1.token))).json();
+    expect(bad.results[0].ok).toBe(false);
+    await act(post({ actions: [{ t: "setName", name: "गजानन" }] }, p1.token));
+    await dev(post({ money: 50000 }, p2.token));
+    await act(post({ actions: [{ t: "setName", name: "Sitaram" }] }, p2.token));
+    const r = await (await board(get(p1.token))).json();
+    expect(r.top.map((x: { name: string }) => x.name).slice(0, 2)).toEqual(["Sitaram", "गजानन"]);
+    expect(r.me).toMatchObject({ rank: 2, total: 2, name: "गजानन" });
+    expect(r.top[1].you).toBe(true);
+    expect(JSON.stringify(r)).not.toMatch(/token|recovery|[a-f0-9]{16}/); // no ids or secrets leak
+  });
+});

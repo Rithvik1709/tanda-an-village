@@ -36,6 +36,7 @@ export class TitleScreen {
   open = true;
   onPlay: () => void = () => {};
   onSettings: () => void = () => {};
+  onBoard: () => void = () => {};
   onRestore: (code: string) => Promise<string | null> = async () => null;
 
   constructor(parent: HTMLElement) {
@@ -48,8 +49,9 @@ export class TitleScreen {
         <div class="title-buttons">
           <button class="primary" data-t="play">Start farming</button>
           <div class="title-row">
+            <button data-t="board">Leaderboard</button>
+            <button data-t="about">The village</button>
             <button data-t="settings">Settings</button>
-            <button data-t="about">About the village</button>
           </div>
           <button class="link" data-t="restore">Continue a farm from another device</button>
         </div>
@@ -70,6 +72,7 @@ export class TitleScreen {
       if (!t || this.el.classList.contains("busy")) return;
       if (t.dataset.t === "play") this.onPlay();
       if (t.dataset.t === "settings") this.onSettings();
+      if (t.dataset.t === "board") this.onBoard();
       if (t.dataset.t === "about") {
         const c = this.el.querySelector(".about-card") as HTMLElement;
         c.hidden = !c.hidden;

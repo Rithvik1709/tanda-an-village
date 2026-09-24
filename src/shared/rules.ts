@@ -44,7 +44,8 @@ export type Action =
   | { t: "choose"; option: string }
   | { t: "claimMission" }
   | { t: "decorate" }
-  | { t: "installDrip"; plot: number };
+  | { t: "installDrip"; plot: number }
+  | { t: "setName"; name: string };
 
 export type Result = { ok: true; msg?: string; gained?: Record<string, number> } | { ok: false; error: string };
 
@@ -89,7 +90,15 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
-const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip"]);
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName"]);
+
+/** A leaderboard name: 2–20 letters (any script), digits, spaces, dots, dashes or apostrophes. */
+export function cleanName(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const n = raw.normalize("NFC").replace(/\s+/g, " ").trim();
+  if (n.length < 2 || n.length > 20 || !/^[\p{L}\p{M}\p{N} .'-]+$/u.test(n)) return null;
+  return n;
+}
 const FOREVER = 8.64e15; // drip-irrigated soil never dries
 
 /** Story actions: talking, visiting, deliveries, choices, rewards — and the drip set. */
@@ -458,6 +467,13 @@ function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: numbe
 export function apply(world: World, save: Save, a: Action, now: number): Result {
   if (!a || typeof a !== "object" || !KNOWN.has(a.t)) return fail("Unknown action.");
   if (save.missions) checkDeadline(world, save, now);
+  if (a.t === "setName") {
+    const n = cleanName(a.name);
+    if (!n) return fail("Use 2–20 letters, numbers or spaces.");
+    save.name = n;
+    save.updatedAt = now;
+    return { ok: true, msg: `You're on the board as ${n}` };
+  }
   if (a.t === "talk" || a.t === "visit" || a.t === "deliver" || a.t === "choose" || a.t === "claimMission" || a.t === "decorate" || a.t === "installDrip") {
     const r = story(world, save, a, now);
     if (r.ok) save.updatedAt = now;

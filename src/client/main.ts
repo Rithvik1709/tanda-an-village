@@ -39,6 +39,7 @@ import { Infrastructure } from "./scene/infrastructure";
 import { Nav, separate } from "./player/nav";
 import { Audio, renderRms, SOUNDS } from "./audio";
 import { Guide } from "./ui/guide";
+import { Leaderboard } from "./ui/leaderboard";
 import { current } from "../shared/missions";
 import { isTouchOnly, loadSettings, SettingsPanel, showMobileNote, TitleScreen, Tutorial } from "./ui/screens";
 
@@ -235,6 +236,20 @@ titleScreen.onPlay = () => {
   if (!guide.showWelcome(uiRoot, () => enterGame(true))) enterGame(true);
 };
 titleScreen.onSettings = () => settingsPanel.show();
+const board = new Leaderboard(uiRoot, () => net.token);
+board.onClose = () => hud.setPlaying(titleScreen.open);
+board.setName = async (n) => {
+  const r = game.act({ t: "setName", name: n });
+  if (!r.ok) return r.error;
+  await net.flush();
+  return null;
+};
+const showBoard = () => {
+  board.show();
+  hud.setPlaying(true);
+  document.exitPointerLock?.();
+};
+titleScreen.onBoard = showBoard;
 const showSettings = settingsPanel.show.bind(settingsPanel);
 settingsPanel.show = () => {
   showSettings();
@@ -685,10 +700,12 @@ controls.onInteract = () => {
   if (s) openStall(s.kind);
 };
 controls.onEscape = () => {
+  board.close();
   panels.close();
   map.close();
 };
 controls.onMap = () => (map.open ? map.close() : showMap());
+controls.onBoard = () => (board.open ? board.close() : showBoard());
 controls.onHelp = () => {
   guide.toggleHelp();
   if (guide.helpOpen) document.exitPointerLock?.();

@@ -130,7 +130,8 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .tagline { font-size: 17px; line-height: 1.55; margin: 18px 0 10px; opacity: 0.92; }
 .tagline b { color: #ffd98a; font-weight: 700; }
 .title-save { min-height: 22px; font-size: 15px; color: #ffe6b0; }
-.title-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; width: min(400px, 100%); }
+.title-buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 18px; width: min(420px, 100%); }
+.title-buttons .title-row button { padding: 11px 8px; white-space: nowrap; }
 .title-buttons button.primary, .title-buttons .link, .title-buttons .title-restore, .title-buttons .restore-msg { grid-column: 1 / -1; }
 .title-row { display: contents; }
 .title-buttons button { width: 100%; text-align: center; }
@@ -215,3 +216,15 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .goal-deadline { font-size: 13px; font-weight: 700; color: #b0452a; }
 .goal-missed { font-size: 12px; color: #b0452a; }
 .rep { color: #cfe8a8; font-weight: 700; }
+.board { z-index: 40; }
+.board-me { padding: 10px 12px; border-radius: 10px; background: #fbe3b8; margin-bottom: 10px; font-size: 15px; }
+.board-table td { padding: 8px 6px; }
+.board-table td.rank { width: 36px; text-align: center; font-size: 18px; font-weight: 800; color: #9a6a10; }
+.board-table tr.you td { background: #fdf0d2; }
+.board-table tr.sep td { border-top: 2px dashed #d9c49a; }
+.name-form { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.name-form label { font-weight: 700; }
+.name-form div { display: flex; gap: 6px; }
+.name-form input { flex: 1; font: 600 14px system-ui; padding: 7px 10px; border-radius: 8px; border: 1px solid #d9c49a; }
+.name-form button { font: 700 14px system-ui; padding: 7px 16px; border-radius: 8px; border: 0; background: #b8553a; color: #fff; cursor: pointer; }
+.name-form small { opacity: 0.65; }

@@ -76,7 +76,7 @@ export class Guide {
         <div><b>Use it</b><span><b>Right-click</b> the soil: plough, sow, water · <b>Left-click</b> a ripe crop: harvest</span></div>
         <div><b>Talk &amp; trade</b><span><kbd>E</kbd> near a stall or person</span></div>
         <div><b>Bulls &amp; cart</b><span><kbd>F</kbd> feed · <kbd>R</kbd> at the cart: load and ride to the town mandi</span></div>
-        <div><b>Other</b><span><kbd>M</kbd> map · <kbd>V</kbd> first/third person · <kbd>T</kbd> torch at night · <kbd>H</kbd> this help · <kbd>Esc</kbd> pause</span></div>
+        <div><b>Other</b><span><kbd>L</kbd> leaderboard · <kbd>M</kbd> map · <kbd>V</kbd> first/third person · <kbd>T</kbd> torch at night · <kbd>H</kbd> this help · <kbd>Esc</kbd> pause</span></div>
       </div>
       <p class="hint">The golden marker and the goal card (top left) always show what to do next. Your farm is saved online automatically.</p>
       <div class="big-acts"><button data-close>Got it</button></div></div>`;

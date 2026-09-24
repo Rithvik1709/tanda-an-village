@@ -13,16 +13,29 @@ land. Runs in the browser (Three.js). A server checks every move, and your farm 
   - `node scripts/m4.mjs`: accounts, saves, tamper checks
   - `node scripts/shots.mjs --name x --eval "$(cat scripts/m3.js)"`: farming (also m5 economy, m6 land, m7 cart, m8 bank)
 
-## Deploy (Vercel + Upstash Redis)
+## Deploy (Vercel + Supabase)
 
-1. `npx vercel login`
-2. `npx vercel link`: create the project `tanda`.
-3. Vercel dashboard → Storage → add **Upstash for Redis** (free tier) and connect it to the project.
-   It sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`. Without them, the API refuses to run on Vercel.
+The game's API runs as Vercel functions in this repo (`api/`). They check every move and are the only
+thing that talks to the database. Players start as guests, with no sign-up.
+
+1. **Supabase:** create a project at supabase.com (Region: Mumbai). In the SQL Editor, paste
+   [`supabase/schema.sql`](supabase/schema.sql) and run it.
+2. **Vercel:** `npx vercel login`, then `npx vercel link` (project `tanda`).
+3. **Keys:** in Vercel → Settings → Environment Variables, add `SUPABASE_URL` and
+   `SUPABASE_SERVICE_ROLE_KEY` (from Supabase → Settings → API). Or use Vercel's Supabase integration,
+   which adds them for you. **The service key must never go in client code.**
 4. `npx vercel --prod`
-5. Check the deploy: `curl https://<deployment>/api/health` should return `{"ok":true,"store":"UpstashStore",…}`.
-6. Domains → add `tanda.gajananrathod.in`, then at your DNS provider add a `CNAME` from `tanda`
-   to `cname.vercel-dns.com`.
+5. Check: `curl https://<deployment>/api/health` should return `{"ok":true,"store":"SupabaseStore",…}`.
+6. Domains → add `tanda.gajananrathod.in`, then at your DNS provider add a `CNAME` from `tanda` to `cname.vercel-dns.com`.
+
+Without the Supabase keys, the API refuses to run on Vercel, so saves are never silently lost.
+Locally it uses JSON files in `.data/`.
+
+**What's stored:**
+- `kv`: players, session token hashes, recovery codes, and each save as JSONB with a `rev` column.
+  A stale write is refused and replayed, so two devices can play at once.
+- `leaderboard`: name, net worth, title, missions and Sarpanch, updated after every accepted move.
+- `accounts`: ready for sign-up later (Supabase Auth user → guest farm).
 
 The dev-only endpoint `/api/dev` (clock fast-forward and money grant) returns 404 on Vercel.
 

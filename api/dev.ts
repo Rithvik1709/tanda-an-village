@@ -1,5 +1,5 @@
 import { begin } from "../src/shared/missions";
-import { authed, devClockAllowed, json, loadSave, readJson, serverNow, unauthorized, writeSave } from "./_lib/game";
+import { authed, devClockAllowed, json, readJson, serverNow, unauthorized, updateSave } from "./_lib/game";
 
 /** POST /api/dev { skipMs?, money? } — dev only: fast-forward this save's clock, or grant money for tests. 404 in production. */
 export async function POST(req: Request): Promise<Response> {
@@ -12,12 +12,13 @@ export async function POST(req: Request): Promise<Response> {
   const rep = body?.rep === undefined ? null : Number(body.rep);
   const money = Number(body?.money ?? 0);
   if (!Number.isFinite(skip) || skip < 0 || skip > 30 * 24 * 3600e3 || !Number.isInteger(money) || money < 0 || money > 1e7) return json({ error: "bad request" }, 400);
-  const save = await loadSave(id);
-  if (!save) return unauthorized();
-  save.devSkew = (save.devSkew ?? 0) + skip;
-  save.money += money;
-  if (jump !== null && Number.isInteger(jump) && jump >= 0) begin(save, jump, serverNow(save));
-  if (rep !== null && Number.isFinite(rep)) save.rep = rep;
-  await writeSave(save);
+  const done = await updateSave(id, (save) => {
+    save.devSkew = (save.devSkew ?? 0) + skip;
+    save.money += money;
+    if (jump !== null && Number.isInteger(jump) && jump >= 0) begin(save, jump, serverNow(save));
+    if (rep !== null && Number.isFinite(rep)) save.rep = rep;
+  });
+  if (!done) return unauthorized();
+  const { save } = done;
   return json({ save, serverNow: serverNow(save) });
 }

@@ -1,5 +1,5 @@
 import { newSave } from "../src/shared/save";
-import { issueToken, json, normalizeCode, type Player, randomHex, readJson, recoveryCode, world, writeSave } from "./_lib/game";
+import { issueToken, json, normalizeCode, type Player, randomHex, readJson, recoveryCode, world, createSave, publish } from "./_lib/game";
 import { store } from "./_lib/store";
 
 /**
@@ -26,6 +26,8 @@ export async function POST(req: Request): Promise<Response> {
   const player: Player = { id, recoveryCode: code, createdAt: now };
   await s.set(`player:${id}`, player);
   await s.set(`recovery:${code}`, id);
-  await writeSave(newSave(id, world(), now));
+  const save = newSave(id, world(), now);
+  await createSave(save);
+  await publish(save).catch(() => {});
   return json({ token: await issueToken(id), id, recoveryCode: code }, 201);
 }
