@@ -120,23 +120,38 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .info .title { color: #f3d9a0; font-weight: 700; }
 .info .debt { color: #ffb4a0; font-weight: 700; }
 /* ---- title screen ---- */
-.title-screen { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: auto; background: linear-gradient(180deg, rgba(20,14,10,0.0) 30%, rgba(20,14,10,0.55)); transition: opacity 0.6s; z-index: 10; }
+.title-screen { position: absolute; inset: 0; pointer-events: auto; z-index: 10; transition: opacity 0.6s;
+  background: linear-gradient(90deg, rgba(24,14,6,0.78) 0%, rgba(24,14,6,0.55) 34%, rgba(24,14,6,0) 62%), linear-gradient(0deg, rgba(20,12,4,0.55), rgba(20,12,4,0) 30%); }
 .title-screen.gone { opacity: 0; pointer-events: none; }
-.title-inner { text-align: center; color: #fff; margin-top: 8vh; }
-.wordmark { font: 800 clamp(56px, 11vw, 112px)/0.9 Georgia, "Times New Roman", serif; letter-spacing: -0.02em; text-shadow: 0 4px 30px rgba(60, 20, 0, 0.55), 0 2px 0 rgba(120, 50, 10, 0.5); color: #fff4dc; }
-.wordmark span { display: block; font: 700 clamp(22px, 3.2vw, 34px) system-ui; letter-spacing: 0.04em; margin-top: 10px; color: #ffd98a; }
-.tagline { font-size: 17px; margin: 18px auto 8px; max-width: 520px; text-shadow: 0 1px 8px rgba(0,0,0,0.6); }
-.title-save { min-height: 22px; font-size: 15px; color: #ffe6b0; text-shadow: 0 1px 6px rgba(0,0,0,0.6); }
-.title-buttons { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 14px; }
-.title-buttons button { font: 700 16px system-ui; padding: 11px 26px; min-width: 240px; border-radius: 12px; border: 0; background: rgba(246, 238, 219, 0.92); color: #2a2530; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
-.title-buttons button.primary { background: #b8553a; color: #fff; font-size: 18px; padding: 13px 30px; }
-.title-buttons button.link { background: none; box-shadow: none; color: #fff; font-weight: 600; font-size: 14px; text-decoration: underline; min-width: 0; }
-.title-buttons button:hover { transform: translateY(-1px); }
-.title-screen .keys { margin-top: 18px; font-size: 12px; opacity: 0.75; }
-.title-screen .loading { position: absolute; bottom: 30px; left: 0; right: 0; text-align: center; color: #fff; font-size: 14px; opacity: 0; transition: opacity 0.3s; }
+.title-inner { position: absolute; left: clamp(24px, 7vw, 110px); top: 50%; transform: translateY(-50%); width: min(520px, calc(100vw - 48px)); color: #fff; }
+.eyebrow { font: 700 12px system-ui; letter-spacing: 0.18em; text-transform: uppercase; color: #ffcf7a; opacity: 0.9; }
+.wordmark { font: 800 clamp(64px, 9vw, 120px)/0.92 Georgia, "Times New Roman", serif; letter-spacing: -0.02em; color: #fff4dc; text-shadow: 0 4px 30px rgba(60,20,0,0.5); margin-top: 6px; }
+.wordmark span { display: block; font: 700 clamp(20px, 2.4vw, 28px) system-ui; letter-spacing: 0.02em; margin-top: 12px; color: #ffd98a; }
+.tagline { font-size: 17px; line-height: 1.55; margin: 18px 0 10px; opacity: 0.92; }
+.title-save { min-height: 22px; font-size: 15px; color: #ffe6b0; }
+.title-buttons { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 16px; }
+.title-row { display: flex; gap: 10px; }
+.title-buttons button { font: 700 15px system-ui; padding: 11px 20px; border-radius: 12px; border: 1px solid rgba(255,236,200,0.35); background: rgba(255,244,220,0.12); color: #fff4dc; cursor: pointer; backdrop-filter: blur(6px); }
+.title-buttons button:hover { background: rgba(255,244,220,0.22); }
+.title-buttons button.primary { background: #c25a36; border-color: transparent; font-size: 18px; padding: 14px 34px; box-shadow: 0 10px 30px rgba(120,40,10,0.45); }
+.title-buttons button.primary:hover { background: #d4683f; }
+.title-buttons button.link { background: none; border: 0; padding: 4px 0; font-weight: 600; font-size: 14px; text-decoration: underline; opacity: 0.85; backdrop-filter: none; }
+.about-card { position: absolute; right: clamp(20px, 5vw, 70px); top: 50%; transform: translateY(-50%); width: min(400px, calc(100vw - 40px)); padding: 22px 24px; border-radius: 16px; background: rgba(250,242,226,0.96); color: #2a2530; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+.about-card h3 { margin: 6px 0 10px; font: 800 24px Georgia, serif; }
+.about-card p { font-size: 14px; line-height: 1.6; margin: 0 0 10px; }
+.about-card .eyebrow { color: #9a6a10; }
+.about-card .about-note { font-size: 11px; opacity: 0.6; }
+.about-card .x { position: absolute; right: 12px; top: 10px; border: 0; background: none; font-size: 18px; cursor: pointer; opacity: 0.6; }
+.title-credit { position: absolute; left: clamp(24px, 7vw, 110px); bottom: 26px; color: #f4e6c8; font-size: 14px; letter-spacing: 0.02em; }
+.title-credit b { color: #ffd98a; }
+.title-keys { position: absolute; right: 24px; bottom: 26px; color: #fff; font-size: 12px; opacity: 0.7; }
+.title-screen .loading { position: absolute; bottom: 60px; left: clamp(24px, 7vw, 110px); color: #fff; font-size: 14px; opacity: 0; transition: opacity 0.3s; }
 .title-screen.busy .loading { opacity: 0.9; }
 .title-screen.busy .title-buttons { opacity: 0.4; }
 .ui-title .hud > :not(.toasts):not(.banner) { visibility: hidden; }
+.settings { z-index: 40; background: rgba(20,12,4,0.5); }
+.settings .panel-card { background: #f6eedb; color: #2a2530; }
+@media (max-width: 900px) { .about-card { top: auto; bottom: 70px; transform: none; } .title-keys { display: none; } }
 /* ---- settings, tutorial, phone note ---- */
 .settings-card label { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; font-weight: 600; font-size: 14px; }
 .settings-card label b { position: absolute; right: 22px; font-weight: 700; color: #8a5a10; }

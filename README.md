@@ -1,5 +1,7 @@
 # Tanda · तांडा
 
+Created by **Gajanan Rathod**.
+
 A cinematic farming game set in **Ukhali Tanda (उखळी तांडा)**, a Banjara settlement in Maharashtra. Ox caravans were the Banjara trade of old, and they still are in the game. Farm black soil, water your jowar, onions
 and sugarcane, cart the harvest to the town mandi behind your bulls Sarja and Raja, and buy and sell
 land. Runs in the browser (Three.js). A server checks every move, and your farm is saved online.

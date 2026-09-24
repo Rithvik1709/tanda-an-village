@@ -41,22 +41,39 @@ export class TitleScreen {
   constructor(parent: HTMLElement) {
     this.el = el("div", "title-screen", parent, `
       <div class="title-inner">
+        <div class="eyebrow">A farming game from the Deccan</div>
         <div class="wordmark">Tanda<span>उखळी तांडा · Ukhali Tanda</span></div>
-        <p class="tagline">A Banjara tanda on the black soil of the Deccan. Farm, cart your harvest to the mandi the old caravan way, and buy the land.</p>
+        <p class="tagline">Come home to the tanda. Plough the black soil, cart your harvest to the mandi the old caravan way, and grow from a small farmer to the Pola champion.</p>
         <div class="title-save"></div>
         <div class="title-buttons">
           <button class="primary" data-t="play">Start farming</button>
-          <button data-t="settings">Settings</button>
+          <div class="title-row">
+            <button data-t="settings">Settings</button>
+            <button data-t="about">About the village</button>
+          </div>
           <button class="link" data-t="restore">Continue a farm from another device</button>
         </div>
-        <p class="keys">WASD walk · mouse look · left click harvest · right click use · E talk · M map · V view · T torch</p>
       </div>
+      <aside class="about-card" hidden>
+        <button class="x" data-t="about">✕</button>
+        <div class="eyebrow">The real village</div>
+        <h3>Ukhali Tanda · उखळी तांडा</h3>
+        <p>A Banjara settlement in <b>Jalna district, Maharashtra</b> (19.82° N, 76.21° E), in the black-soil country of Marathwada. Its lanes, the Jalna road, the field strips, the red scrub to the east and the old vihir in the fields are laid out from the real map.</p>
+        <p>The Banjaras once crossed the Deccan in ox caravans carrying salt and grain. Today the tanda farms jowar, onion and sugarcane with bulls and electric pumps and drip lines. It gathers at the Sevalal Maharaj mandir for Teej, and honours its bulls at Pola.</p>
+        <p class="about-note">Roads: © OpenStreetMap contributors. The houses, people and stories are imagined.</p>
+      </aside>
+      <div class="title-credit">Created by <b>Gajanan Rathod</b></div>
+      <div class="title-keys">WASD walk · mouse look · left click harvest · right click use · E talk · M map · V view · T torch · H help</div>
       <div class="loading">Preparing the village…</div>`);
     this.el.addEventListener("click", (e) => {
       const t = (e.target as HTMLElement).closest("[data-t]") as HTMLElement | null;
       if (!t || this.el.classList.contains("busy")) return;
       if (t.dataset.t === "play") this.onPlay();
       if (t.dataset.t === "settings") this.onSettings();
+      if (t.dataset.t === "about") {
+        const c = this.el.querySelector(".about-card") as HTMLElement;
+        c.hidden = !c.hidden;
+      }
       if (t.dataset.t === "restore") {
         t.outerHTML = `<form class="restore title-restore"><input name="code" placeholder="XXXX-XXXX-XXXX" maxlength="16" autocomplete="off" spellcheck="false"><button>Continue that farm</button></form><div class="restore-msg"></div>`;
         const f = this.el.querySelector(".title-restore") as HTMLFormElement;
