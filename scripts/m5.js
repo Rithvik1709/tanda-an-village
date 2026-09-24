@@ -1,7 +1,13 @@
 // M5 scripted economy: grow onions, sell them to the trader through the panel, check prices and the
 // ledger, buy at the seed shop, and confirm the server agrees on the money. Run via shots.mjs --eval.
-(async () => { window.__bailgaadi.setView("first");
+(async () => {
+  for (const id of ["homecoming", "firstcrop", "water", "order", "bulls", "teej", "caravan", "debt", "election", "land", "pola"]) localStorage.setItem("tanda.mission." + id, "1"); // (story cards are tested elsewhere)
+  window.__bailgaadi.setView("first");
   const g = window.__bailgaadi;
+  g.autoSkipStory(true); // story cards are tested in missions.js
+  g.play();
+  await new Promise((r) => setTimeout(r, 900));
+  g.skipStory();
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const key = (code) => window.dispatchEvent(new KeyboardEvent("keydown", { code }));
   const click = async (sel) => { const b = document.querySelector(sel); if (!b) throw new Error("no " + sel); b.click(); await wait(80); };
@@ -11,17 +17,17 @@
   const y = p.y;
   // a row of onions, sown and left to grow (dry soil still grows, just slower)
   const cells = [3, 4, 5, 6, 7, 8].map((d) => [p.x0 + d, y, p.z0 + 4]);
-  const at = async (c) => {
-    const sx = c[0] + 0.5, sz = c[2] - 1.5, e = { x: sx, y: y + 2.62, z: sz };
-    const dx = c[0] + 0.5 - e.x, dy = c[1] + 0.9 - e.y, dz = c[2] + 0.5 - e.z;
-    g.teleport(sx, y + 1, sz, Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz)));
+  const at = async (c, h = 0.9) => {
+    const sx = c[0] + 0.5, sz = c[2] - 1.5, e = { x: sx, y: y + 1.62, z: sz };
+    const dx = c[0] + 0.5 - e.x, dy = c[1] + h - e.y, dz = c[2] + 0.5 - e.z;
+    g.teleport(sx, y, sz, Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz)));
     await wait(50);
   };
   for (const [slot, list] of [[1, cells], [4, cells]]) for (const c of list) { g.select(slot); await at(c); const r = await g.right(); if (!r?.ok) log.errors.push(r); }
   await g.sync();
   await g.skip(10 * 10 * 60 * 1000); // ten game days: enough even for dry soil in summer
   g.select(0);
-  for (const c of cells) { await at([c[0], c[1] + 0.3, c[2]]); const r = await g.left(); if (!r?.ok) log.errors.push(r); }
+  for (const c of cells) { await at(c, 1.2); const r = await g.left(); if (!r?.ok) log.errors.push(r); }
   log.onions = g.inv().onion;
   await g.sync();
 

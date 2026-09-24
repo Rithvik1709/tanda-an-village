@@ -1,7 +1,13 @@
 // M7 scripted: buy the bulls, cart and plough → plough a row → grow onions → feed the pair →
 // load the cart → ride to the town mandi → sell → the ledger shows the town premium.
-(async () => { window.__bailgaadi.setView("first");
+(async () => {
+  for (const id of ["homecoming", "firstcrop", "water", "order", "bulls", "teej", "caravan", "debt", "election", "land", "pola"]) localStorage.setItem("tanda.mission." + id, "1"); // (story cards are tested elsewhere)
+  window.__bailgaadi.setView("first");
   const g = window.__bailgaadi;
+  g.autoSkipStory(true); // story cards are tested in missions.js
+  g.play();
+  await new Promise((r) => setTimeout(r, 900));
+  g.skipStory();
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const click = async (sel) => { const b = document.querySelector(sel); if (!b) throw new Error("no " + sel); b.click(); await wait(120); };
   const DAY = 10 * 60 * 1000;

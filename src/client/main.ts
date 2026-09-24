@@ -42,6 +42,7 @@ import { Nav, separate } from "./player/nav";
 import { Audio, renderRms, SOUNDS } from "./audio";
 import { Guide } from "./ui/guide";
 import { Leaderboard } from "./ui/leaderboard";
+import { PhoneMenu } from "./ui/phonemenu";
 import { current } from "../shared/missions";
 import { loadSettings, SettingsPanel, TitleScreen, Tutorial } from "./ui/screens";
 import { isTouch, TouchControls } from "./player/touch";
@@ -205,7 +206,7 @@ function releaseMouse() {
   document.exitPointerLock?.();
 }
 function resumePlay() {
-  if (titleScreen.open || mode !== "play") return;
+  if (titleScreen.open || mode !== "play" || switching || windowOpen()) return;
   if (TOUCH) return hud.setPlaying(true);
   const p = canvas.requestPointerLock?.() as Promise<void> | undefined;
   // browsers refuse a re-lock right after a release; then a small "click to continue" chip is enough
@@ -276,6 +277,7 @@ board.setName = async (n) => {
   return null;
 };
 const showBoard = () => {
+  closeWindows();
   board.show();
   hud.setPlaying(true);
   releaseMouse();
@@ -283,15 +285,85 @@ const showBoard = () => {
 titleScreen.onBoard = showBoard;
 const showSettings = settingsPanel.show.bind(settingsPanel);
 settingsPanel.show = () => {
+  closeWindows();
   showSettings();
   hud.setPlaying(true); // the pause panel steps aside
   releaseMouse();
 };
+/* ---------- one window at a time ----------
+ * Every window the game can show is listed here. Opening one closes the others; while any is open
+ * (or a story card is up) the farmer stands still, the thumb controls hide, and nothing in the
+ * world reacts to taps or keys.
+ */
+let switching = false;
+let autoSkip = false; // test hook: scripts that aren't about the story tap its cards away before acting
+const STILL = { forward: 0, right: 0, jump: false, sprint: false };
+const phoneMenu = new PhoneMenu(uiRoot, () => net.recoveryCode);
+const WINDOWS = () => [
+  { open: () => !!panels.open, close: () => panels.close() },
+  { open: () => map.open, close: () => map.close() },
+  { open: () => board.open, close: () => board.close() },
+  { open: () => settingsPanel.open, close: () => settingsPanel.close() },
+  { open: () => guide.helpOpen, close: () => guide.toggleHelp(false) },
+  { open: () => phoneMenu.open, close: () => phoneMenu.close() },
+];
+function closeWindows() {
+  switching = true;
+  for (const w of WINDOWS()) if (w.open()) w.close();
+  switching = false;
+}
+function windowOpen() {
+  return WINDOWS().some((w) => w.open()) || guide.dialogueOpen || !!document.querySelector(".welcome, .fs-gate:not([hidden])");
+}
+phoneMenu.onPick = (what) => (what === "map" ? showMap() : what === "board" ? showBoard() : what === "help" ? controls.onHelp() : settingsPanel.show());
+phoneMenu.onClose = () => resumePlay();
+phoneMenu.onRestore = async (code) => {
+  const err = await net.restore(code);
+  if (err) return err;
+  location.reload();
+  return null;
+};
+// tapping the dark area round a window closes it (not story cards: those need their buttons)
+uiRoot.addEventListener("click", (e) => {
+  const t = e.target as HTMLElement;
+  if ((t.classList.contains("panel") || t.classList.contains("mapview")) && !t.classList.contains("dialogue") && !t.classList.contains("welcome")) closeWindows();
+});
+// Android's back gesture closes the window instead of leaving the game
+history.pushState({ tanda: 1 }, "");
+window.addEventListener("popstate", () => {
+  history.pushState({ tanda: 1 }, "");
+  if (WINDOWS().some((w) => w.open())) closeWindows();
+});
+
 // phones and tablets: touch controls, landscape only
 const touch = TOUCH ? new TouchControls(uiRoot, controls) : null;
 if (touch) {
   controls.touch = touch;
+  touch.onMenu = () => (phoneMenu.open ? phoneMenu.close() : (closeWindows(), phoneMenu.show()));
   document.body.classList.add("is-touch");
+  // first, full screen: one tap before the title (Android can also lock landscape; iPhone can't, so the game turns itself)
+  const gate = document.createElement("div");
+  gate.className = "fs-gate";
+  const canFullscreen = !!document.documentElement.requestFullscreen;
+  gate.innerHTML = `<div class="panel-card"><div class="eyebrow">Tanda · उखळी तांडा</div><h2>Play full screen</h2>
+    <p class="lede">${canFullscreen ? "Tanda is best played full screen, in landscape." : "Tip: for full screen on iPhone, tap Share → Add to Home Screen, then open Tanda from there."}</p>
+    <div class="big-acts"><button data-go>▶ Tap to play</button></div></div>`;
+  uiRoot.appendChild(gate);
+  const goFull = () => {
+    document.documentElement.requestFullscreen?.({ navigationUI: "hide" }).then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape")).catch(() => {});
+    gate.hidden = true;
+    setTimeout(resize, 300);
+  };
+  gate.querySelector("[data-go]")!.addEventListener("click", goFull);
+  // leaving full screen mid-game pauses behind the same card
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement && canFullscreen && !titleScreen.open) {
+      gate.querySelector("h2")!.textContent = "Paused";
+      gate.querySelector("[data-go]")!.textContent = "▶ Tap to continue full screen";
+      gate.hidden = false;
+    }
+    setTimeout(resize, 300);
+  });
   // tapping a hotbar slot picks it
   uiRoot.addEventListener("touchstart", (e) => {
     const slot = (e.target as HTMLElement).closest(".slot");
@@ -455,6 +527,7 @@ panels.onClose = () => resumePlay();
 const map = new MapView(document.getElementById("ui")!, world);
 map.onClose = () => (panels.open ? hud.setPlaying(true) : resumePlay());
 function showMap() {
+  closeWindows();
   map.show(game.save, clock(game.now()).day, { x: body.pos.x, z: body.pos.z, yaw: controls.yaw });
   hud.setPlaying(true);
   releaseMouse();
@@ -577,6 +650,7 @@ const TALK: Partial<Record<PanelKind, string>> = { land: "naik", trader: "ganpat
 function openStall(kind: PanelKind, tab?: string) {
   const who = TALK[kind];
   if (who && booted_) game.act({ t: "talk", npc: who });
+  closeWindows();
   panels.show(kind, tab);
   hud.setPlaying(true); // hide the click-to-play panel under it
   hud.setHint("");
@@ -706,8 +780,8 @@ game.onChange(refreshStatus);
 game.onChange(() => syncFields());
 const sfxQueue = { push: (name: string) => audio.play(name) };
 
-controls.onDig = () => void useLeft();
-controls.onPlace = () => void useRight();
+controls.onDig = () => void (!windowOpen() && useLeft());
+controls.onPlace = () => void (!windowOpen() && useRight());
 controls.onSelect = (i) => {
   hotbar.select(i);
   hud.refresh();
@@ -754,6 +828,8 @@ async function goHomeToSleep() {
   sleeping = false;
 }
 controls.onInteract = () => {
+  if (guide.dialogueOpen) return;
+  if (windowOpen() && !panels.open) return;
   const h = nowHour();
   if (isNight(h) && nearHome() && !nearStall()) return void goHomeToSleep();
   if (Nights.evening(h) && nearFire() && !nearStall()) {
@@ -781,14 +857,11 @@ controls.onInteract = () => {
   const s = nearStall();
   if (s) openStall(s.kind);
 };
-controls.onEscape = () => {
-  board.close();
-  panels.close();
-  map.close();
-};
+controls.onEscape = () => closeWindows();
 controls.onMap = () => (map.open ? map.close() : showMap());
 controls.onBoard = () => (board.open ? board.close() : showBoard());
 controls.onHelp = () => {
+  if (!guide.helpOpen) closeWindows();
   guide.toggleHelp();
   if (guide.helpOpen) releaseMouse();
 };
@@ -801,8 +874,8 @@ controls.onView = () => {
   rig.view = rig.view === "third" ? "first" : "third";
   hud.toast(rig.view === "third" ? "Third person" : "First person");
 };
-controls.onRide = () => void (!panels.open && cartAction());
-controls.onFeed = () => void (!panels.open && feedBulls());
+controls.onRide = () => void (!windowOpen() && cartAction());
+controls.onFeed = () => void (!windowOpen() && feedBulls());
 // the pause panel sits over the canvas: a click on it (outside the account box) also starts play
 document.querySelector(".play-prompt")!.addEventListener("click", (e) => {
   if (!(e.target as HTMLElement).closest(".account")) canvas.requestPointerLock?.();
@@ -871,18 +944,27 @@ const rig = new CameraRig(camera, (x, z) => hf.at(x, z), (x, y, z) => {
   return !!id && !TERRAIN.has(id) && block(id).solid && block(id).opaque;
 });
 /** On a phone held upright, the whole game is turned sideways (it always plays in landscape). */
-const rotated = () => TOUCH && window.innerHeight > window.innerWidth;
+const screenSize = () => ({ w: Math.round(window.visualViewport?.width ?? window.innerWidth), h: Math.round(window.visualViewport?.height ?? window.innerHeight) });
+const rotated = () => TOUCH && screenSize().h > screenSize().w;
 function resize() {
   const turn = rotated();
+  const sz = screenSize();
   document.documentElement.classList.toggle("rotated", turn);
-  const w = turn ? window.innerHeight : window.innerWidth, h = turn ? window.innerWidth : window.innerHeight;
+  const w = turn ? sz.h : sz.w, h = turn ? sz.w : sz.h;
+  // the game's own width and height (landscape), in real pixels
+  document.documentElement.style.setProperty("--app-w", `${w}px`);
+  document.documentElement.style.setProperty("--app-h", `${h}px`);
   renderer.setSize(w, h, false);
   post.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
 window.addEventListener("resize", resize);
-window.addEventListener("orientationchange", () => setTimeout(resize, 200));
+window.addEventListener("orientationchange", () => setTimeout(resize, 250));
+window.visualViewport?.addEventListener("resize", resize);
+// no pinch or double-tap zoom on phones (iOS ignores the viewport tag for this)
+document.addEventListener("gesturestart", (e) => e.preventDefault());
+document.addEventListener("dblclick", (e) => e.preventDefault());
 resize();
 
 // frame timing for the 60 fps check
@@ -916,7 +998,8 @@ renderer.setAnimationLoop(() => {
   } else if (mode === "play") {
     // fixed sub-steps keep collision stable when a frame hitches
     const n = Math.ceil(dt / (1 / 120));
-    for (let i = 0; i < n; i++) walker.step(controls.input(), controls.yaw, dt / n);
+    const input = windowOpen() ? STILL : controls.input(); // a window is open: the farmer waits
+    for (let i = 0; i < n; i++) walker.step(input, controls.yaw, dt / n);
     rig.update(dt, body.pos, controls.yaw, controls.pitch);
     // aim along the crosshair; you can only reach what's near your farmer
     const ray = rig.ray();
@@ -949,6 +1032,11 @@ renderer.setAnimationLoop(() => {
     const st = mode === "play" && !panels.open && !farmyard.ride ? nearStall() : undefined;
     hud.setHint(farmyard.ride || panels.open ? "" : st ? `<kbd>E</kbd> ${st.label}` : cartHint() || (nightK > 0.6 && !torchOn && mode === "play" ? "<kbd>T</kbd> Switch on your torch" : ""));
     hud.setBulls(bullsChip());
+    // the watchdog: nothing may leave the player stuck — no pause panel on a phone, controls back when windows close
+    if (TOUCH) {
+      hud.setPlaying(true);
+      hud.setResume(false);
+    }
     infra.setDrip([...game.save.drip.map((id) => world.plots[id]), ...villagers.dripPlots().map((id) => world.plots[id])]);
     farmyard.rig.setDecor({ jhool: !!game.save.inv.jhool, gerua: !!game.save.missions.flags.decorated, garland: game.save.perks.includes("polaChampion") });
     // point the pool of bulb lights at the bulbs nearest to you
@@ -986,6 +1074,7 @@ renderer.setAnimationLoop(() => {
       body.pos.z = playerBody.pos.z;
     }
   }
+  if (touch) touch.visible = mode === "play" && !titleScreen.open && !windowOpen() && !farmyard.ride;
   farmer.root.position.set(body.pos.x, body.pos.y, body.pos.z);
   farmer.root.rotation.y = body.heading;
   farmer.visible = mode !== "title" && (rig.view === "third" || !!farmyard.ride);
@@ -1042,7 +1131,7 @@ renderer.setAnimationLoop(() => {
   if (hud.debugOn) hud.setDebug(debugText(dt));
   if (booted_) {
     const c = clock(game.now());
-    guide.update(game.save, { world, now: game.now(), day: c.day, onOwnLand: game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]) }, camera, now / 1000, mode === "title" || !!panels.open || map.open || !!farmyard.ride || guide.helpOpen);
+    guide.update(game.save, { world, now: game.now(), day: c.day, onOwnLand: game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]) }, camera, now / 1000, mode === "title" || WINDOWS().some((w) => w.open()) || !!farmyard.ride || !!document.querySelector(".welcome, .fs-gate:not([hidden])"));
   }
 });
 
@@ -1169,11 +1258,13 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     blockAt: (x: number, y: number, z: number) => block(get(x, y, z)).name,
     select: (i: number) => controls.onSelect(i),
     left: async () => {
+      if (autoSkip) (window.__bailgaadi.skipStory as () => number)();
       const r = useLeft();
       await worldRenderer.flush();
       return r;
     },
     right: async () => {
+      if (autoSkip) (window.__bailgaadi.skipStory as () => number)();
       const r = useRight();
       await worldRenderer.flush();
       return r;
@@ -1219,6 +1310,13 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     setView: (v: "first" | "third") => (rig.view = v),
     torch: (on: boolean) => (torchOn = on),
     villagerDebug: () => villagers.debug(),
+    // test hook: tap through any story card that's showing (they're tested in missions.js)
+    autoSkipStory: (on: boolean) => (autoSkip = on),
+    skipStory: () => {
+      let n = 0;
+      for (let b = document.querySelector(".dialogue button") as HTMLButtonElement | null; b && n < 5; b = document.querySelector(".dialogue button"), n++) b.click();
+      return n;
+    },
     home: () => ({ door: { ...nights.home.door }, fire: { ...nights.fire } }),
     clockNow: () => ({ hour: clock(game.now()).hour, day: clock(game.now()).day }),
     noFog: () => {
@@ -1238,7 +1336,10 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     closePanel: () => panels.close(),
     showMap: () => showMap(),
     closeMap: () => map.close(),
-    key: (code: string) => window.dispatchEvent(new KeyboardEvent("keydown", { code })),
+    key: (code: string) => {
+      if (autoSkip) (window.__bailgaadi.skipStory as () => number)();
+      window.dispatchEvent(new KeyboardEvent("keydown", { code }));
+    },
     plough: async () => {
       ploughNext = true;
       const r = useRight();

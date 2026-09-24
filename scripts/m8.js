@@ -2,6 +2,10 @@
 // out → let the sahukar loan go overdue (bank refuses) → repay everything → net worth and a new title.
 (async () => { window.__bailgaadi.setView("first");
   const g = window.__bailgaadi;
+  g.autoSkipStory(true);
+  g.play();
+  await new Promise((r) => setTimeout(r, 900));
+  g.skipStory();
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const click = async (sel) => { const b = document.querySelector(sel); if (!b) throw new Error("no " + sel); b.click(); await wait(120); };
   const DAY = 10 * 60 * 1000;

@@ -1,6 +1,9 @@
 // M6 scripted land deal: land office → buy a plot → farm it → list it → wait for an offer → accept.
-(async () => { window.__bailgaadi.setView("first");
+(async () => {
+  for (const id of ["homecoming", "firstcrop", "water", "order", "bulls", "teej", "caravan", "debt", "election", "land", "pola"]) localStorage.setItem("tanda.mission." + id, "1"); // (story cards are tested elsewhere)
+  window.__bailgaadi.setView("first");
   const g = window.__bailgaadi;
+  g.autoSkipStory(true); // story cards are tested in missions.js
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const key = (code) => window.dispatchEvent(new KeyboardEvent("keydown", { code }));
   const click = async (sel) => { const b = document.querySelector(sel); if (!b) throw new Error("no " + sel); b.click(); await wait(100); };

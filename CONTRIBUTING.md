@@ -56,7 +56,8 @@ If you changed gameplay, the UI or visuals, also run the scripted play-through t
 | land market | `node scripts/shots.mjs --name x --eval "$(cat scripts/m6.js)"` |
 | bulls & cart | `node scripts/shots.mjs --name x --eval "$(cat scripts/m7.js)"` |
 | bank & godown | `node scripts/shots.mjs --name x --eval "$(cat scripts/m8.js)"` |
-| missions / election | `scripts/missions.js`, `scripts/election.js` |
+| missions / election / nights | `scripts/missions.js`, `scripts/election.js`, `scripts/night.js` |
+| phones (3 screen sizes, one window at a time) | `node scripts/phone.mjs` |
 
 For visual changes, please attach a before and after screenshot to the PR.
 

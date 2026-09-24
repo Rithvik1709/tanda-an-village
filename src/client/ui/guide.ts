@@ -81,6 +81,8 @@ export class Guide {
 
   constructor(parent: HTMLElement, scene: THREE.Scene, private groundAt: (x: number, z: number) => number) {
     this.card = el("div", "goal", parent);
+    // on phones the card folds to one line; a tap opens it
+    this.card.addEventListener("click", () => this.card.classList.toggle("open"));
     this.arrow = el("div", "goal-arrow", parent);
     this.arrow.hidden = true;
     this.help = el("div", "panel help", parent);
