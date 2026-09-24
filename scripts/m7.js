@@ -1,6 +1,6 @@
 // M7 scripted: buy the bulls, cart and plough → plough a row → grow onions → feed the pair →
 // load the cart → ride to the town mandi → sell → the ledger shows the town premium.
-(async () => {
+(async () => { window.__bailgaadi.setView("first");
   const g = window.__bailgaadi;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const click = async (sel) => { const b = document.querySelector(sel); if (!b) throw new Error("no " + sel); b.click(); await wait(120); };

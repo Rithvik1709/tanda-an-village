@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { Plot } from "../shared/world";
 import { parkedCart, Rig } from "./engine/livestock";
-import { along, findPath, groundY, pathLength, type Pt } from "./player/path";
+import { along, findPath, pathLength, type Pt } from "./player/path";
 
 /*
  * Where the bulls and the cart are, and the ride. All of this is presentation: the server only
@@ -25,7 +25,7 @@ export class Farmyard {
   onArrive: (dest: Dest) => void = () => {};
   private walkTo: { x: number; z: number } | null = null;
 
-  constructor(private vox: Uint8Array, starter: Plot) {
+  constructor(private vox: Uint8Array, starter: Plot, private groundY: (x: number, z: number) => number) {
     const g = starter.gate!;
     const out = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] }[g.side];
     // park beside the gate, out on the lane, facing away from the fence
@@ -34,7 +34,7 @@ export class Farmyard {
     this.group.add(this.rig.group, this.cart);
     this.rig.group.visible = false;
     this.cart.visible = false;
-    this.pos = { x: this.home.x + 2, y: groundY(vox, this.home.x + 2, this.home.z), z: this.home.z, heading: this.home.heading };
+    this.pos = { x: this.home.x + 2, y: groundY(this.home.x + 2, this.home.z), z: this.home.z, heading: this.home.heading };
   }
 
   set(hasBulls: boolean, hasCart: boolean) {
@@ -100,20 +100,20 @@ export class Farmyard {
         this.pos.heading = lerpAngle(this.pos.heading, Math.atan2(dx, dz), Math.min(1, dt * 4));
       } else if (this.walkTo) this.walkTo = null;
     }
-    const gy = groundY(this.vox, this.pos.x, this.pos.z);
+    const gy = this.groundY(this.pos.x, this.pos.z);
     this.pos.y += (gy - this.pos.y) * Math.min(1, dt * 8);
     if (Math.abs(gy - this.pos.y) > 3) this.pos.y = gy;
     this.rig.group.position.set(this.pos.x, this.pos.y, this.pos.z);
     this.rig.group.rotation.y = this.pos.heading;
     this.rig.update(dt, Math.hypot(this.pos.x - before.x, this.pos.z - before.z));
-    this.cart.position.set(this.cartAt.x, groundY(this.vox, this.cartAt.x, this.cartAt.z), this.cartAt.z);
+    this.cart.position.set(this.cartAt.x, this.groundY(this.cartAt.x, this.cartAt.z), this.cartAt.z);
     this.cart.rotation.y = this.cartAt.heading;
   }
 
   /** Where the driver sits on a moving cart (world space). */
   seat() {
     const h = this.pos.heading;
-    return { x: this.pos.x - Math.sin(h) * 2.7, y: this.pos.y + 1.95, z: this.pos.z - Math.cos(h) * 2.7 };
+    return { x: this.pos.x - Math.sin(h) * 2.1, y: this.pos.y + 1.95, z: this.pos.z - Math.cos(h) * 2.1 };
   }
 }
 

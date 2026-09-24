@@ -1,6 +1,6 @@
 // M5 scripted economy: grow onions, sell them to the trader through the panel, check prices and the
 // ledger, buy at the seed shop, and confirm the server agrees on the money. Run via shots.mjs --eval.
-(async () => {
+(async () => { window.__bailgaadi.setView("first");
   const g = window.__bailgaadi;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const key = (code) => window.dispatchEvent(new KeyboardEvent("keydown", { code }));

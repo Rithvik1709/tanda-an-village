@@ -36,7 +36,6 @@ import { isOverdue, netWorth, TITLES, titleFor } from "../shared/bank";
 import { Farmyard } from "./farmyard";
 import { Audio, renderRms, SOUNDS } from "./audio";
 import { isTouchOnly, loadSettings, SettingsPanel, showMobileNote, TitleScreen, Tutorial } from "./ui/screens";
-import { groundY } from "./player/path";
 
 type Hooks = {
   ready: boolean;
@@ -218,8 +217,8 @@ const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: N
   },
   {
     kind: "sahukar",
-    at: { x: 108.5, y: groundY(vox, 108.5, 108.5), z: 108.5 },
-    npc: new Npc({ kurta: "#f2e6c8", dhoti: "#f6f0e0", hat: "#c0392b", hatTall: true, skin: "#b07a52" }, 108.5, groundY(vox, 108.5, 110.3), 110.3, Math.PI),
+    at: { x: 108.5, y: hf.at(108.5, 108.5), z: 108.5 },
+    npc: new Npc({ kurta: "#f2e6c8", dhoti: "#f6f0e0", hat: "#c0392b", hatTall: true, skin: "#b07a52" }, 108.5, hf.at(108.5, 110.3), 110.3, Math.PI),
     label: "Borrow from Sahukar Motilal (fast, but dear)",
   },
   {
@@ -267,7 +266,7 @@ function refreshSigns() {
 }
 
 // ---- Sarja & Raja, and the bailgaadi ----
-const farmyard = new Farmyard(vox, world.plots.find((p) => p.starter)!);
+const farmyard = new Farmyard(vox, world.plots.find((p) => p.starter)!, (x, z) => hf.at(x, z));
 scene.add(farmyard.group);
 let rideHeading = 0;
 function startRide(dest: "town" | "home") {
@@ -283,7 +282,7 @@ farmyard.onArrive = (dest) => {
   // step down beside the cart
   const h = farmyard.cartAt.heading;
   const x = farmyard.cartAt.x + Math.cos(h) * 1.6, z = farmyard.cartAt.z - Math.sin(h) * 1.6;
-  Object.assign(body.pos, { x, y: groundY(vox, x, z) + 0.05, z });
+  Object.assign(body.pos, { x, y: hf.at(x, z), z });
   Object.assign(body.vel, { x: 0, y: 0, z: 0 });
   hud.setPlaying(false);
   // turn to whoever you came to see
@@ -571,8 +570,13 @@ renderer.setAnimationLoop(() => {
     const seat = farmyard.seat();
     Object.assign(body.pos, { x: seat.x, y: seat.y - 1.18, z: seat.z });
     Object.assign(body.vel, { x: 0, y: 0, z: 0 });
-    camera.position.set(seat.x, seat.y + 0.45, seat.z);
-    camera.rotation.set(controls.pitch, controls.yaw, 0, "YXZ");
+    // the ride is filmed: a follow camera behind and above the cart (first person sits on the seat)
+    const d0 = rig.distance, v0 = rig.view;
+    rig.distance = 7.5;
+    rig.view = "third";
+    rig.update(dt, { x: seat.x, y: seat.y - 0.6, z: seat.z }, controls.yaw, Math.min(controls.pitch, -0.12), 1.58);
+    rig.distance = d0;
+    rig.view = v0;
     target = null;
     outline.visible = false;
     fields.setAim(null);
@@ -618,8 +622,13 @@ renderer.setAnimationLoop(() => {
   for (const s of STALLS) s.npc.update(dt, camera.position);
   farmer.root.position.set(body.pos.x, body.pos.y, body.pos.z);
   farmer.root.rotation.y = body.heading;
-  farmer.visible = mode !== "title" && (rig.view === "third" || !!farmyard.ride) && !farmyard.ride;
-  farmer.animate(dt, body.speed);
+  farmer.visible = mode !== "title" && (rig.view === "third" || !!farmyard.ride);
+  if (farmyard.ride) {
+    // sitting on the cart, facing the road
+    farmer.root.position.set(farmyard.seat().x, farmyard.seat().y - 0.95, farmyard.seat().z);
+    farmer.root.rotation.y = farmyard.pos.heading;
+  }
+  farmer.animate(dt, farmyard.ride ? 0 : body.speed);
   worldRenderer.flush();
   const hour = hourOverride ?? (mode === "title" ? 17.4 : clock(game.now()).hour);
   sky.update(hour, dt, mode === "play" ? new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z) : camera.position);

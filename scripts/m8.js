@@ -1,6 +1,6 @@
 // M8 scripted: bank loan + sahukar loan → grow onions → store them in the godown → rent on the way
 // out → let the sahukar loan go overdue (bank refuses) → repay everything → net worth and a new title.
-(async () => {
+(async () => { window.__bailgaadi.setView("first");
   const g = window.__bailgaadi;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const click = async (sel) => { const b = document.querySelector(sel); if (!b) throw new Error("no " + sel); b.click(); await wait(120); };

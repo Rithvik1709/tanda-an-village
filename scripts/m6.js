@@ -1,5 +1,5 @@
 // M6 scripted land deal: land office → buy a plot → farm it → list it → wait for an offer → accept.
-(async () => {
+(async () => { window.__bailgaadi.setView("first");
   const g = window.__bailgaadi;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const key = (code) => window.dispatchEvent(new KeyboardEvent("keydown", { code }));
@@ -61,9 +61,11 @@
   const gt = p.gate;
   const out = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] }[gt.side];
   const sx = gt.x + 0.5 + out[0] * 4.5 + (out[0] ? 0 : 2.6), sz = gt.z + 0.5 + out[1] * 4.5 + (out[1] ? 0 : 2.6);
-  g.teleport(sx, y + 1.2, sz, Math.atan2(out[0], out[1]), -0.12);
+  g.setView("third");
+  g.teleport(sx + out[0] * 3, y + 1, sz + out[1] * 3, Math.atan2(out[0], out[1]), -0.1);
   await wait(900);
   await window.__shot("m6-sign");
+  g.setView("first");
 
   // wait game days for a buyer
   for (let d = 0; d < 12; d++) {

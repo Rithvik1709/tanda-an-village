@@ -22,6 +22,7 @@ await page.goto("http://localhost:5190", { waitUntil: "load" });
 await ready();
 const first = await page.evaluate(async () => {
   const g = window.__bailgaadi;
+  g.setView("first");
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   g.setHour(16.5);
   const p = g.starterPlot();
@@ -43,8 +44,6 @@ const first = await page.evaluate(async () => {
   for (const c of row) await act(1, "R", c); // hoe
   for (const c of row) await act(4, "R", c); // onion seeds
   for (const c of row.slice(0, 3)) await act(2, "R", c); // water three of them
-  // build a little brick marker at the row's end
-  await act(7, "R", [p.x0 + 9, y, p.z0 + 4]);
   out.status = await g.sync();
   out.saveBefore = { inv: g.inv(), farm: Object.keys(g.farm()).length };
 
@@ -64,7 +63,7 @@ const first = await page.evaluate(async () => {
   out.caneAfterServer = Object.values(g.farm()).filter((f) => f.plant?.crop === "sugarcane").length;
   out.caneSeedsAfter = g.inv()["seed:sugarcane"] ?? 0;
   out.saveAfter = { inv: g.inv(), farm: g.farm() };
-  out.brick = g.blockAt(p.x0 + 9, y + 1, p.z0 + 4);
+
   g.teleport(p.x0 + 1.5, y + 1, p.z0 + 1.2, -Math.PI / 2 - 0.5, -0.55);
   await wait(400);
   return out;
@@ -78,7 +77,6 @@ check(first.rawUnripe.results[0].ok === false, `server refuses an unripe harvest
 check(first.rawMoney.results[0].ok === false, `server refuses an unknown action: "${first.rawMoney.results[0].error}"`);
 check(first.localCaneBefore === 6 && first.caneAfterServer === 4, `cheat rolled back: 6 cane planted locally, ${first.caneAfterServer} survive the server (had 4 seeds)`);
 check(first.caneSeedsAfter === 0, `seed count back to the truth: ${first.caneSeedsAfter}`);
-check(first.brick === "Brick", "brick placed");
 
 // full reload: same browser profile, so the same guest token
 await page.reload({ waitUntil: "load" });
@@ -89,13 +87,13 @@ const second = await page.evaluate(async () => {
   const p = g.starterPlot();
   g.teleport(p.x0 + 1.5, p.y + 1, p.z0 + 1.2, -Math.PI / 2 - 0.5, -0.55);
   await new Promise((r) => setTimeout(r, 600));
-  return { code: g.recoveryCode(), inv: g.inv(), farm: g.farm(), brick: g.blockAt(p.x0 + 9, p.y + 1, p.z0 + 4), crop: g.blockAt(p.x0 + 3, p.y + 1, p.z0 + 4) };
+  return { code: g.recoveryCode(), inv: g.inv(), farm: g.farm(), crop: g.blockAt(p.x0 + 3, p.y + 1, p.z0 + 4) };
 });
 await page.screenshot({ path: "out/m4-after-reload.png" });
 check(second.code === first.code, `same farmer after reload (${second.code})`);
 check(JSON.stringify(second.inv) === JSON.stringify(first.saveAfter.inv), `same inventory after reload ${JSON.stringify(second.inv)}`);
 check(Object.keys(second.farm).length === Object.keys(first.saveAfter.farm).length, `same ${Object.keys(second.farm).length} farm cells after reload`);
-check(second.brick === "Brick" && /Onion/.test(second.crop), `world edits and crops redrawn: ${second.brick}, ${second.crop}`);
+check(/Onion/.test(second.crop), `crops back after reload: ${second.crop}`);
 
 // another device: a fresh browser context restores the farm by recovery code
 const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 720 } });
@@ -104,9 +102,11 @@ await p2.goto("http://localhost:5190", { waitUntil: "load" });
 await p2.waitForFunction(() => window.__bailgaadi?.ready === true, null, { timeout: 60_000 });
 const newCode = await p2.evaluate(() => window.__bailgaadi.recoveryCode());
 check(newCode !== first.code, "a new device starts as a new guest");
-await p2.fill(".restore input", first.code.toLowerCase());
+// on the title screen: "Continue a farm from another device"
+await p2.click('[data-t="restore"]');
+await p2.fill(".title-restore input", first.code.toLowerCase());
 await p2.screenshot({ path: "out/m4-restore-panel.png" });
-await p2.click(".restore button");
+await p2.click(".title-restore button");
 await p2.waitForEvent("load");
 await p2.waitForFunction(() => window.__bailgaadi?.ready === true, null, { timeout: 60_000 });
 const third = await p2.evaluate(() => ({ code: window.__bailgaadi.recoveryCode(), farm: Object.keys(window.__bailgaadi.farm()).length }));

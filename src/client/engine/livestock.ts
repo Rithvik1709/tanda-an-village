@@ -1,20 +1,30 @@
 import * as THREE from "three";
-import { mergeBoxes } from "./merge";
 
 /*
- * The Khillari bull pair and the bullock cart, built from boxes like everything else.
- * Everything faces +z. A `Rig` is the pair (always) plus the cart behind them (when hitched).
+ * The Khillari bull pair and the bailgaadi, modelled with rounded forms: a deep chest and hump,
+ * long swept-back horns painted for Bail Pola, a woven jhool over the back, brass bells, and a
+ * wooden cart on two tall spoked wheels. Everything faces +z. `Rig` = the yoked pair (always)
+ * plus the cart behind (when hitched).
  */
-const mat = (() => {
-  const cache = new Map<string, THREE.MeshLambertMaterial>();
-  return (c: string) => cache.get(c) ?? (cache.set(c, new THREE.MeshLambertMaterial({ color: c })), cache.get(c)!);
-})();
-function box(parent: THREE.Object3D, w: number, h: number, d: number, c: string, x: number, y: number, z: number) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c));
-  m.position.set(x, y, z);
-  parent.add(m);
-  return m;
+const cache = new Map<string, THREE.MeshStandardMaterial>();
+const M = (c: string, rough = 0.8, metal = 0) => {
+  const k = c + rough + metal;
+  if (!cache.has(k)) cache.set(k, new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: metal }));
+  return cache.get(k)!;
+};
+function add(parent: THREE.Object3D, g: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0) {
+  const mesh = new THREE.Mesh(g, m);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
 }
+const ellipsoid = (rx: number, ry: number, rz: number) => {
+  const g = new THREE.SphereGeometry(1, 20, 14);
+  g.scale(rx, ry, rz);
+  return g;
+};
 
 class Bull {
   readonly group = new THREE.Group();
@@ -22,54 +32,71 @@ class Bull {
   private head = new THREE.Group();
   private tail = new THREE.Group();
 
-  constructor(blanket: string, hornTip: string) {
+  constructor(jhool: string, horn: string) {
     const g = this.group;
-    const hide = "#e6e0d4", shade = "#cdc6b8", dark = "#8f857a";
-    box(g, 0.72, 0.72, 1.5, hide, 0, 0.98, 0); // body
-    box(g, 0.74, 0.6, 0.5, shade, 0, 1.02, 0.45); // shoulders
-    box(g, 0.44, 0.28, 0.36, shade, 0, 1.46, 0.46); // the hump
-    box(g, 0.2, 0.34, 0.5, shade, 0, 0.66, 0.62); // dewlap
-    box(g, 0.76, 0.06, 0.78, blanket, 0, 1.36, -0.12); // jhool, the painted cloth
-    box(g, 0.78, 0.2, 0.06, blanket, 0, 1.26, 0.27);
-    for (const [x, z] of [[-0.22, 0.52], [0.22, 0.52], [-0.22, -0.55], [0.22, -0.55]]) {
+    const hide = M("#e4ddd0", 0.9), shade = M("#c9c0b1", 0.9), dark = M("#6d625a", 0.9);
+    add(g, ellipsoid(0.42, 0.42, 0.9), hide, 0, 1.12, -0.05); // barrel
+    add(g, ellipsoid(0.44, 0.47, 0.42), hide, 0, 1.2, 0.5); // chest
+    add(g, ellipsoid(0.24, 0.24, 0.26), shade, 0, 1.58, 0.52); // the hump
+    add(g, ellipsoid(0.1, 0.3, 0.3), shade, 0, 0.8, 0.72); // dewlap
+    add(g, ellipsoid(0.38, 0.36, 0.34), hide, 0, 1.13, -0.7); // haunch
+    // the jhool: a bright woven cloth over the back, edged in gold
+    const jh = new THREE.CylinderGeometry(0.47, 0.47, 1.1, 16, 1, true, -Math.PI * 0.62, Math.PI * 1.24);
+    jh.rotateX(Math.PI / 2);
+    jh.rotateZ(Math.PI / 2);
+    jh.rotateY(Math.PI / 2);
+    add(g, jh, new THREE.MeshStandardMaterial({ color: jhool, roughness: 0.9, side: THREE.DoubleSide }), 0, 1.16, -0.08);
+    for (const s of [-1, 1]) add(g, new THREE.BoxGeometry(0.02, 0.06, 1.1), M("#d4a24a", 0.4, 0.6), s * 0.45, 0.83, -0.08);
+    for (const [x, z] of [[-0.2, 0.52], [0.2, 0.52], [-0.2, -0.68], [0.2, -0.68]]) {
       const leg = new THREE.Group();
-      leg.position.set(x, 0.66, z);
-      box(leg, 0.18, 0.6, 0.18, hide, 0, -0.3, 0);
-      box(leg, 0.19, 0.08, 0.2, "#3a2f28", 0, -0.62, 0.01); // hooves
+      leg.position.set(x, 0.92, z);
+      add(leg, new THREE.CapsuleGeometry(0.1, 0.35, 4, 10), hide, 0, -0.22, 0);
+      add(leg, new THREE.CapsuleGeometry(0.065, 0.36, 4, 10), hide, 0, -0.62, 0);
+      add(leg, new THREE.CylinderGeometry(0.075, 0.085, 0.1, 10), dark, 0, -0.87, 0.01); // hoof
       g.add(leg);
       this.legs.push(leg);
     }
-    this.head.position.set(0, 1.18, 0.82);
+    // the head: long face, dark muzzle, and the great horns
+    this.head.position.set(0, 1.32, 0.86);
     g.add(this.head);
-    box(this.head, 0.34, 0.36, 0.46, hide, 0, 0, 0.16);
-    box(this.head, 0.3, 0.22, 0.18, dark, 0, -0.08, 0.46); // muzzle
-    box(this.head, 0.36, 0.04, 0.02, "#1d1814", 0, 0.06, 0.39); // eyes line
-    box(this.head, 0.14, 0.08, 0.06, shade, -0.23, 0.08, 0.02); // ears
-    box(this.head, 0.14, 0.08, 0.06, shade, 0.23, 0.08, 0.02);
+    const face = ellipsoid(0.16, 0.2, 0.34);
+    face.rotateX(0.55);
+    add(this.head, face, hide, 0, -0.06, 0.18);
+    add(this.head, ellipsoid(0.13, 0.11, 0.12), dark, 0, -0.22, 0.44); // muzzle
     for (const s of [-1, 1]) {
-      // long horns sweeping up and back, painted at the tips
-      const horn = new THREE.Group();
-      horn.position.set(s * 0.13, 0.18, 0.02);
-      horn.rotation.set(-0.95, 0, s * 0.3);
-      box(horn, 0.07, 0.07, 0.34, "#d8cdb4", 0, 0, -0.17);
-      box(horn, 0.075, 0.075, 0.14, hornTip, 0, 0, -0.4);
-      box(horn, 0.05, 0.05, 0.06, "#c9a040", 0, 0, -0.5); // brass tip cap
-      this.head.add(horn);
+      add(this.head, new THREE.SphereGeometry(0.03, 8, 6), M("#1c1612", 0.3), s * 0.14, 0.02, 0.18); // eyes
+      const ear = ellipsoid(0.1, 0.04, 0.06);
+      add(this.head, ear, shade, s * 0.2, 0.06, 0.02).rotation.z = s * 0.4;
+      // horns: a curving taper sweeping up and back, painted, with brass caps
+      const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(s * 0.1, 0.12, 0), new THREE.Vector3(s * 0.26, 0.34, -0.1), new THREE.Vector3(s * 0.3, 0.6, -0.32), new THREE.Vector3(s * 0.22, 0.78, -0.5)]);
+      const hg = new THREE.TubeGeometry(curve, 12, 0.05, 8);
+      const p = hg.getAttribute("position") as THREE.BufferAttribute;
+      for (let i = 0; i < p.count; i++) {
+        const t = Math.floor(i / 9) / 12;
+        const c = curve.getPointAt(Math.min(1, t));
+        p.setXYZ(i, c.x + (p.getX(i) - c.x) * (1 - t * 0.7), c.y + (p.getY(i) - c.y) * (1 - t * 0.7), c.z + (p.getZ(i) - c.z) * (1 - t * 0.7));
+      }
+      hg.computeVertexNormals();
+      add(this.head, hg, M(horn, 0.5));
+      add(this.head, new THREE.ConeGeometry(0.03, 0.1, 8), M("#d4a24a", 0.3, 0.8), s * 0.22, 0.83, -0.53);
     }
-    box(g, 0.3, 0.1, 0.12, "#c9a040", 0, 0.86, 0.8); // bell on the collar
-    box(g, 0.12, 0.12, 0.1, "#b08a30", 0, 0.76, 0.84);
-    this.tail.position.set(0, 1.25, -0.76);
-    box(this.tail, 0.06, 0.62, 0.06, shade, 0, -0.31, 0);
-    box(this.tail, 0.1, 0.14, 0.1, "#3a2f28", 0, -0.66, 0);
+    // brass bells on a red collar
+    const collar = new THREE.TorusGeometry(0.3, 0.035, 6, 18);
+    collar.rotateX(Math.PI / 2 - 0.5);
+    add(g, collar, M("#b8322a", 0.8), 0, 1.22, 0.78);
+    for (const s of [-1, 0, 1]) add(g, new THREE.SphereGeometry(0.055, 10, 8), M("#d4a24a", 0.3, 0.8), s * 0.14, 0.98 - Math.abs(s) * 0.05, 0.92);
+    this.tail.position.set(0, 1.3, -0.98);
+    add(this.tail, new THREE.CylinderGeometry(0.025, 0.02, 0.75, 6), shade, 0, -0.37, 0);
+    add(this.tail, ellipsoid(0.06, 0.12, 0.06), dark, 0, -0.8, 0);
     g.add(this.tail);
   }
 
   animate(t: number, gait: number) {
-    // gait 0 = standing (head bobs, tail flicks), 1 = walking
-    this.legs.forEach((leg, i) => (leg.rotation.x = Math.sin(t * 7 + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.45 * gait));
-    this.head.rotation.x = Math.sin(t * (gait ? 7 : 1.3)) * (gait ? 0.05 : 0.08) + (gait ? 0 : 0.12);
+    this.legs.forEach((leg, i) => (leg.rotation.x = Math.sin(t * 6 + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.4 * gait));
+    this.head.rotation.x = Math.sin(t * (gait ? 6 : 1.2)) * (gait ? 0.04 : 0.07) + (gait ? 0 : 0.1);
+    this.head.rotation.y = gait ? 0 : Math.sin(t * 0.4) * 0.15;
     this.tail.rotation.z = Math.sin(t * 2.3) * 0.25;
-    this.tail.rotation.x = 0.15 + Math.sin(t * 1.1) * 0.08;
+    this.tail.rotation.x = 0.12 + Math.sin(t * 1.1) * 0.08;
   }
 }
 
@@ -78,38 +105,54 @@ class Cart {
   private wheels: THREE.Group[] = [];
   constructor() {
     const g = this.group;
-    const wood = "#9a7046", dark = "#6a4a2c";
-    box(g, 0.12, 0.12, 2.6, dark, -0.18, 1.05, 1.1); // the two shafts running up to the yoke
-    box(g, 0.12, 0.12, 2.6, dark, 0.18, 1.05, 1.1);
-    box(g, 1.3, 0.1, 1.9, wood, 0, 1.08, -1.0); // bed
-    for (const x of [-0.62, 0.62]) {
-      box(g, 0.08, 0.4, 1.9, wood, x, 1.33, -1.0); // side rails
-      for (const z of [-1.9, -1.35, -0.8, -0.25]) box(g, 0.1, 0.55, 0.1, dark, x, 1.35, z); // stakes
+    const wood = M("#8a6440", 0.85), dark = M("#5a3f26", 0.9), iron = M("#3a3530", 0.5, 0.5);
+    for (const x of [-0.2, 0.2]) {
+      const shaft = new THREE.CylinderGeometry(0.05, 0.06, 2.9, 8);
+      shaft.rotateX(Math.PI / 2 - 0.02);
+      add(g, shaft, dark, x, 1.12, 1.15);
     }
-    box(g, 1.3, 0.4, 0.08, wood, 0, 1.33, -1.95);
-    box(g, 1.1, 0.12, 0.5, "#c9a45c", 0, 1.2, -0.4); // a hay cushion for the driver
-    for (const x of [-0.82, 0.82]) {
+    add(g, new THREE.BoxGeometry(1.3, 0.08, 2), wood, 0, 1.12, -1); // the bed
+    for (const x of [-0.64, 0.64]) {
+      add(g, new THREE.BoxGeometry(0.06, 0.06, 2), dark, x, 1.55, -1); // top rail
+      for (let z = -1.9; z <= -0.1; z += 0.3) add(g, new THREE.CylinderGeometry(0.025, 0.025, 0.45, 6), wood, x, 1.34, z); // side staves
+    }
+    add(g, new THREE.BoxGeometry(1.2, 0.14, 0.6), M("#c9a45c", 1), 0, 1.23, -0.45); // straw cushion for the driver
+    // an arched canopy of woven matting over the back, like village carts on long trips
+    const hood = new THREE.CylinderGeometry(0.66, 0.66, 1.1, 18, 1, true, -Math.PI / 2, Math.PI);
+    hood.rotateX(Math.PI / 2);
+    hood.rotateZ(Math.PI / 2);
+    hood.rotateY(Math.PI / 2);
+    add(g, hood, new THREE.MeshStandardMaterial({ color: "#b89a62", roughness: 1, side: THREE.DoubleSide }), 0, 1.55, -1.35);
+    for (const x of [-0.85, 0.85]) {
       const w = new THREE.Group();
-      w.position.set(x, 0.78, -1.0);
-      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.06, 6, 20), mat("#4a3420"));
-      rim.rotation.y = Math.PI / 2;
-      w.add(rim);
-      for (let i = 0; i < 6; i++) {
-        const spoke = box(w, 0.05, 1.42, 0.06, wood, 0, 0, 0);
-        spoke.rotation.x = (i / 6) * Math.PI;
+      w.position.set(x, 0.8, -1);
+      const rim = new THREE.TorusGeometry(0.76, 0.06, 8, 28);
+      rim.rotateY(Math.PI / 2);
+      add(w, rim, dark);
+      const tyre = new THREE.TorusGeometry(0.8, 0.025, 6, 28);
+      tyre.rotateY(Math.PI / 2);
+      add(w, tyre, iron);
+      for (let i = 0; i < 12; i++) {
+        const sp = new THREE.CylinderGeometry(0.022, 0.03, 0.74, 6);
+        sp.translate(0, 0.37, 0);
+        sp.rotateX((i / 12) * Math.PI * 2);
+        add(w, sp, wood);
       }
-      box(w, 0.2, 0.2, 0.2, dark, 0, 0, 0); // hub
+      const hub = new THREE.CylinderGeometry(0.13, 0.13, 0.22, 12);
+      hub.rotateZ(Math.PI / 2);
+      add(w, hub, dark);
       g.add(w);
       this.wheels.push(w);
     }
-    box(g, 1.9, 0.08, 0.08, dark, 0, 0.78, -1.0); // axle
+    const axle = new THREE.CylinderGeometry(0.05, 0.05, 1.8, 8);
+    axle.rotateZ(Math.PI / 2);
+    add(g, axle, iron, 0, 0.8, -1);
   }
   roll(dist: number) {
-    for (const w of this.wheels) w.rotation.x = dist / 0.78;
+    for (const w of this.wheels) w.rotation.x = dist / 0.8;
   }
 }
 
-/** The pair (always) and the cart (when hitched). */
 export class Rig {
   readonly group = new THREE.Group();
   readonly pair = new THREE.Group();
@@ -121,15 +164,16 @@ export class Rig {
 
   constructor() {
     this.bulls = [new Bull("#c0392b", "#2e86c1"), new Bull("#e67e22", "#16a085")];
-    this.bulls[0].group.position.x = -0.5;
-    this.bulls[1].group.position.x = 0.5;
+    this.bulls[0].group.position.x = -0.55;
+    this.bulls[1].group.position.x = 0.55;
     this.pair.add(this.bulls[0].group, this.bulls[1].group);
-    box(this.pair, 1.9, 0.12, 0.14, "#6a4a2c", 0, 1.38, 0.72); // the yoke across their necks
+    const yoke = new THREE.CylinderGeometry(0.07, 0.07, 2.2, 8);
+    yoke.rotateZ(Math.PI / 2);
+    add(this.pair, yoke, M("#5a3f26", 0.9), 0, 1.5, 0.66);
     this.group.add(this.pair);
-    this.cart.group.position.z = -1.35;
+    this.cart.group.position.z = -1.4;
     this.cart.group.visible = false;
     this.group.add(this.cart.group);
-    mergeBoxes(this.group);
   }
 
   setHitched(on: boolean) {
@@ -137,7 +181,6 @@ export class Rig {
     this.cart.group.visible = on;
   }
 
-  /** Advance animation; `moved` is how far the rig travelled this frame. */
   update(dt: number, moved: number) {
     this.t += dt;
     const gait = Math.min(1, moved / Math.max(dt, 1e-3) / 2);
@@ -147,17 +190,15 @@ export class Rig {
   }
 }
 
-/** A cart standing alone (parked), so it can wait at home or at the mandi. */
+/** The cart standing alone, tipped forward onto its shafts. */
 export function parkedCart(): THREE.Group {
   const c = new Cart();
-  // tip the cart forward about its axle until the shaft ends rest on the ground
   const pivot = new THREE.Group();
-  pivot.position.set(0, 0.78, -1.0);
-  c.group.position.set(0, -0.78, 1.0);
-  pivot.rotation.x = 0.29;
+  pivot.position.set(0, 0.8, -1.0);
+  c.group.position.set(0, -0.8, 1.0);
+  pivot.rotation.x = 0.33;
   pivot.add(c.group);
   const g = new THREE.Group();
   g.add(pivot);
-  mergeBoxes(g);
   return g;
 }
