@@ -6,10 +6,34 @@ import { mergeParts } from "../engine/merge";
  * One rig for the farmer and everyone in the village; `animate` swings limbs from a walk phase.
  * Faces +z, feet at the origin, about 1.7 m tall.
  */
-export type Look = { kurta: string; dhoti: string; hat: string; hatStyle: "pheta" | "topi" | "odhni"; skin: string; tail?: string; woman?: boolean };
+export type Look = { kurta: string; dhoti: string; hat: string; hatStyle: "pheta" | "topi" | "odhni" | "none"; skin: string; tail?: string; woman?: boolean; modern?: boolean };
 
 /** A Banjara woman: mirror-work ghaghra, embroidered kanchali, a coin-edged odhni over the head, arms stacked with bangles. */
 export const banjaraWoman = (skirt: string, odhni: string): Look => ({ kurta: "#1f5a52", dhoti: skirt, hat: odhni, hatStyle: "odhni", skin: "#9a6240", woman: true });
+
+/** A checked shirt fabric. */
+function checkTex(base: string): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d")!;
+  g.fillStyle = base;
+  g.fillRect(0, 0, 64, 64);
+  g.fillStyle = "rgba(255,255,255,0.28)";
+  for (let i = 0; i < 64; i += 16) {
+    g.fillRect(i, 0, 5, 64);
+    g.fillRect(0, i, 64, 5);
+  }
+  g.fillStyle = "rgba(0,0,0,0.25)";
+  for (let i = 8; i < 64; i += 16) {
+    g.fillRect(i, 0, 2, 64);
+    g.fillRect(0, i, 64, 2);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(4, 3);
+  return t;
+}
 
 /** The embroidery: bands of colour, zigzags, and little round mirrors that catch the light. */
 function mirrorWork(base: string): THREE.CanvasTexture {
@@ -48,7 +72,8 @@ function mirrorWork(base: string): THREE.CanvasTexture {
   t.repeat.set(3, 1);
   return t;
 }
-export const FARMER: Look = { kurta: "#f1ead9", dhoti: "#e9e1cd", hat: "#e0762a", hatStyle: "pheta", skin: "#9b6541", tail: "#e0762a" };
+/** The hero: back from the city — a checked shirt over a tee, jeans, white sneakers, a watch, a backpack. */
+export const FARMER: Look = { kurta: "#2f5f9e", dhoti: "#2c3e5c", hat: "#1a1210", hatStyle: "none", skin: "#9b6541", modern: true };
 
 const mats = new Map<string, THREE.MeshStandardMaterial>();
 const mat = (c: string, rough = 0.85) => {
@@ -82,6 +107,11 @@ export class Figure {
     const b = this.body;
     if (look.woman) {
       this.woman(look);
+      mergeParts(this.root);
+      return;
+    }
+    if (look.modern) {
+      this.modern(look);
       mergeParts(this.root);
       return;
     }
@@ -145,6 +175,71 @@ export class Figure {
       cap.rotation.y = Math.PI / 4;
     }
     mergeParts(this.root);
+  }
+
+  private modern(look: Look) {
+    const b = this.body;
+    // jeans all the way down, white sneakers
+    for (const s of [-1, 1]) {
+      const hip = new THREE.Group();
+      hip.position.set(s * 0.1, 0.92, 0);
+      b.add(hip);
+      part(new THREE.CapsuleGeometry(0.075, 0.34, 4, 10), look.dhoti, hip, 0, -0.23, 0);
+      const knee = new THREE.Group();
+      knee.position.set(0, -0.46, 0);
+      hip.add(knee);
+      part(new THREE.CapsuleGeometry(0.062, 0.34, 4, 10), look.dhoti, knee, 0, -0.2, 0);
+      part(new THREE.BoxGeometry(0.11, 0.07, 0.27), "#f4f4f2", knee, 0, -0.44, 0.04, 0.5); // sneakers
+      part(new THREE.BoxGeometry(0.115, 0.02, 0.28), "#b8392b", knee, 0, -0.47, 0.04); // red soles
+      this.hips.push(hip);
+      this.knees.push(knee);
+    }
+    part(new THREE.CylinderGeometry(0.19, 0.19, 0.06, 18), "#2a1f18", b, 0, 0.93, 0); // a belt
+    // a white tee under an open checked shirt
+    part(lathe([[0.001, 0.9], [0.195, 0.9], [0.19, 1.05], [0.2, 1.3], [0.17, 1.4], [0.06, 1.45], [0.001, 1.45]], 22), "#f2f0ea", b);
+    const check = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.205, 0.215, 0.55, 22, 1, true, Math.PI * 0.12, Math.PI * 1.76),
+      new THREE.MeshStandardMaterial({ map: checkTex(look.kurta), roughness: 0.8, side: THREE.DoubleSide }),
+    );
+    check.position.set(0, 1.17, 0);
+    check.castShadow = true;
+    b.add(check);
+    part(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 10), look.skin, b, 0, 1.48, 0);
+    // a backpack from the city
+    part(new THREE.BoxGeometry(0.3, 0.38, 0.14), "#3a3f46", b, 0, 1.18, -0.24, 0.7);
+    for (const s of [-1, 1]) part(new THREE.BoxGeometry(0.04, 0.4, 0.03), "#2a2e33", b, s * 0.11, 1.2, -0.16);
+    for (const s of [-1, 1]) {
+      const sh = new THREE.Group();
+      sh.position.set(s * 0.22, 1.36, 0);
+      b.add(sh);
+      const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, 0.24, 4, 10), new THREE.MeshStandardMaterial({ map: checkTex(look.kurta), roughness: 0.8 }));
+      sleeve.position.y = -0.14;
+      sleeve.castShadow = true;
+      sh.add(sleeve);
+      const el = new THREE.Group();
+      el.position.set(0, -0.32, 0);
+      sh.add(el);
+      part(new THREE.CapsuleGeometry(0.043, 0.22, 4, 10), look.skin, el, 0, -0.13, 0);
+      part(new THREE.SphereGeometry(0.05, 10, 8), look.skin, el, 0, -0.29, 0.01);
+      if (s < 0) part(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 12), "#1c1c1c", el, 0, -0.22, 0, 0.3); // a watch
+      sh.rotation.z = s * 0.08;
+      this.shoulders.push(sh);
+      this.elbows.push(el);
+    }
+    this.head.position.set(0, 1.53, 0);
+    b.add(this.head);
+    const h = this.head;
+    part(new THREE.SphereGeometry(0.115, 20, 16), look.skin, h, 0, 0.11, 0).scale.set(0.92, 1.05, 1);
+    part(new THREE.SphereGeometry(0.03, 10, 8), look.skin, h, 0, 0.1, 0.11);
+    for (const s of [-1, 1]) {
+      part(new THREE.SphereGeometry(0.014, 8, 6), "#1c1410", h, s * 0.042, 0.14, 0.102, 0.4);
+      part(new THREE.SphereGeometry(0.022, 8, 6), look.skin, h, s * 0.112, 0.11, 0);
+    }
+    // a short modern cut: fuller on top, faded sides, and a trimmed beard line
+    const hair = part(new THREE.SphereGeometry(0.122, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2.1), look.hat, h, 0, 0.14, -0.01);
+    hair.scale.set(1, 0.9, 1.05);
+    part(new THREE.SphereGeometry(0.07, 12, 8), look.hat, h, 0.02, 0.24, 0.05).scale.set(1.3, 0.55, 1);
+    part(new THREE.TorusGeometry(0.085, 0.018, 6, 16, Math.PI), "#1f1712", h, 0, 0.075, 0.03).rotation.z = Math.PI;
   }
 
   private woman(look: Look) {

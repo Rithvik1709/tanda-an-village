@@ -24,8 +24,9 @@ export function owed(l: Loan, now: number): number {
   const L = LENDERS[l.lender];
   const onTime = Math.min(now, l.dueAt) - l.takenAt;
   const late = Math.max(0, now - l.dueAt);
-  let total = l.principal * (1 + L.rate * (onTime / DAY_MS));
-  if (late > 0) total += l.principal * (L.lateFee + L.rate * L.lateRateMult * (late / DAY_MS));
+  const rate = l.rate ?? L.rate;
+  let total = l.principal * (1 + rate * (onTime / DAY_MS));
+  if (late > 0) total += l.principal * (L.lateFee + rate * L.lateRateMult * (late / DAY_MS));
   return Math.max(0, Math.ceil(total - l.paid));
 }
 export const isOverdue = (l: Loan, now: number) => now > l.dueAt && owed(l, now) > 0;
@@ -34,7 +35,7 @@ export const totalDebt = (s: Save, now: number) => s.loans.reduce((a, l) => a + 
 /** The bank lends up to 40% of the land you own, less what you already owe it. The sahukar asks nothing. */
 export function creditLimit(world: World, s: Save, lender: Lender, now: number, day: number): number {
   const land = s.plots.reduce((a, id) => a + landValue(world.plots[id], day), 0);
-  const cap = lender === "bank" ? land * 0.4 : 3000 + land * 0.15;
+  const cap = lender === "bank" ? land * 0.4 : (3000 + land * 0.15) * (s.perks?.includes("sahukarRaj") ? 1.5 : 1);
   const used = s.loans.filter((l) => l.lender === lender).reduce((a, l) => a + owed(l, now), 0);
   return Math.max(0, Math.floor((cap - used) / 100) * 100);
 }

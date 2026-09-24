@@ -35,7 +35,7 @@ export type Mission = {
   choices?: { id: string; label: string; effect: string }[];
 };
 
-const since = (s: Save, key: string) => (s.missions.c[key] ?? 0) - (s.missions.base[key] ?? 0);
+export const since = (s: Save, key: string) => (s.missions.c[key] ?? 0) - (s.missions.base[key] ?? 0);
 const starter = (w: World) => w.plots.find((p) => p.starter)!;
 const cellsIn = (s: Save, w: World, plotId: number) => {
   const p = w.plots[plotId];
@@ -138,6 +138,24 @@ export const MISSIONS: Mission[] = [
       },
     ],
     reward: { rep: 15, money: 1000, text: "₹1,000 from the Naik for the paperwork · +15 reputation" },
+  },
+  {
+    id: "election", title: "Gram Panchayat Nivadnuk", local: "ग्रामपंचायत निवडणूक · The panchayat election", who: "Naik Dhavlu",
+    story: "The panchayat election is on, and the tanda is split. Shankar Pawar has Sahukar Motilal's money behind him and promises a new road — and a note in every hand. Kamlabai Jadhav, who runs the women's self-help group, promises taps in every lane from the tanki and a proper teacher for the Z.P. school. Hear them both, come to the gram sabha at the school, and then decide. Folk say you could even stand yourself — if the tanda trusts you.",
+    done: "",
+    objectives: [
+      { id: "kamla", text: "Hear Kamlabai Jadhav's promises (outside the Z.P. school)", need: 1, have: (s) => since(s, "talk:kamlabai") },
+      { id: "shankar", text: "Hear Shankar Pawar's promises (outside the Z.P. school)", need: 1, have: (s) => since(s, "talk:shankar") },
+      { id: "sabha", text: "Attend the gram sabha at the Z.P. school (E at the school, 9 am – 6 pm)", need: 1, have: (s) => since(s, "visit:gramsabha") },
+      { id: "choose", text: "Decide whom you back (at the school)", need: 1, have: (s) => (s.missions.choice ? 1 : 0) },
+      { id: "vote", text: "Cast your vote at the polling booth in the school (E)", need: 1, have: (s) => since(s, "visit:vote") },
+    ],
+    choices: [
+      { id: "kamlabai", label: "Back Kamlabai", effect: "taps and a teacher · drip sets half price · +15 reputation" },
+      { id: "shankar", label: "Take Shankar's envelope", effect: "+₹2,000 now · −15 reputation · the sahukar grows stronger" },
+      { id: "self", label: "Stand for sarpanch yourself", effect: "needs ★ 50 reputation and ₹1,000 deposit · become Sarpanch" },
+    ],
+    reward: { text: "Depends on how Ukhali votes" },
   },
   {
     id: "pola", title: "Bail Pola", local: "बैल पोळा · The festival of bulls", who: "the whole tanda",

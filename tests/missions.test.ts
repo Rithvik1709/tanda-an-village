@@ -101,7 +101,25 @@ describe("the ten missions", () => {
     s.money += 100_000;
     ok(s, { t: "buyPlot", plot: BANDH_PLOT });
     ok(s, { t: "claimMission" });
-    // 10 Pola: happy, painted, then the procession
+    // 10 the election: hear both, the gram sabha (by day), decide, vote once
+    no(s, { t: "visit", place: "vote" }); // nobody chosen yet
+    ok(s, { t: "talk", npc: "kamlabai" });
+    ok(s, { t: "talk", npc: "shankar" });
+    now += 1 * DAY_MS;
+    const h = new Date(now).getUTCHours();
+    void h;
+    let tries = 0;
+    while (apply(world, s, { t: "visit", place: "gramsabha" }, now).ok === false && tries++ < 24) now += HOUR_MS;
+    expect(tries).toBeLessThan(24);
+    const repBefore = s.rep;
+    if (s.rep < 50) s.rep = 50;
+    ok(s, { t: "choose", option: "self" });
+    ok(s, { t: "visit", place: "vote" });
+    no(s, { t: "visit", place: "vote" }); // only once
+    ok(s, { t: "claimMission" });
+    expect(s.perks).toContain("sarpanch");
+    expect(s.rep).toBeGreaterThanOrEqual(Math.max(50, repBefore) + 20);
+    // 11 Pola: happy, painted, then the procession
     no(s, { t: "visit", place: "pola" });
     ok(s, { t: "feed" });
     ok(s, { t: "feed" });
@@ -113,6 +131,29 @@ describe("the ten missions", () => {
     expect(s.perks).toContain("polaChampion");
     expect(s.missions.i).toBe(MISSIONS.length);
     no(s, { t: "claimMission" });
+  });
+
+  it("election: Shankar's envelope pays but costs reputation and strengthens the sahukar; Kamlabai halves drip", () => {
+    const s = newSave("e", world, now);
+    s.missions.i = 9;
+    s.rep = 30;
+    ok(s, { t: "talk", npc: "kamlabai" });
+    ok(s, { t: "talk", npc: "shankar" });
+    let tries = 0;
+    while (apply(world, s, { t: "visit", place: "gramsabha" }, now).ok === false && tries++ < 24) now += HOUR_MS;
+    no(s, { t: "choose", option: "self" }); // ★ 30 is not enough
+    const m0 = s.money;
+    ok(s, { t: "choose", option: "shankar" });
+    expect(s.money).toBe(m0 + 2000);
+    expect(s.rep).toBe(15);
+    ok(s, { t: "visit", place: "vote" });
+    ok(s, { t: "claimMission" });
+    expect(s.perks).toContain("sahukarRaj");
+    const k = newSave("k", world, now);
+    k.perks.push("dripSubsidy");
+    k.money = 10000;
+    ok(k, { t: "buy", item: "drip", n: 1 });
+    expect(k.money).toBe(7000);
   });
 
   it("refusing Ramu costs reputation; delivering what nobody asked for is refused", () => {

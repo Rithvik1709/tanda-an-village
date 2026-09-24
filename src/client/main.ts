@@ -273,6 +273,18 @@ const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: N
     label: "Buy & sell land with Naik Dhavlu, the tanda's headman",
   },
   {
+    kind: "kamlabai",
+    at: { x: world.landmarks.school.x - 1, y: world.landmarks.school.y, z: world.landmarks.school.z - 6 },
+    npc: new Npc({ kurta: "", dhoti: "#1d4ed8", hat: "#15803d", woman: true }, world.landmarks.school.x - 1.2, world.landmarks.school.y, world.landmarks.school.z - 7.2, -Math.PI / 2),
+    label: "Hear Kamlabai Jadhav, candidate for sarpanch",
+  },
+  {
+    kind: "shankar",
+    at: { x: world.landmarks.school.x - 1, y: world.landmarks.school.y, z: world.landmarks.school.z + 6.5 },
+    npc: new Npc({ kurta: "#f6f2e8", dhoti: "#f0ead8", hat: "#f6f2e8", skin: "#a8704a" }, world.landmarks.school.x - 1.2, world.landmarks.school.y, world.landmarks.school.z + 7.6, -Math.PI / 2),
+    label: "Hear Shankar Pawar, candidate for sarpanch",
+  },
+  {
     kind: "mandir",
     at: { x: world.landmarks.temple.x + 0.5, y: world.landmarks.temple.y, z: world.landmarks.temple.z - 0.5 },
     npc: new Npc({ kurta: "#f4f0e4", dhoti: "#f0ead8", hat: "#f6f4ec", hatTall: true, skin: "#8f5a3a" }, world.landmarks.temple.x + 2.2, world.landmarks.temple.y, world.landmarks.temple.z - 1, Math.PI),
@@ -298,6 +310,48 @@ const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: N
   },
 ];
 for (const s of STALLS) scene.add(s.npc.group);
+// the candidates only stand at the school during the election; campaign posters go up with them
+const campaign = new THREE.Group();
+scene.add(campaign);
+{
+  const poster = (lines: string[], bg: string, symbol: string, x: number, z: number, rot: number) => {
+    const c = document.createElement("canvas");
+    c.width = 384;
+    c.height = 512;
+    const g = c.getContext("2d")!;
+    g.fillStyle = bg;
+    g.fillRect(0, 0, 384, 512);
+    g.fillStyle = "#fff8e6";
+    g.fillRect(16, 16, 352, 480);
+    g.fillStyle = bg;
+    g.textAlign = "center";
+    g.font = "120px system-ui";
+    g.fillText(symbol, 192, 190);
+    lines.forEach((l, i) => {
+      g.font = i === 0 ? "800 46px 'Noto Sans Devanagari', system-ui" : "700 30px system-ui";
+      g.fillText(l, 192, 290 + i * 56);
+    });
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    // printed on both faces, so it reads from either side
+    const m = new THREE.Group();
+    for (const flip of [0, Math.PI]) {
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.6), new THREE.MeshStandardMaterial({ map: tex }));
+      face.rotation.y = flip;
+      face.position.z = flip ? -0.01 : 0.01;
+      m.add(face);
+    }
+    m.position.set(x, hf.at(x, z) + 2.2, z);
+    m.rotation.y = rot;
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.2, 0.08), new THREE.MeshStandardMaterial({ color: "#5a4636" }));
+    post.position.set(x, hf.at(x, z) + 1.1, z - 0.05);
+    campaign.add(m, post);
+  };
+  const sc = world.landmarks.school;
+  poster(["कमलाबाई जाधव", "Kamlabai Jadhav", "for Sarpanch"], "#15803d", "🚰", sc.x - 2.6, sc.z - 8.6, -Math.PI / 2);
+  poster(["शंकर पवार", "Shankar Pawar", "for Sarpanch"], "#b45309", "🛣️", sc.x - 2.6, sc.z + 9, -Math.PI / 2);
+  poster(["मतदान केंद्र", "Polling Booth", "Z.P. School"], "#1d4ed8", "🗳️", sc.x - 1.6, sc.z + 1.6, -Math.PI / 2);
+}
 // the people of the tanda going about their day (not traders — just neighbours)
 const WL = world.landmarks.well;
 const NEIGHBOURS = [
@@ -412,6 +466,11 @@ function cartHint(): string {
     return cartInTown() ? "<kbd>R</kbd> Ride home" : "<kbd>R</kbd> Load the cart for the town mandi";
   }
   if (polaHere()) return "<kbd>E</kbd> Lead Sarja & Raja in the Pola procession";
+  if (schoolHere()) {
+    const ms = game.save.missions;
+    const sabha = (ms.c["visit:gramsabha"] ?? 0) > (ms.base["visit:gramsabha"] ?? 0);
+    return !sabha ? "<kbd>E</kbd> Join the gram sabha" : !ms.choice ? "Decide whom you back…" : "<kbd>E</kbd> Vote at the polling booth";
+  }
   if (nearBulls() && game.save.inv.gerua && current(game.save)?.id === "pola" && !game.save.missions.flags.decorated) return "<kbd>F</kbd> Paint Sarja & Raja's horns with gerua";
   if (nearBulls()) return `<kbd>F</kbd> Feed Sarja & Raja (${game.save.inv.fodder ?? 0} kadba)`;
   return "";
@@ -443,6 +502,7 @@ function nearStall() {
   // the nearest one wins (the Naik's door and Ganpat's stall are neighbours on the chowk)
   let best: (typeof STALLS)[number] | undefined, bd = 3.4;
   for (const s of STALLS) {
+    if ((s.kind === "kamlabai" || s.kind === "shankar") && current(game.save)?.id !== "election") continue;
     const d = Math.hypot(body.pos.x - s.at.x, body.pos.z - s.at.z);
     if (d < bd && Math.abs(body.pos.y - s.at.y) < 2) {
       bd = d;
@@ -451,7 +511,7 @@ function nearStall() {
   }
   return best;
 }
-const TALK: Partial<Record<PanelKind, string>> = { land: "naik", trader: "ganpat", shop: "sitabai", sahukar: "motilal", town: "haribhau", bank: "joshi" };
+const TALK: Partial<Record<PanelKind, string>> = { land: "naik", trader: "ganpat", shop: "sitabai", sahukar: "motilal", town: "haribhau", bank: "joshi", kamlabai: "kamlabai", shankar: "shankar" };
 function openStall(kind: PanelKind, tab?: string) {
   const who = TALK[kind];
   if (who && booted_) game.act({ t: "talk", npc: who });
@@ -577,7 +637,7 @@ function refreshStatus() {
   if (s.bestTitle > lastTitle && lastTitle >= 0) hud.toast(`You are now a ${TITLES[s.bestTitle].name}! · ${TITLES[s.bestTitle].local}`);
   if (booted_) lastTitle = s.bestTitle;
   const saved = { saved: "✓ saved", saving: "saving…", offline: "offline — retrying" }[net.status];
-  hud.setInfo(`<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${title.name}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${s.rep ? `<span class="rep" title="Reputation with the tanda: better prices from Ganpat">★ ${s.rep}</span>` : ""}${overdue ? `<span class="debt">loan overdue!</span>` : ""}<span class="sync ${net.status}">${saved}</span><span>${fmtHour(hourOverride ?? c.hour)}</span><span>${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}</span>`);
+  hud.setInfo(`${s.perks.includes("sarpanch") ? `<span class="title">Sarpanch</span>` : ""}<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${title.name}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${s.rep ? `<span class="rep" title="Reputation with the tanda: better prices from Ganpat">★ ${s.rep}</span>` : ""}${overdue ? `<span class="debt">loan overdue!</span>` : ""}<span class="sync ${net.status}">${saved}</span><span>${fmtHour(hourOverride ?? c.hour)}</span><span>${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}</span>`);
 }
 game.onChange(refreshStatus);
 game.onChange(() => syncFields());
@@ -599,7 +659,20 @@ function polaHere() {
   const ch = world.chowk;
   return current(game.save)?.id === "pola" && !!game.save.bulls && body.pos.x > ch.x0 - 2 && body.pos.x < ch.x1 + 2 && body.pos.z > ch.z0 - 2 && body.pos.z < ch.z1 + 2 && farmyard.distTo(body.pos, farmyard.pos.x, farmyard.pos.z) < 12;
 }
+/** At the school during the election: the gram sabha, then the booth. */
+function schoolHere() {
+  const sc = world.landmarks.school;
+  return current(game.save)?.id === "election" && Math.hypot(body.pos.x - sc.x, body.pos.z - sc.z) < 3.2;
+}
 controls.onInteract = () => {
+  if (schoolHere() && !nearStall()) {
+    const ms = game.save.missions;
+    const sabhaDone = (ms.c["visit:gramsabha"] ?? 0) - (ms.base["visit:gramsabha"] ?? 0) > 0;
+    const r = game.act({ t: "visit", place: !sabhaDone ? "gramsabha" : "vote" });
+    hud.toast(r.ok ? (!sabhaDone ? "The gram sabha: the whole tanda packed into the classroom, arguing over taps and roads." : "Ink on your finger, ballot in the box. Counting is tonight!") : r.error, r.ok ? "ok" : "bad");
+    if (r.ok && sabhaDone) celebrate();
+    return;
+  }
   if (polaHere() && !nearStall()) {
     const r = game.act({ t: "visit", place: "pola" });
     hud.toast(r.ok ? "The procession begins! Drums, gulal, and the whole tanda cheering." : r.error, r.ok ? "ok" : "bad");
@@ -770,11 +843,17 @@ renderer.setAnimationLoop(() => {
       BULB_LIGHTS.forEach((l, i) => near[i] && l.position.copy(near[i]));
     }
     BULB_LIGHTS.forEach((l) => (l.intensity = nightK * 9));
-    guide.nearChoice = Math.hypot(body.pos.x - 99.5, body.pos.z - 124) < 5;
+    const elec = current(game.save)?.id === "election";
+    guide.nearChoice = elec ? schoolHere() && (game.save.missions.c["visit:gramsabha"] ?? 0) > (game.save.missions.base["visit:gramsabha"] ?? 0) : Math.hypot(body.pos.x - 99.5, body.pos.z - 124) < 5;
     if (!titleScreen.open) tutorial.update(game.save, game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]), now);
   }
   worldRenderer.cull(camera.position, mode === "title" ? 200 : settings.renderDistance);
-  for (const s of STALLS) s.npc.update(dt, camera.position);
+  const electionOn = current(game.save)?.id === "election";
+  campaign.visible = electionOn;
+  for (const s of STALLS) {
+    if (s.kind === "kamlabai" || s.kind === "shankar") s.npc.group.visible = electionOn;
+    s.npc.update(dt, camera.position);
+  }
   for (const n of NEIGHBOURS) n.update(dt, camera.position);
   const tv0 = performance.now();
   villagers.update(dt, now / 1000, hourOverride ?? clock(game.now()).hour, game.save, clock(game.now()).day, game.now(), camera.position);
@@ -1009,6 +1088,10 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
             refreshStatus();
             await worldRenderer.flush();
             return game.skew;
+          },
+          jumpMission: async (i: number, rep: number) => {
+            await net.skip(0, 0, { mission: i, rep });
+            refreshStatus();
           },
           grant: async (money: number) => {
             await net.skip(0, money);

@@ -15,7 +15,7 @@ import type { World } from "../../shared/world";
  * The trader's and shopkeeper's panels. They only ever call `act` — the same actions the server
  * re-checks — and re-render from the save after each one.
  */
-export type PanelKind = "trader" | "shop" | "land" | "cart" | "town" | "bank" | "sahukar" | "mandir";
+export type PanelKind = "trader" | "shop" | "land" | "cart" | "town" | "bank" | "sahukar" | "mandir" | "kamlabai" | "shankar";
 type Ctx = {
   save: () => Save;
   now: () => number;
@@ -135,7 +135,7 @@ export class Panels {
     const s = this.ctx.save();
     const day = clock(this.ctx.now()).day;
     const tabs =
-      this.open === "cart" || this.open === "town" || this.open === "mandir"
+      this.open === "cart" || this.open === "town" || this.open === "mandir" || this.open === "kamlabai" || this.open === "shankar"
         ? []
         : this.open === "bank"
           ? [["loans", "Loans"], ["godown", "Godown"], ["worth", "Your worth"]]
@@ -145,7 +145,11 @@ export class Panels {
     const who =
       this.open === "trader"
         ? `<h2>Ganpat Seth <small>village trader · व्यापारी</small></h2><p class="lede">"I pay fair, and I pay today. For more, you'd have to cart it to the town mandi."</p>`
-        : this.open === "mandir"
+        : this.open === "kamlabai"
+          ? `<h2>Kamlabai Jadhav <small>candidate for sarpanch · बचत गट अध्यक्ष</small></h2><p class="lede">"Ram Ram, bhau. Our women walk a kilometre for water while the tanki on the tekdi stands half empty. Vote for me and every lane gets a tap. And the Z.P. school gets a real teacher, not one who comes twice a month."</p>`
+          : this.open === "shankar"
+          ? `<h2>Shankar Pawar <small>candidate for sarpanch</small></h2><p class="lede">"A tar road to the Jalna highway, that's what I'll bring! And for your trouble…" (he pats a thick envelope) "…Motilal seth takes care of his friends. Why walk to the booth for nothing?"</p>`
+          : this.open === "mandir"
           ? `<h2>Sevalal Maharaj mandir <small>संत सेवालाल महाराज</small></h2><p class="lede">White flags flutter over the shrine. The tanda brings its first harvest here.</p>`
           : this.open === "bank"
           ? `<h2>Sahakari Bank &amp; godown <small>Joshi saheb, manager · सहकारी बँक</small></h2><p class="lede">"We lend at one rupee in a hundred a day, against your land. Pay on time and we're friends for life."</p>`
@@ -159,7 +163,7 @@ export class Panels {
           ? `<h2>Naik Dhavlu's kacheri <small>the tanda's headman · नायक</small></h2><p class="lede">"Ram Ram! The tanda settled here for this black soil. Buy land near water, bhai — it feeds you every season."</p>`
           : `<h2>Sitabai's seeds &amp; tools <small>बी-बियाणे</small></h2><p class="lede">"Ram Ram! Good seed, good harvest. And my Khillari bulls pull a cart like our caravans of old."</p>`;
     const body =
-      this.tab === "offer" ? this.offer(s) : this.tab === "loans" ? this.loans(s, day, this.open === "bank" ? "bank" : "sahukar") : this.tab === "godown" ? this.godown(s) : this.tab === "worth" ? this.worth(s, day) : this.tab === "load" ? this.load(s, day) : this.tab === "mandi" || this.tab === "sold" ? this.mandi(s, day) : this.tab === "sell" ? this.sell(s, day) : this.tab === "prices" ? this.prices(day) : this.tab === "ledger" ? this.ledger(s, day) : this.tab === "plots" ? this.plots(s, day) : this.tab === "mine" ? this.mine(s, day) : this.buy(s);
+      this.open === "kamlabai" || this.open === "shankar" ? `<p class="hint">${current(s)?.id === "election" ? "Listen to both candidates, attend the gram sabha at the school, then decide." : "The election is over."}</p>` : this.tab === "offer" ? this.offer(s) : this.tab === "loans" ? this.loans(s, day, this.open === "bank" ? "bank" : "sahukar") : this.tab === "godown" ? this.godown(s) : this.tab === "worth" ? this.worth(s, day) : this.tab === "load" ? this.load(s, day) : this.tab === "mandi" || this.tab === "sold" ? this.mandi(s, day) : this.tab === "sell" ? this.sell(s, day) : this.tab === "prices" ? this.prices(day) : this.tab === "ledger" ? this.ledger(s, day) : this.tab === "plots" ? this.plots(s, day) : this.tab === "mine" ? this.mine(s, day) : this.buy(s);
     this.el.innerHTML = `
       <div class="panel-card">
         <button class="x" data-do="close" title="Close (E)">✕</button>

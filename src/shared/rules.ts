@@ -3,7 +3,7 @@ import { advance, CAN_MAX, CROPS, type CropId, isCrop, stageOf, WET_MS, yieldOf 
 import { type Buyer, buyerPrice, LEDGER_DAYS, shopItem } from "./economy";
 import { askingPrice, clearPlot, forSale, offersFor, valuePlot } from "./land";
 import { carried, CARRY, creditLimit, GODOWN_CAPACITY, isOverdue, LENDERS, type Lender, type Loan, owed, rentFor, stored } from "./bank";
-import { begin, BANDH_PLOT, bump, complete, current, deadlineAt } from "./missions";
+import { begin, BANDH_PLOT, bump, complete, current, deadlineAt, since } from "./missions";
 import { BULL_NAMES, bullsNow, CART_CAPACITY, FEED, MIN_MOOD, newBulls, PLOUGH_COST, PLOUGH_ROW, TRIP_COST, TRIP_MS } from "./bulls";
 import { hash2 } from "./rng";
 import type { LedgerEntry, Save } from "./save";
@@ -98,11 +98,21 @@ function story(world: World, save: Save, a: Extract<Action, { t: "talk" | "visit
   const ms = save.missions;
   switch (a.t) {
     case "talk":
-      if (!["naik", "ganpat", "sitabai", "motilal", "haribhau", "joshi", "ramu"].includes(a.npc)) return fail("Who?");
+      if (!["naik", "ganpat", "sitabai", "motilal", "haribhau", "joshi", "ramu", "kamlabai", "shankar"].includes(a.npc)) return fail("Who?");
       bump(save, `talk:${a.npc}`);
       return { ok: true };
     case "visit": {
-      if (!["aamrai", "prices", "teej", "pola"].includes(a.place)) return fail("Where?");
+      if (!["aamrai", "prices", "teej", "pola", "gramsabha", "vote"].includes(a.place)) return fail("Where?");
+      if (a.place === "gramsabha") {
+        const h = clock(now).hour;
+        if (m?.id !== "election") return fail("There's no gram sabha today.");
+        if (!(h >= 9 && h < 18)) return fail("The gram sabha meets between 9 am and 6 pm.");
+      }
+      if (a.place === "vote") {
+        if (m?.id !== "election") return fail("It isn't polling day.");
+        if (!ms.choice) return fail("Decide whom you back first.");
+        if (since(save, "visit:vote") > 0) return fail("You've already voted — the ink is still on your finger.");
+      }
       if (a.place === "teej") {
         const h = clock(now).hour;
         if (m?.id !== "teej" || !(h >= 19 || h < 4)) return fail("The gathering is after dark, during Teej.");
@@ -125,6 +135,22 @@ function story(world: World, save: Save, a: Extract<Action, { t: "talk" | "visit
     }
     case "choose": {
       if (!m?.choices || ms.choice) return fail("Nothing to decide.");
+      if (m.id === "election") {
+        if (since(save, "visit:gramsabha") < 1) return fail("Hear everyone at the gram sabha first.");
+        if (a.option === "self") {
+          if (save.rep < 50) return fail(`The tanda doesn't know you well enough yet (★ ${save.rep} of 50). Help your neighbours first.`);
+          if (save.money < 1000) return fail("The nomination deposit is ₹1,000.");
+          save.money -= 1000;
+          save.stats.spent += 1000;
+          record(save, { day: clock(now).day, kind: "buy", item: "nomination", n: 1, amount: 1000 });
+        } else if (a.option === "shankar") {
+          save.money += 2000;
+          save.rep = Math.max(0, save.rep - 15);
+          record(save, { day: clock(now).day, kind: "sell", item: "envelope", n: 1, amount: 2000, where: "Shankar Pawar" });
+        } else if (a.option !== "kamlabai") return fail("Pick one.");
+        ms.choice = a.option;
+        return { ok: true, msg: a.option === "self" ? "Your name goes up on the ballot. Now vote!" : a.option === "shankar" ? "The envelope is thick. Kamlabai looks away as you pass." : "You tie a ribbon for Kamlabai at the school gate." };
+      }
       if (a.option === "help") {
         if (save.money < 1500) return fail("You'd need ₹1,500 — you have ₹" + save.money + ".");
         save.money -= 1500;
@@ -153,7 +179,22 @@ function story(world: World, save: Save, a: Extract<Action, { t: "talk" | "visit
       }
       if (r.rep) save.rep += r.rep;
       if (r.perk && !save.perks.includes(r.perk)) save.perks.push(r.perk);
-      const line = m.id === "debt" ? (ms.choice === "help" ? "Ramu kaka will never forget this." : "Motilal took Ramu kaka's field. People remember.") : m.done;
+      let line = m.id === "debt" ? (ms.choice === "help" ? "Ramu kaka will never forget this." : "Motilal took Ramu kaka's field. People remember.") : m.done;
+      if (m.id === "election") {
+        if (ms.choice === "self") {
+          save.rep += 20;
+          if (!save.perks.includes("sarpanch")) save.perks.push("sarpanch");
+          save.money += 1000; // the deposit comes back to a winner
+          line = "The counting ends at midnight: you win by 41 votes! Sarpanch of Ukhali Tanda — the city boy who came home.";
+        } else if (ms.choice === "kamlabai") {
+          save.rep += 15;
+          if (!save.perks.includes("dripSubsidy")) save.perks.push("dripSubsidy");
+          line = "Kamlabai wins! Within a month the tanki fills the new taps, and the panchayat pays half of every farmer's drip set.";
+        } else {
+          if (!save.perks.includes("sahukarRaj")) save.perks.push("sahukarRaj");
+          line = "Shankar wins. The road never comes, and Motilal's interest goes up again. You have your ₹2,000.";
+        }
+      }
       begin(save, ms.i + 1, now);
       return { ok: true, msg: `${m.title} complete! ${r.text}`, gained: {}, ...(line ? { line } : {}) } as Result;
     }
@@ -213,7 +254,7 @@ function finance(world: World, save: Save, a: Extract<Action, { t: "borrow" | "r
       if (save.loans.filter((l) => l.lender === a.lender).length >= 3) return fail(`${L.name} won't give a fourth loan.`);
       const limit = creditLimit(world, save, a.lender, now, day);
       if (a.amount > limit) return fail(limit ? `${L.name} will lend at most ₹${limit.toLocaleString("en-IN")}.` : `${L.name} won't lend more right now.`);
-      const loan: Loan = { id: save.nextLoanId++, lender: a.lender, principal: a.amount, rate: L.rate, takenAt: now, dueAt: now + L.termDays * DAY_MS, paid: 0 };
+      const loan: Loan = { id: save.nextLoanId++, lender: a.lender, principal: a.amount, rate: L.rate * (a.lender === "sahukar" && save.perks.includes("sahukarRaj") ? 1.2 : 1), takenAt: now, dueAt: now + L.termDays * DAY_MS, paid: 0 };
       save.loans.push(loan);
       save.money += a.amount;
       record(save, { day, kind: "borrow", item: `loan:${a.lender}`, n: 1, amount: a.amount, where: L.name });
@@ -404,7 +445,7 @@ function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: numbe
   const item = shopItem(a.item);
   if (!item) return fail("The shop doesn't sell that.");
   if (item.max && (save.inv[item.id] ?? 0) + a.n > item.max) return fail(`You already have the ${item.name.toLowerCase()}.`);
-  const amount = Math.round(item.price * a.n * (item.id.startsWith("seed:") && save.perks.includes("discount") ? 0.8 : 1));
+  const amount = Math.round(item.price * a.n * (item.id.startsWith("seed:") && save.perks.includes("discount") ? 0.8 : 1) * (item.id === "drip" && save.perks.includes("dripSubsidy") ? 0.5 : 1));
   if (save.money < amount) return fail(`That costs ₹${amount} — you have ₹${save.money}.`);
   save.money -= amount;
   save.inv[item.id] = (save.inv[item.id] ?? 0) + a.n;

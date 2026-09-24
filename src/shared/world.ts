@@ -365,7 +365,7 @@ export function generateWorld(seed = WORLD_SEED): World {
   };
   // the Hanuman mandir: a small shrine by the Sevalal mandir, its door open to the west
   const hanuman = (() => {
-    const x0 = 124, z0 = 86;
+    const x0 = 124, z0 = 99;
     const y0 = height[col(x0 + 2, z0 + 2)] + 1;
     pad(x0 - 1, z0 - 1, x0 + 5, z0 + 5, y0 - 1);
     wallRing(x0, z0, 5, 5, y0, 3, B.SAFFRON, { side: "W", at: z0 + 2, wide: 1 });
@@ -375,7 +375,7 @@ export function generateWorld(seed = WORLD_SEED): World {
   })();
   // the Zilla Parishad school: a long classroom block with a verandah, a compound wall and a flag
   const school = (() => {
-    const x0 = 124, z0 = 97, w = 9, d = 6;
+    const x0 = 124, z0 = 84, w = 9, d = 6;
     const y0 = height[col(x0 + 4, z0 + 3)] + 1;
     pad(x0 - 4, z0 - 2, x0 + w + 1, z0 + d + 3, y0 - 1);
     wallRing(x0, z0, w, d, y0, 3, B.WHITEWASH, { side: "W", at: z0 + 3, wide: 1 });
@@ -397,9 +397,11 @@ export function generateWorld(seed = WORLD_SEED): World {
   })();
   // the pani ki tanki beside it: the tanda's water tank, standing tall on the hilltop
   const tank = (() => {
-    const x = 157, z = 78;
-    let y = 0;
-    for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) y = Math.max(y, height[col(x + dx, z + dz)]);
+    // halfway up the tekdi's west face, on a terrace cut a little below the slope
+    const x = 146, z = 80;
+    let sum = 0;
+    for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) sum += height[col(x + dx, z + dz)];
+    const y = Math.round(sum / 49) - 1;
     pad(x - 3, z - 3, x + 3, z + 3, y);
     for (const [dx, dz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) for (let k = 1; k <= 3; k++) set(x + dx, y + k, z + dz, B.COBBLE);
     structures.push({ kind: "tank", x, z, y: y + 1 });

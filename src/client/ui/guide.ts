@@ -37,6 +37,9 @@ function whereFor(mission: string, objective: string, c: Ctx, save: Save): Where
     case "pola:paint": return save.inv.gerua ? null : at({ x: L.seedShop.x, z: L.seedShop.z - 1 }, "Sitabai (gerua)");
     case "pola:procession": { const ch = c.world.chowk; return { x: (ch.x0 + ch.x1) / 2, y: 17, z: (ch.z0 + ch.z1) / 2, label: "The chowk" }; }
     case "debt:choose": return at({ x: 99.5, z: 124 }, "Ramu kaka");
+    case "election:kamla": return at({ x: L.school.x - 1.5, z: L.school.z - 7.5 }, "Kamlabai Jadhav", 0, 0);
+    case "election:shankar": return at({ x: L.school.x - 1.5, z: L.school.z + 7.5 }, "Shankar Pawar", 0, 0);
+    case "election:sabha": case "election:choose": case "election:vote": return at(L.school, "Z.P. school", 0, 0);
   }
   return null;
 }
@@ -186,7 +189,7 @@ export class Guide {
       if (r.ok) {
         this.onGoalDone(m.title);
         const line = (r as { line?: string }).line ?? m.done;
-        this.dialogue(`Mission complete · ${m.who}`, `${m.title} ✓`, line, [{ label: `Collect: ${m.reward.text}`, onClick: () => this.onDialogue(false) }]);
+        this.dialogue(`Mission complete · ${m.who}`, `${m.title} ✓`, line, [{ label: m.choices ? "Continue" : `Collect: ${m.reward.text}`, onClick: () => this.onDialogue(false) }]);
       } else this.claiming = "";
     }
     this.card.hidden = hidden;
