@@ -493,13 +493,13 @@ const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: N
   {
     kind: "bank",
     at: { x: world.landmarks.bank.x + 0.5, y: world.landmarks.bank.y, z: world.landmarks.bank.z - 0.3 },
-    npc: new Npc({ kurta: "#dfe6ee", dhoti: "#3a3a44", hat: "#2a2a30", skin: "#b07a52" }, world.landmarks.bank.x + 0.5, world.landmarks.bank.y, world.landmarks.bank.z + 1.3, Math.PI),
+    npc: new Npc({ kurta: "#dfe6ee", dhoti: "#3a3a44", hat: "#2a2a30", skin: "#b07a52" }, world.landmarks.bank.x - 0.75, world.landmarks.bank.y, world.landmarks.bank.z + 1.45, -Math.PI / 2), // beside the door, outside the wall
     label: "Loans & the godown at the Sahakari Bank",
   },
   {
     kind: "sahukar",
-    at: { x: 102.5, y: hf.at(102.5, 124.5), z: 124.5 },
-    npc: new Npc({ kurta: "#f2e6c8", dhoti: "#f6f0e0", hat: "#c0392b", hatTall: true, skin: "#b07a52" }, 108.5, hf.at(102.5, 126.3), 126.3, Math.PI),
+    at: { x: 108.5, y: hf.at(108.5, 125), z: 125 }, // just in front of him (it was 6 m off, by the well)
+    npc: new Npc({ kurta: "#f2e6c8", dhoti: "#f6f0e0", hat: "#c0392b", hatTall: true, skin: "#b07a52" }, 108.5, hf.at(108.5, 126.3), 126.3, Math.PI),
     label: "Borrow from Sahukar Motilal (fast, but dear)",
   },
   {
@@ -620,6 +620,8 @@ function pastimeHint(): string {
   const job = jobs.hint(body.pos, h);
   if (job) return job;
   if (nearDagdu() && DAYTIME(h)) return `<kbd>E</kbd> ${tr("Talk to Dagdu mama, the old fisherman")}`;
+  const nb = nearNeighbour();
+  if (nb) return `<kbd>E</kbd> ${tr("Say Ram Ram to {name}", { name: NEIGHBOUR_TALK[nb.i].name.split(" · ")[0] })}`;
   if (atTalavEdge(body.pos.x, body.pos.z) && !body.inWater) {
     if (!game.save.inv.rod) return tr("🎣 Fish here with a gal (rod) — Sitabai sells one");
     return fishing.castsLeft() > 0 ? `<kbd>E</kbd> ${tr("Cast your line into the talav")} <small class="hours">${tr(" · {n} casts left today", { n: fishing.castsLeft() })}</small>` : tr("🎣 The fish have stopped biting today — come back tomorrow");
@@ -638,6 +640,12 @@ function pastimeInteract(): boolean {
   if (jobs.interact(body.pos, h)) return true;
   if (nearDagdu() && DAYTIME(h)) {
     guide.dialogue("Dagdu mama · दगडू मामा", "The old fisherman", "Sit, sit. The talav fills from the tekdi every monsoon, and the fish come with it. Cast out past the lotus. When the float dips — strike! Then reel slowly: when the fish pulls hard, let it run, or your line will snap. They bite best at dawn and in the evening. And the maral… the maral you must earn.", [{ label: "Thank you, mama", onClick: () => guide.onDialogue(false) }]);
+    return true;
+  }
+  const nb = nearNeighbour();
+  if (nb) {
+    const n = NEIGHBOUR_TALK[nb.i];
+    guide.dialogue(n.name, tr("Ram Ram!"), n.lines[clock(game.now()).day % n.lines.length], [{ label: tr("Ram Ram"), onClick: () => guide.onDialogue(false) }]);
     return true;
   }
   if (atTalavEdge(body.pos.x, body.pos.z) && !body.inWater) {
@@ -876,7 +884,8 @@ function checkPlotEntry() {
 
 /** The stall the player is standing at, if any (within a few steps of its counter). */
 function nearStall() {
-  // the nearest one wins (the Naik's door and Ganpat's stall are neighbours on the chowk)
+  // the nearest one wins (the Naik's door and Ganpat's stall are neighbours on the chowk), and a
+  // neighbour standing closer than the counter gets E instead
   let best: (typeof STALLS)[number] | undefined, bd = 3.4;
   for (const s of STALLS) {
     if ((s.kind === "kamlabai" || s.kind === "shankar") && current(game.save)?.id !== "election") continue;
@@ -886,7 +895,26 @@ function nearStall() {
       best = s;
     }
   }
+  if (best) {
+    const gd = DAYTIME(nowHour()) ? jobs.giverDist(body.pos) : Infinity;
+    if ((gd < 2.4 && gd < bd) || (nearNeighbour()?.d ?? Infinity) < bd) return undefined;
+  }
   return best;
+}
+/** The neighbours who stand about (by the well, the mandir, the banyan): E greets them. */
+const NEIGHBOUR_TALK = [
+  { name: "Gangubai · गंगूबाई", lines: ["Ram Ram! The well is sweet this year — Sevalal's blessing.", "My daughter-in-law says your jowar looks good. I say wait for the harvest."] },
+  { name: "Parvati · पार्वती", lines: ["Ram Ram, bala! Carry your water early, before the sun climbs.", "Kashibai always needs a hand. Ask her, she pays in bhakri and rupees."] },
+  { name: "Jamnabai · जमनाबाई", lines: ["Ram Ram. I light a diya here every evening for the tanda.", "At Teej the girls sing here till midnight. You'll see."] },
+  { name: "Harishchandra baba · हरिश्चंद्र बाबा", lines: ["Ram Ram, beta. I've sat under this banyan for sixty years.", "Our people carried salt across the Deccan once. Now we carry onions to Jalna!"] },
+];
+function nearNeighbour() {
+  let best: { i: number; d: number } | null = null;
+  NEIGHBOURS.forEach((n, i) => {
+    const d = Math.hypot(body.pos.x - n.group.position.x, body.pos.z - n.group.position.z);
+    if (d < 2.2 && (!best || d < best.d)) best = { i, d };
+  });
+  return best as { i: number; d: number } | null;
 }
 const TALK: Partial<Record<PanelKind, string>> = { land: "naik", trader: "ganpat", shop: "sitabai", sahukar: "motilal", town: "haribhau", bank: "joshi", kamlabai: "kamlabai", shankar: "shankar" };
 function openStall(kind: PanelKind, tab?: string) {
