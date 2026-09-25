@@ -669,10 +669,17 @@ panels.onClose = () => resumePlay();
 // ---- the map (M) and the for-sale boards at plot gates ----
 const map = new MapView(document.getElementById("ui")!, world);
 map.onClose = () => (panels.open ? hud.setPlaying(true) : resumePlay());
+map.onPick = (p) => {
+  guide.waypoint = { x: p.x, y: hf.at(p.x, p.z), z: p.z, label: `📍 ${p.label}` };
+  map.waypoint = { x: p.x, z: p.z };
+  hud.toast(`Marker set: ${p.label} — follow the arrow`);
+  audio.play("buy");
+};
 function showMap() {
   closeWindows();
   const kaam = jobs.open().map((id) => ({ ...jobs.spots().find((g) => g.id === id)!, label: GIVERS[id].name }));
-  map.show(game.save, clock(game.now()).day, { x: body.pos.x, z: body.pos.z, yaw: controls.yaw }, kaam);
+  map.waypoint = guide.waypoint;
+  map.show(game.save, clock(game.now()).day, { x: body.pos.x, z: body.pos.z, yaw: controls.yaw }, kaam, game.now());
   hud.setPlaying(true);
   releaseMouse();
 }
@@ -1434,7 +1441,7 @@ renderer.setAnimationLoop(() => {
     refreshSigns();
     if (mode === "play") checkPlotEntry();
     const st = mode === "play" && !panels.open && !farmyard.ride ? nearStall() : undefined;
-    hud.setHint(farmyard.ride || panels.open || ploughJob ? "" : st ? (isOpen(st.kind, nowHour()) ? `<kbd>E</kbd> ${st.label}${hoursText(st.kind) ? ` <small class="hours">· open till ${hoursText(st.kind).split(" – ")[1]}</small>` : ""}` : `🔒 ${closedText(st.kind)}`) : cartHint() || (mode === "play" && canSleep() ? "<kbd>Z</kbd> Sleep till morning (you walk home)" : nightK > 0.6 && !torchOn && mode === "play" ? "<kbd>T</kbd> Switch on your torch" : ""));
+    hud.setHint(farmyard.ride || windowOpen() || ploughJob ? "" : st ? (isOpen(st.kind, nowHour()) ? `<kbd>E</kbd> ${st.label}${hoursText(st.kind) ? ` <small class="hours">· open till ${hoursText(st.kind).split(" – ")[1]}</small>` : ""}` : `🔒 ${closedText(st.kind)}`) : cartHint() || (mode === "play" && canSleep() ? "<kbd>Z</kbd> Sleep till morning (you walk home)" : nightK > 0.6 && !torchOn && mode === "play" ? "<kbd>T</kbd> Switch on your torch" : ""));
     hud.setBulls(bullsChip());
     // the watchdog: nothing may leave the player stuck — no pause panel on a phone, controls back when windows close
     if (TOUCH) {
@@ -1596,7 +1603,7 @@ renderer.setAnimationLoop(() => {
   if (hud.debugOn) hud.setDebug(debugText(dt));
   if (booted_) {
     const c = clock(game.now());
-    guide.update(game.save, { world, now: game.now(), day: c.day, onOwnLand: game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]) }, camera, now / 1000, mode === "title" || WINDOWS().some((w) => w.open()) || !!farmyard.ride || !!document.querySelector(".welcome, .fs-gate:not([hidden])"));
+    guide.update(game.save, { world, now: game.now(), day: c.day, onOwnLand: game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]), me: body.pos }, camera, now / 1000, mode === "title" || WINDOWS().some((w) => w.open()) || !!farmyard.ride || !!document.querySelector(".welcome, .fs-gate:not([hidden])"));
   }
 });
 

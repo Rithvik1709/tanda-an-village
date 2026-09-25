@@ -579,3 +579,13 @@ small.why.shortage { background: rgba(158,214,122,.18); color: var(--good); }
 .log-list li.bad span { color: var(--bad); }
 .log-list time { font: 500 12px ui-monospace, Menlo, monospace; opacity: .6; padding-top: 2px; }
 .log-list em { font-style: normal; opacity: .6; }
+.map-tip { margin: 0 0 6px; font-size: 12px; opacity: .7; }
+.map-card canvas { cursor: crosshair; }
+/* on a phone the map takes the whole screen */
+.is-touch .mapview { background: rgba(20,14,10,0.9); }
+.is-touch .map-card { width: 100%; height: 100%; max-height: none; border-radius: 0; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto 1fr; column-gap: 14px; padding: 8px 12px; }
+.is-touch .map-card h2 { grid-column: 2; font-size: 16px; }
+.is-touch .map-card .map-tip { grid-column: 2; }
+.is-touch .map-card canvas { grid-column: 1; grid-row: 1 / span 4; height: calc(var(--app-h, 100vh) - 16px) !important; width: auto !important; max-width: 62vw; margin: 0; }
+.is-touch .map-card .map-legend { grid-column: 2; flex-direction: column; gap: 6px; }
+.is-touch .map-card .map-credit { grid-column: 2; }

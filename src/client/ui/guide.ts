@@ -47,7 +47,7 @@ import type { World } from "../../shared/world";
  * Making the game easy to follow: a welcome card, a chain of goals (each checked from the save),
  * a golden marker in the world with an on-screen arrow and distance, and a help card (H).
  */
-type Ctx = { world: World; now: number; day: number; onOwnLand: boolean };
+type Ctx = { world: World; now: number; day: number; onOwnLand: boolean; me?: { x: number; z: number } };
 type Where = { x: number; y: number; z: number; label: string };
 
 /** Where each objective happens, for the golden marker. */
@@ -90,6 +90,8 @@ export class Guide {
   private shownFor = "";
   private choiceAsked = "";
   private claiming = "";
+  /** A place picked on the map: the marker and the arrow guide you there instead, until you arrive. */
+  waypoint: { x: number; y: number; z: number; label: string } | null = null;
   /** Set by the game when you're standing near the person who asks you to choose. */
   nearChoice = false;
   onToast: (m: string, k: "ok" | "bad") => void = () => {};
@@ -266,7 +268,13 @@ export class Guide {
     }
     if (html !== this.cardHtml) this.card.innerHTML = this.cardHtml = html;
     // the marker and the edge-of-screen arrow
-    const tg = this.target;
+    // a waypoint you set on the map wins over the story's marker until you reach it
+    const me = c.me ?? camera.position;
+    if (this.waypoint && Math.hypot(this.waypoint.x - me.x, this.waypoint.z - me.z) < 3.5) {
+      this.onToast(`You're at ${this.waypoint.label.replace(/^📍 /, "")}`, "ok");
+      this.waypoint = null;
+    }
+    const tg = this.waypoint ?? this.target;
     this.marker.visible = !!tg && !hidden;
     (this.beam.material as THREE.ShaderMaterial).uniforms.uTime.value = t;
     if (!tg || hidden) {
