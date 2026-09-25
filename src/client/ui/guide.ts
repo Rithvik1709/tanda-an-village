@@ -302,8 +302,19 @@ export class Guide {
       y *= k;
     }
     const ang = Math.atan2(-y, x);
-    this.arrow.style.left = `${(x * 0.5 + 0.5) * 100}%`;
-    this.arrow.style.top = `${(-y * 0.5 + 0.5) * 100}%`;
+    // never on top of the goal card, or under a thumb on a phone
+    const box = this.arrow.parentElement!.getBoundingClientRect();
+    let ax = (x * 0.5 + 0.5) * box.width, ay = (-y * 0.5 + 0.5) * box.height;
+    // (the arrow is centred on its point, so test its whole box, from its size last frame)
+    const hw = (this.arrow.offsetWidth || 120) / 2 + 4, hh = (this.arrow.offsetHeight || 26) / 2 + 4;
+    for (const sel of [".goal", ".touch:not([hidden]) .t-stick", ".touch:not([hidden]) .t-use", ".touch:not([hidden]) .t-pad", ".touch:not([hidden]) .t-jump"]) {
+      const o = document.querySelector(sel)?.getBoundingClientRect();
+      if (!o || !o.width) continue;
+      const l = o.left - box.left, r = o.right - box.left, t = o.top - box.top, b = o.bottom - box.top;
+      if (ax + hw > l && ax - hw < r && ay + hh > t && ay - hh < b) ay = t > box.height / 2 ? t - hh : b + hh;
+    }
+    this.arrow.style.left = `${(ax / box.width) * 100}%`;
+    this.arrow.style.top = `${(ay / box.height) * 100}%`;
     this.arrow.classList.toggle("edge", !onScreen);
     const ah = `${onScreen ? "" : `<i style="transform:rotate(${ang}rad)">➤</i>`}<span>${tg.label} · ${Math.round(dist)} m</span>`;
     if (ah !== this.arrow.innerHTML) this.arrow.innerHTML = ah;

@@ -32,6 +32,7 @@ export class TouchControls {
     this.el.className = "touch";
     this.el.innerHTML = `
       <div class="t-look"></div>
+      <div class="t-move"></div>
       <div class="t-stick"><div class="t-knob"></div></div>
       <div class="t-pad"><div class="t-pad-knob"></div><span>look</span></div>
       <button data-a="use" class="t-act t-use">Use</button>
@@ -54,6 +55,22 @@ export class TouchControls {
       this.stickId = t.identifier;
       const r = this.stick.getBoundingClientRect();
       this.stickOrigin = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      this.onStick(t.clientX, t.clientY);
+      e.preventDefault();
+    }, { passive: false });
+    // or anywhere on the left third: the stick comes to your thumb, and goes home when you let go
+    const moveZone = this.el.querySelector(".t-move") as HTMLElement;
+    moveZone.addEventListener("touchstart", (e) => {
+      const t = e.changedTouches[0];
+      this.stickId = t.identifier;
+      const home = this.stick.getBoundingClientRect(), zone = this.el.getBoundingClientRect();
+      // (in the turned layout the screen is rotated, so place the stick in the game's own axes)
+      const p = turned() ? { x: t.clientY - zone.top, y: zone.right - t.clientX } : { x: t.clientX - zone.left, y: t.clientY - zone.top };
+      const hx = turned() ? home.top - zone.top + home.height / 2 : home.left - zone.left + home.width / 2;
+      const hy = turned() ? zone.right - home.right + home.width / 2 : home.top - zone.top + home.height / 2;
+      this.stick.style.translate = `${p.x - hx}px ${p.y - hy}px`;
+      this.stickOrigin = { x: t.clientX, y: t.clientY };
+      this.stick.classList.add("floating");
       this.onStick(t.clientX, t.clientY);
       e.preventDefault();
     }, { passive: false });
@@ -87,6 +104,8 @@ export class TouchControls {
           this.move = { forward: 0, right: 0 };
           this.run = false;
           this.knob.style.transform = "";
+          this.stick.style.translate = "";
+          this.stick.classList.remove("floating");
         }
         if (t.identifier === this.lookId) this.endLook();
       }

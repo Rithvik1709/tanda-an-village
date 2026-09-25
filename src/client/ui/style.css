@@ -428,9 +428,9 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 .touch .t-top { position: absolute; top: 8px; right: calc(env(safe-area-inset-right) + 8px); display: flex; gap: 6px; pointer-events: auto; }
 .touch .t-top button { position: static; height: 34px; min-width: 34px; padding: 0 12px; border-radius: 17px; font-size: 12px; }
 .touch .t-top .t-menu { padding: 0; width: 38px; font-size: 16px; background: rgba(194,90,54,0.8); }
-.is-touch .hotbar { pointer-events: auto; bottom: calc(env(safe-area-inset-bottom) + 4px); transform: translateX(-50%) scale(0.62); transform-origin: bottom center; }
+.is-touch .hotbar { pointer-events: auto; bottom: calc(env(safe-area-inset-bottom) + 4px); transform: translateX(-50%) scale(0.9); transform-origin: bottom center; } /* 47 px slots: big enough for a thumb */
 /* the one contextual action ("Tie Sarja & Raja", "Load the cart"…) is a button you tap */
-.is-touch .interact { pointer-events: auto; top: auto !important; bottom: calc(env(safe-area-inset-bottom) + 60px) !important; font-size: 12px !important; padding: 8px 14px !important; border-radius: 18px; border: 1px solid var(--gold); background: rgba(28,19,12,0.78); max-width: 40%; text-align: center; }
+.is-touch .interact { pointer-events: auto; top: auto !important; bottom: calc(env(safe-area-inset-bottom) + 76px) !important; font-size: 12px !important; padding: 8px 14px !important; border-radius: 18px; border: 1px solid var(--gold); background: rgba(28,19,12,0.78); max-width: 40%; text-align: center; }
 .is-touch .interact.down { background: var(--rust); }
 .is-touch .interact { z-index: 6; } /* above the look pad, or a tap on its middle turns the camera instead */
 .is-touch .interact::after { content: " ›"; color: var(--gold); }
@@ -589,3 +589,25 @@ small.why.shortage { background: rgba(158,214,122,.18); color: var(--good); }
 .is-touch .map-card canvas { grid-column: 1; grid-row: 1 / span 4; height: calc(var(--app-h, 100vh) - 16px) !important; width: auto !important; max-width: 62vw; margin: 0; }
 .is-touch .map-card .map-legend { grid-column: 2; flex-direction: column; gap: 6px; }
 .is-touch .map-card .map-credit { grid-column: 2; }
+/* the floating joystick: the left third of the screen, clear of the goal card and the hotbar */
+.touch .t-move { position: absolute; left: 0; top: 45%; bottom: 0; width: 30%; pointer-events: auto; touch-action: none; }
+.touch .t-stick.floating { opacity: 0.95; }
+/* text and buttons at the size you chose (Settings) */
+.goal { scale: var(--ui, 1); transform-origin: top left; }
+.kaam { scale: var(--ui, 1); transform-origin: top right; }
+.info, .toasts, .kabaddi { scale: var(--ui, 1); transform-origin: top center; }
+.toasts { transform-origin: bottom center; }
+.hotbar, .interact, .fishing { scale: var(--ui, 1); transform-origin: bottom center; }
+.tip { scale: var(--ui, 1); transform-origin: top center; }
+.log-bell, .touch .t-stick { scale: var(--ui, 1); transform-origin: bottom left; }
+.touch .t-use, .touch .t-jump, .touch .t-harvest, .touch .t-pad { scale: var(--ui, 1); transform-origin: bottom right; }
+.touch .t-top { scale: var(--ui, 1); transform-origin: top right; }
+.panel-card, .map-card { scale: var(--ui, 1); transform-origin: center; }
+.is-touch .panel-card, .is-touch .map-card { scale: none; zoom: var(--ui, 1); }
+.settings .seg { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: flex; gap: 8px; margin: 6px 0; }
+.settings .seg legend { font-size: 13px; padding: 0 4px; }
+.settings .seg label { flex: 1; display: flex; }
+.settings .seg input { position: absolute; opacity: 0; }
+.settings .seg span { flex: 1; text-align: center; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); cursor: pointer; }
+.settings .seg input:checked + span { background: var(--rust); color: #fff; border-color: var(--rust); }
+.settings .seg input:focus-visible + span { outline: 2px solid var(--gold); }

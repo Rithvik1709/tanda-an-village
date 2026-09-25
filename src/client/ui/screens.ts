@@ -5,10 +5,14 @@ import type { Save } from "../../shared/save";
  * The screens around the game: the title, settings and the note for
  * phones. Plain DOM; each reports what the player chose through callbacks.
  */
-export type Settings = { sensitivity: number; renderDistance: number; volume: number };
+export type Settings = { sensitivity: number; renderDistance: number; volume: number; uiScale: number };
 const KEY = "bailgaadi.settings";
 const touchDevice = typeof matchMedia !== "undefined" && (matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1);
-export const DEFAULTS: Settings = { sensitivity: 0.0022, renderDistance: touchDevice ? 90 : 128, volume: 0.8 };
+export const DEFAULTS: Settings = { sensitivity: 0.0022, renderDistance: touchDevice ? 90 : 128, volume: 0.8, uiScale: 1 };
+/** How big the HUD, cards and buttons are drawn (a setting, for small screens and tired eyes). */
+/** On a phone the screen is small: "Large" is as far as it goes before the controls collide. */
+const UI_SIZES: [number, string][] = touchDevice ? [[1, "Normal"], [1.2, "Large"]] : [[1, "Normal"], [1.25, "Large"], [1.5, "Largest"]];
+export const applyUiScale = (s: Settings) => document.documentElement.style.setProperty("--ui", String(Math.min(s.uiScale || 1, UI_SIZES[UI_SIZES.length - 1][0])));
 
 export function loadSettings(): Settings {
   try {
@@ -134,6 +138,10 @@ export class SettingsPanel {
       if (t.name === "sens") this.s.sensitivity = Number(t.value) / 10000;
       if (t.name === "rd") this.s.renderDistance = Number(t.value);
       if (t.name === "vol") this.s.volume = Number(t.value) / 100;
+      if (t.name === "ui") {
+        this.s.uiScale = Number(t.value);
+        applyUiScale(this.s);
+      }
       if (t.name === "gfx") {
         setGraphicsChoice(t.value as TierChoice);
         const msg = this.el.querySelector(".gfx-msg") as HTMLElement;
@@ -166,6 +174,7 @@ export class SettingsPanel {
       <label>How far you can see <b class="v-rd"></b><input type="range" name="rd" min="80" max="200" step="1" list="rd-stops" value="${this.s.renderDistance}"></label>
       <datalist id="rd-stops"><option value="80"></option><option value="128"></option><option value="200"></option></datalist>
       <label>Sound <b class="v-vol"></b><input type="range" name="vol" min="0" max="100" value="${Math.round(this.s.volume * 100)}"></label>
+      <fieldset class="seg"><legend>Text and buttons</legend>${UI_SIZES.map(([v, name]) => `<label><input type="radio" name="ui" value="${v}" ${Math.min(this.s.uiScale || 1, UI_SIZES[UI_SIZES.length - 1][0]) === v ? "checked" : ""}><span>${name}</span></label>`).join("")}</fieldset>
       <label class="gfx">Graphics <b>running at ${Q.tier}${Q.shadows ? "" : ", no shadows"}</b>
         <select name="gfx">${(["auto", "low", "medium", "high"] as const).map((c) => `<option value="${c}" ${graphicsChoice() === c ? "selected" : ""}>${c === "auto" ? `Auto (best for this device: ${detectTier()})` : c === "low" ? "Low: smoothest, for older phones and laptops" : c === "medium" ? "Medium" : "High: shadows, bloom and dense grass"}</option>`).join("")}</select></label>
       <p class="hint gfx-msg">If the game stutters, choose Low. On Auto, it also lowers itself if your device can't keep up.</p>
