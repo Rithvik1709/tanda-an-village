@@ -1,4 +1,5 @@
 import { CROP_IDS, CROPS } from "../../shared/crops";
+import { FISH_IDS } from "../../shared/fish";
 import { type Hotbar, type Slot, slotName } from "../player/hotbar";
 
 /** The in-game HTML overlay: crosshair, hotbar, info chips, toasts, tooltip, F3 panel, play prompt. */
@@ -68,7 +69,11 @@ export class Hud {
       c.className = s.kind === "tool" && s.tool === "can" ? "water" : "count";
       c.parentElement!.classList.toggle("empty", (s.kind === "seed" && !(inv[`seed:${s.crop}`] > 0)) || (s.kind === "block" && !(inv[`block:${s.block}`] > 0)));
     });
-    this.goods.innerHTML = CROP_IDS.map((id) => `<span><b>${inv[id] ?? 0}</b> ${CROPS[id].name}</span>`).join("");
+    // what you carry, only when you carry something (and only the kinds you have)
+    const fish = FISH_IDS.reduce((a, f) => a + (inv[`fish:${f}`] ?? 0), 0);
+    const html = CROP_IDS.filter((id) => inv[id] > 0).map((id) => `<span><b>${inv[id]}</b> ${CROPS[id].name}</span>`).join("") + (fish ? `<span><b>${fish}</b> fish</span>` : "");
+    if (this.goods.innerHTML !== html) this.goods.innerHTML = html;
+    this.goods.hidden = !html;
   }
 
   setInfo(html: string) {

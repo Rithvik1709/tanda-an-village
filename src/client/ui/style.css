@@ -487,7 +487,7 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 
 /* ---- pastimes: the day's kaam, fishing at the talav, kabaddi on the maidan ---- */
 .kaam { position: absolute; right: 12px; top: 96px; width: 262px; padding: 9px 12px; border-radius: 12px; background: var(--glass); color: var(--ink); border: 1px solid var(--line); border-left: 4px solid var(--gold); backdrop-filter: blur(6px); box-shadow: 0 6px 20px rgba(0,0,0,0.18); pointer-events: auto; cursor: pointer; font-size: 12.5px; z-index: 6; }
-.kaam-head { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); display: flex; justify-content: space-between; }
+.kaam-head { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .kaam-head span { text-transform: none; letter-spacing: 0; font-weight: 700; opacity: 0.8; }
 .kaam ul { list-style: none; margin: 6px 0 4px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .kaam li { display: flex; gap: 6px; align-items: baseline; line-height: 1.3; }
@@ -496,7 +496,10 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 .kaam li.done { opacity: 0.5; text-decoration: line-through; }
 .kaam small { font-size: 10.5px; opacity: 0.6; }
 .is-touch .kaam { top: 62px; right: calc(env(safe-area-inset-right) + 8px); width: 200px; padding: 5px 9px; font-size: 11px; }
-.is-touch .kaam:not(.open) ul, .is-touch .kaam:not(.open) small { display: none; }
+.kaam:not(.open) ul, .kaam:not(.open) small { display: none; }
+.kaam:not(.open) { width: auto; }
+.kaam-head .fold::after { content: "▾"; margin-left: 8px; color: var(--gold); font-weight: 400; }
+.kaam.open .kaam-head .fold::after { content: "▴"; }
 
 .fishing { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); pointer-events: auto; z-index: 6; /* above the phone's look pad */ }
 .fish-card { width: 300px; padding: 10px 14px 12px; border-radius: 14px; background: rgba(24, 34, 38, 0.78); backdrop-filter: blur(5px); color: #eef4f2; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
@@ -535,3 +538,7 @@ body:not(.is-touch) .fishing.reeling .fish-foot::after { content: " · hold the 
 .goal ul.objectives li span { display: flex; flex-direction: column; gap: 2px; }
 .goal ul.objectives small.how { font-size: 12px; font-weight: 500; opacity: 0.8; line-height: 1.35; color: var(--gold-2); }
 .is-touch .goal small.how { display: block !important; font-size: 10.5px !important; opacity: 0.85; } /* the one line on how to do it matters most on a phone */
+.info .clock { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.info .dial { width: 22px; height: 13px; color: #fff; }
+.info .season { opacity: 0.75; }
+.goods[hidden] { display: none !important; }

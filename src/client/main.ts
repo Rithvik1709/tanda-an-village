@@ -957,8 +957,20 @@ function refreshStatus() {
   const overdue = s.loans.some((l) => isOverdue(l, game.now()));
   if (s.bestTitle > lastTitle && lastTitle >= 0) hud.toast(`You are now a ${TITLES[s.bestTitle].name}! · ${TITLES[s.bestTitle].local}`);
   if (booted_) lastTitle = s.bestTitle;
-  const saved = { saved: "✓ saved", saving: "saving…", offline: "offline — retrying" }[net.status];
-  hud.setInfo(`${s.perks.includes("sarpanch") ? `<span class="title">Sarpanch</span>` : ""}<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${title.name}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${s.rep ? `<span class="rep" title="Reputation with the tanda: better prices from Ganpat">★ ${s.rep}</span>` : ""}${overdue ? `<span class="debt">loan overdue!</span>` : ""}<span class="sync ${net.status}">${saved}</span><span>${fmtHour(hourOverride ?? c.hour)}</span><span>${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}</span>`);
+  // one compact cluster: who you are, money, reputation, the time on a little sun-dial, the season's day;
+  // "saved" only speaks up while saving or when the server can't be reached
+  const sync = net.status === "saved" ? "" : `<span class="sync ${net.status}">${net.status === "saving" ? "saving…" : "offline — retrying"}</span>`;
+  const h = hourOverride ?? c.hour;
+  hud.setInfo(`${s.perks.includes("sarpanch") ? `<span class="title">Sarpanch</span>` : ""}<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${title.name}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${s.rep ? `<span class="rep" title="Reputation with the tanda: better prices from Ganpat">★ ${s.rep}</span>` : ""}${overdue ? `<span class="debt">loan overdue!</span>` : ""}${sync}${TOUCH && carriedNow(s) ? `<span class="basket" title="What you're carrying">🧺 ${carriedNow(s)}</span>` : ""}<span class="clock" title="${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}">${sunDial(h)}${fmtHour(h)}</span><span class="season">${SEASON_NAMES[c.season].split(" · ")[0]} · ${c.dayOfSeason + 1}/${SEASON_DAYS}</span>`);
+}
+/** Produce and fish in hand (phones show this in the info chip; the counts chip is too wide for them). */
+const carriedNow = (s: typeof game.save) => Object.entries(s.inv).reduce((a, [k, n]) => a + (CROPS[k as keyof typeof CROPS] || k.startsWith("fish:") ? n : 0), 0);
+/** A tiny dial: the sun travelling its arc by day, the moon by night. */
+function sunDial(h: number) {
+  const day = h >= 6 && h < 19.5;
+  const k = day ? (h - 6) / 13.5 : ((h < 6 ? h + 24 : h) - 19.5) / 10.5;
+  const a = Math.PI * (1 - k), x = 12 + Math.cos(a) * 8, y = 12 - Math.sin(a) * 8;
+  return `<svg class="dial" viewBox="0 0 24 14" aria-hidden="true"><path d="M3 12 A9 9 0 0 1 21 12" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-width="1.5"/><circle cx="${x.toFixed(1)}" cy="${Math.min(12, y).toFixed(1)}" r="2.6" fill="${day ? "#ffc94a" : "#dfe6ff"}"/></svg>`;
 }
 game.onChange(refreshStatus);
 game.onChange(() => syncFields());
@@ -1384,7 +1396,8 @@ renderer.setAnimationLoop(() => {
     playground.update(dt, DAYTIME(h), camera.position);
     kabaddi.update(dt, h, body.pos, body.vel, camera.position);
     jobs.update(dt, now / 1000, h, camera.position, body.pos);
-    jobs.hidden = mode !== "play" || titleScreen.open || !!farmyard.ride || windowOpen(); // never over a window
+    // the kaam list waits until you know your way round (after Mission 1), and never covers a window
+    jobs.hidden = mode !== "play" || titleScreen.open || !!farmyard.ride || windowOpen() || game.save.missions.i < 1;
     if (fishing.active && (farmyard.ride || mode !== "play" || !!ploughJob)) fishing.stop();
     if (kabaddi.active && (farmyard.ride || !!ploughJob)) kabaddi.quit("You left the match.");
   }

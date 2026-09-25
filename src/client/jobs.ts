@@ -83,7 +83,16 @@ export class Jobs {
     this.el = document.createElement("div");
     this.el.className = "kaam";
     d.ui.appendChild(this.el);
-    this.el.addEventListener("click", () => this.el.classList.toggle("open"));
+    // folded to a chip until you open it; the choice is remembered
+    try {
+      if (localStorage.getItem("tanda.kaam.open") === "1") this.el.classList.add("open");
+    } catch { /* ignore */ }
+    this.el.addEventListener("click", () => {
+      const open = this.el.classList.toggle("open");
+      try {
+        localStorage.setItem("tanda.kaam.open", open ? "1" : "0");
+      } catch { /* ignore */ }
+    });
   }
 
   /** Where each neighbour stands (for the map and for keeping people apart). */
@@ -264,7 +273,7 @@ export class Jobs {
 
   private renderList(jobs: Job[], done: number[], day: boolean) {
     const left = jobs.filter((j) => !done.includes(j.slot)).length;
-    const html = `<div class="kaam-head">📋 Kaam today <span>${left ? `${left} of ${jobs.length} open` : "all done!"}</span></div>
+    const html = `<div class="kaam-head">📋 Kaam today <span>${left ? `${left} of ${jobs.length} open` : "all done!"}</span><b class="fold" aria-hidden="true"></b></div>
       <ul>${jobs.map((j) => `<li class="${done.includes(j.slot) ? "done" : ""}"><i>${done.includes(j.slot) ? "✓" : ""}</i><span>${jobLine(j)}</span><em>₹${j.pay}</em></li>`).join("")}</ul>
       <small>${day ? "Look for the <b>!</b> over their heads · new jobs every day" : "Everyone's gone in for the night — new jobs in the morning"}</small>`;
     if (html !== this.listHtml) this.el.innerHTML = this.listHtml = html;
