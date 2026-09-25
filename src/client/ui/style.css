@@ -645,3 +645,5 @@ small.why.shortage { background: rgba(158,214,122,.18); color: var(--good); }
 .cart-stuck { margin: 8px 0 12px; padding: 10px 14px; border-radius: 12px; background: rgba(224,118,42,0.14); border: 1px solid rgba(224,118,42,0.45); }
 .cart-stuck .big-acts { margin-top: 8px; justify-content: flex-start; }
 .cart-stuck .why { color: #ffd9a8; }
+.dialogue .dlg-n { display: inline-block; min-width: 1.4em; margin-right: 8px; padding: 0 4px; border-radius: 5px; background: rgba(0,0,0,0.25); font-size: 0.8em; text-align: center; }
+.is-touch .dialogue .dlg-n { display: none; }
