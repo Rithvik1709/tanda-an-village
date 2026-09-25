@@ -543,3 +543,8 @@ body:not(.is-touch) .fishing.reeling .fish-foot::after { content: " · hold the 
 .info .season { opacity: 0.75; }
 .goods[hidden] { display: none !important; }
 .touch .t-use.long { font-size: 11px; line-height: 1.1; padding: 0 4px; }
+.sell-all { margin: 4px 0 10px; }
+.sell-all button { width: 100%; font-size: 16px; padding: 12px 18px; }
+small.why { font: 700 10px system-ui; text-transform: uppercase; letter-spacing: .05em; padding: 2px 5px; border-radius: 4px; margin-left: 4px; }
+small.why.glut { background: rgba(255,158,132,.18); color: var(--bad); }
+small.why.shortage { background: rgba(158,214,122,.18); color: var(--good); }

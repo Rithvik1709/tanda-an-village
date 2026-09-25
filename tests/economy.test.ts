@@ -173,3 +173,15 @@ describe("buying and selling", () => {
     expect(SHOP.every((i) => i.price > 0)).toBe(true);
   });
 });
+
+describe("prices at the stalls", () => {
+  it("are whole rupees, never zero, and the town still pays more than the village", () => {
+    for (const c of ["jowar", "onion", "sugarcane"] as const)
+      for (let d = 0; d < 200; d++) {
+        const v = buyerPrice(c, d, "village"), t = buyerPrice(c, d, "town");
+        expect(Number.isInteger(v) && Number.isInteger(t)).toBe(true);
+        expect(v).toBeGreaterThanOrEqual(1);
+        expect(t).toBeGreaterThan(v);
+      }
+  });
+});
