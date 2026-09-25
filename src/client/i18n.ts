@@ -152,6 +152,8 @@ const D: Record<string, [string, string]> = {
   "Feed Sarja & Raja ({n} kadba)": ["सर्जा-राजाला चारा द्या ({n} कडबा)", "सर्जा-राजा को चारा दें ({n} कड़बा)"],
   "Sleep till morning (you walk home)": ["सकाळपर्यंत झोपा (तुम्ही घरी चालत जाता)", "सुबह तक सोएँ (आप घर चले जाते हैं)"],
   "Switch on your torch": ["टॉर्च लावा", "टॉर्च जलाएँ"],
+  "The mandir bell: the stalls close soon (Ganpat at 8 pm, the bank at 6)": ["मंदिराची घंटा: दुकाने लवकरच बंद होतील (गणपत रात्री ८ ला, बँक ६ ला)", "मंदिर की घंटी: दुकानें जल्द बंद होंगी (गणपत रात 8 बजे, बैंक 6 बजे)"],
+  "🌾 {crop} is ripe in {plot}": ["🌾 {plot} मध्ये {crop} तयार आहे", "🌾 {plot} में {crop} पक गया"],
   "Talk to Dagdu mama, the old fisherman": ["म्हातारे मच्छीमार दगडू मामांशी बोला", "बूढ़े मछुआरे दगडू मामा से बात करें"],
   "🎣 Fish here with a gal (rod) — Sitabai sells one": ["🎣 इथे गळाने मासे पकडा — सीताबाई गळ विकतात", "🎣 यहाँ काँटे से मछली पकड़ें — सीताबाई काँटा बेचती हैं"],
   "Cast your line into the talav": ["तलावात गळ टाका", "तालाब में काँटा डालें"],

@@ -754,6 +754,41 @@ function closedMsg(kind: string) {
   const open = hoursText(kind).split(" – ")[0];
   return tr("{name} is closed · opens at {open} (open {hours})", { name: tr(h.name), open, hours: hoursText(kind) });
 }
+/*
+ * Sound as information: the mandir bell at 6:30 pm (the stalls close soon), a rooster at dawn, a soft
+ * chime when a crop of yours ripens while you're near its field.
+ */
+let lastHourHeard = -1, ripeHeard = -1;
+function daySounds() {
+  if (mode !== "play" || !booted_) return;
+  const h = nowHour();
+  const crossed = (at: number) => lastHourHeard >= 0 && lastHourHeard < at && h >= at && h - lastHourHeard < 2;
+  if (crossed(18.5)) {
+    audio.play("templebell");
+    hud.toast(tr("The mandir bell: the stalls close soon (Ganpat at 8 pm, the bank at 6)"));
+  }
+  if (crossed(6) || (lastHourHeard > 20 && h >= 6 && h < 7)) audio.play("rooster");
+  lastHourHeard = h;
+  // ripe crops in the field you're standing near
+  const here = world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)];
+  const plot = game.save.plots.map((id) => world.plots[id]).find((p) => Math.max(p.x0 - body.pos.x, body.pos.x - p.x1, p.z0 - body.pos.z, body.pos.z - p.z1) < 25) ?? (here >= 0 && game.save.plots.includes(here) ? world.plots[here] : null);
+  if (!plot) return void (ripeHeard = -1);
+  let ripe = 0, crop = "";
+  for (const [k, cell] of Object.entries(game.save.farm)) {
+    if (!cell.plant) continue;
+    const i = Number(k), x = i % W, z = Math.floor(i / W) % D;
+    if (x < plot.x0 || x > plot.x1 || z < plot.z0 || z > plot.z1) continue;
+    if (advance(cell.plant, cell.wetUntil, game.now()).progress >= 1) {
+      ripe++;
+      crop = cell.plant.crop;
+    }
+  }
+  if (ripeHeard >= 0 && ripe > ripeHeard) {
+    audio.play("ripe");
+    hud.toast(tr("🌾 {crop} is ripe in {plot}", { crop: cropName(crop) || crop, plot: plot.name }));
+  }
+  ripeHeard = ripe;
+}
 function cartHint(): string {
   if (nearCart()) {
     if (game.save.trip) return `<kbd>R</kbd> ${tr(cartInTown() ? "Sell the load at the mandi" : "Continue to the town mandi")}`;
@@ -1453,8 +1488,9 @@ renderer.setAnimationLoop(() => {
     refreshSigns();
     if (mode === "play") checkPlotEntry();
     const st = mode === "play" && !panels.open && !farmyard.ride ? nearStall() : undefined;
-    hud.setHint(farmyard.ride || windowOpen() || ploughJob ? "" : st ? (isOpen(st.kind, nowHour()) ? `<kbd>E</kbd> ${tr(st.label)}${hoursText(st.kind) ? ` <small class="hours">· ${tr("open till {h}", { h: hoursText(st.kind).split(" – ")[1] })}</small>` : ""}` : `🔒 ${closedMsg(st.kind)}`) : cartHint() || (mode === "play" && canSleep() ? `<kbd>Z</kbd> ${tr("Sleep till morning (you walk home)")}` : nightK > 0.6 && !torchOn && mode === "play" ? `<kbd>T</kbd> ${tr("Switch on your torch")}` : ""));
+    hud.setHint(farmyard.ride || windowOpen() || ploughJob ? "" : st ? (isOpen(st.kind, nowHour()) ? `<kbd>E</kbd> ${tr(st.label)}${hoursText(st.kind) ? ` <small class="hours">· ${tr("open till {h}", { h: hoursText(st.kind).split(" – ")[1] })}</small>` : ""}` : (canSleep() ? `<kbd>Z</kbd> ${tr("Sleep till morning (you walk home)")}` : `🔒 ${closedMsg(st.kind)}`)) : cartHint() || (mode === "play" && canSleep() ? `<kbd>Z</kbd> ${tr("Sleep till morning (you walk home)")}` : nightK > 0.6 && !torchOn && mode === "play" ? `<kbd>T</kbd> ${tr("Switch on your torch")}` : ""));
     hud.setBulls(bullsChip());
+    daySounds();
     // the watchdog: nothing may leave the player stuck — no pause panel on a phone, controls back when windows close
     if (TOUCH) {
       hud.setPlaying(true);

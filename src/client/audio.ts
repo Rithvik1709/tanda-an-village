@@ -183,6 +183,36 @@ export const SOUNDS: Record<string, Fx> = {
     osc.stop(t + 0.6);
     lfo.stop(t + 0.6);
   },
+  templebell: (c, o, t) => {
+    // the mandir's big bell: a low strike with long, beating partials, rung twice
+    for (const k of [0, 1.1]) for (const [m, a, d] of [[1, 1, 3.2], [2.02, 0.5, 2.4], [2.97, 0.32, 1.8], [4.13, 0.2, 1.2], [5.4, 0.12, 0.8]] as const) tone(c, o, t + k, { f: 196 * m, peak: 0.16 * a, a: 0.004, d });
+  },
+  rooster: (c, o, t) => {
+    // kuk-kuk-kukooo: a few rising, nasal calls
+    const call = (t0: number, f0: number, f1: number, d: number) => {
+      const osc = c.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(f0, t0);
+      osc.frequency.linearRampToValueAtTime(f1, t0 + d * 0.7);
+      osc.frequency.linearRampToValueAtTime(f0 * 0.9, t0 + d);
+      const f = c.createBiquadFilter();
+      f.type = "bandpass";
+      f.frequency.value = 1400;
+      f.Q.value = 2;
+      const g = env(c, t0, 0.16, 0.02, d);
+      osc.connect(f).connect(g).connect(o);
+      osc.start(t0);
+      osc.stop(t0 + d + 0.05);
+    };
+    call(t, 520, 640, 0.14);
+    call(t + 0.2, 540, 680, 0.14);
+    call(t + 0.42, 560, 900, 0.75);
+  },
+  ripe: (c, o, t) => {
+    // a soft two-note chime: something in your field is ready
+    bell(c, o, t, 1046, 0.1);
+    bell(c, o, t + 0.16, 1568, 0.09);
+  },
   cricket: (c, o, t) => {
     for (let i = 0; i < 3; i++) tone(c, o, t + i * 0.05, { type: "sine", f: 4400 + Math.random() * 200, peak: 0.018, a: 0.004, d: 0.03 });
   },
