@@ -18,7 +18,7 @@ export const DEFAULT_HOTBAR: Slot[] = [
 ];
 
 export const slotName = (s: Slot) =>
-  s.kind === "hand" ? "Hand" : s.kind === "tool" ? (s.tool === "hoe" ? "Hoe" : "Watering can") : s.kind === "seed" ? `${CROPS[s.crop].name} seeds` : block(s.block).name;
+  s.kind === "hand" ? "Hand · does what the soil needs" : s.kind === "tool" ? (s.tool === "hoe" ? "Hoe" : "Watering can") : s.kind === "seed" ? `${CROPS[s.crop].name} seeds` : block(s.block).name;
 
 export class Hotbar {
   selected = 0;

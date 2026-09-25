@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { inject as injectAnalytics } from "@vercel/analytics";
 import { B, block, BLOCKS, isCropBlock } from "../shared/blocks";
 import { advance, CROPS, msToRipe } from "../shared/crops";
-import { canCapacity, isNight, type Result, untilMorning } from "../shared/rules";
+import { canCapacity, isNight, type Result, soilQuality, untilMorning } from "../shared/rules";
 import { newSave } from "../shared/save";
 import { clock, fmtHour, SEASON_DAYS, SEASON_NAMES } from "../shared/time";
 import { D, generateWorld, H, idx, MAIDAN, TALAV, talavOut, W, WATER_LEVEL, WORLD_SEED } from "../shared/world";
@@ -625,7 +625,7 @@ function pastimeInteract(): boolean {
     return true;
   }
   if (onMaidan() && Kabaddi.canPlay(h)) {
-    const tag = TOUCH ? "tap Harvest" : "click";
+    const tag = TOUCH ? "tap Tag" : "click";
     guide.dialogue("Kabaddi · कबड्डी", "Ukhali vs the Hanuman Club", `The boys from the Hanuman Vyayamshala are here for a match! Five raids each. On your raid, cross the midline, tag defenders (${tag}) and get back over the line in one breath — don't let them catch you. On theirs, tackle their raider (${tag}) before he touches anyone and gets away. The day's first win pays ₹101 and a coconut.`, [
       { label: "Let's play!", onClick: () => { guide.onDialogue(false); kabaddi.start(); } },
       { label: "Not now", onClick: () => guide.onDialogue(false) },
@@ -864,12 +864,57 @@ function report(r: Outcome, sfx: string): Outcome {
   return r;
 }
 
+/*
+ * The smart hand: aim at something and the hand does what it needs — plough grass or soil in your field,
+ * sow ploughed soil (the seed you last used, else onion, jowar, sugarcane), water a dry crop, fill the can
+ * at water, harvest what's ripe. The explicit tools (2–6) still work as before.
+ */
+type Smart = { t: "till" | "plant" | "water" | "refill" | "harvest"; label: string; crop?: import("../shared/crops").CropId; hold: "hoe" | "can" | "bag" | "none" };
+let lastSeed: import("../shared/crops").CropId | null = null;
+const seedToSow = () => [lastSeed, "onion", "jowar", "sugarcane"].find((c) => c && (game.save.inv[`seed:${c}`] ?? 0) > 0) as import("../shared/crops").CropId | undefined;
+function smartFor(t: Hit | null): Smart | null {
+  if (!t) return null;
+  const id = get(t.x, t.y, t.z);
+  if (block(id).liquid) return game.save.inv.can ? { t: "refill", label: "Fill can", hold: "can" } : null;
+  const crop = isCropBlock(id);
+  const cell = game.save.farm[String(idx(t.x, crop ? t.y - 1 : t.y, t.z))];
+  if (cell?.plant) {
+    const p = advance(cell.plant, cell.wetUntil, game.now());
+    if (p.progress >= 1) return { t: "harvest", label: "Harvest", hold: "none" };
+    if (cell.wetUntil <= game.now() && (game.save.inv.water ?? 0) > 0) return { t: "water", label: "Water", hold: "can" };
+    return null;
+  }
+  if (cell) {
+    const seed = seedToSow();
+    return seed ? { t: "plant", label: `Sow ${CROPS[seed].name.toLowerCase()}`, crop: seed, hold: "bag" } : null;
+  }
+  const plotId = world.plotMap[t.x + W * t.z];
+  if (plotId >= 0 && game.save.plots.includes(plotId) && t.ny === 1 && block(id).farmable) return { t: "till", label: "Plough", hold: "hoe" };
+  if (nearWater(t) && game.save.inv.can) return { t: "refill", label: "Fill can", hold: "can" };
+  return null;
+}
+let smartHold: Smart["hold"] | null = null;
+const soilQ = (t: Hit) => soilQuality(world, t.x, t.z, get(t.x, t.y, t.z));
+function useSmart(): Outcome {
+  const s = smartFor(target);
+  if (!s || !target) return null;
+  const id = get(target.x, target.y, target.z);
+  const at = { x: target.x, y: isCropBlock(id) ? target.y - 1 : target.y, z: target.z };
+  smartHold = s.hold;
+  if (s.t === "harvest") return report(game.act({ t: "harvest", ...at }), "harvest"); // (aimed at the plant or the soil under it)
+  if (s.t === "till") return report(game.act({ t: "till", ...at }), "till");
+  if (s.t === "plant") return report(game.act({ t: "plant", ...at, crop: s.crop! }), "plant");
+  if (s.t === "water") return report(game.act({ t: "water", ...at }), "water");
+  return report(game.act({ t: "refill", ...target }), "fill");
+}
+
 /** Left click: harvest a crop (an unripe one just says how far along it is), otherwise dig. */
 function useLeft(): Outcome {
   if (!target) return null;
   const { x, y, z } = target;
   if (block(get(x, y, z)).liquid) return null;
   if (isCropBlock(get(x, y, z))) return report(game.act({ t: "harvest", x, y: y - 1, z }), "harvest");
+  if (game.save.farm[String(idx(x, y, z))]?.plant) return report(game.act({ t: "harvest", x, y, z }), "harvest"); // aimed at the soil under it
   return null; // real farming: the land isn't dug up block by block
 }
 
@@ -881,6 +926,9 @@ function useRight(): Outcome {
   // aiming at a plant means "the soil it grows in"
   const soilY = isCropBlock(id) ? target.y - 1 : target.y;
   const at = { x: target.x, y: soilY, z: target.z };
+  // a ripe crop is harvested whatever is in hand
+  if (smartFor(target)?.t === "harvest") return useSmart();
+  if (slot.kind === "hand") return useSmart();
   if (slot.kind === "tool" && slot.tool === "hoe") {
     // (on a phone, Use with the hoe ploughs a whole row whenever your bulls and plough are there)
     const shift = controls.held.has("ShiftLeft") || controls.held.has("ShiftRight") || ploughNext || TOUCH;
@@ -901,8 +949,10 @@ function useRight(): Outcome {
   }
   if (slot.kind === "tool" && slot.tool === "can")
     return game.save.farm[String(idx(at.x, at.y, at.z))] ? report(game.act({ t: "water", ...at }), "water") : report(game.act({ t: "refill", ...target }), "fill");
-  if (slot.kind === "seed") return report(game.act({ t: "plant", ...at, crop: slot.crop }), "plant");
-  if (slot.kind === "hand") return isCropBlock(id) ? useLeft() : null;
+  if (slot.kind === "seed") {
+    lastSeed = slot.crop;
+    return report(game.act({ t: "plant", ...at, crop: slot.crop }), "plant");
+  }
   if (slot.kind !== "block") return null;
   // building: plants are replaced in place, like tall grass; otherwise build onto the face we look at
   const onPlant = block(id).shape === "cross" && !isCropBlock(id);
@@ -925,6 +975,10 @@ function tipFor(t: Hit | null): string {
   const id = get(t.x, t.y, t.z);
   const soil = game.save.farm[String(idx(t.x, isCropBlock(id) ? t.y - 1 : t.y, t.z))];
   const cur = hotbar.current;
+  if (cur.kind === "hand") {
+    const s = smartFor(t);
+    if (s) return `Right-click: ${s.label.toLowerCase()}${s.t === "till" || s.t === "plant" ? ` · soil ${Math.round(((soil?.q ?? soilQ(t)) * 100))}%` : ""}`;
+  }
   if (!soil) {
     if (cur.kind === "tool" && cur.tool === "can" && nearWater(t)) return "Right-click: fill the can";
     const plotId = world.plotMap[t.x + W * t.z];
@@ -937,12 +991,12 @@ function tipFor(t: Hit | null): string {
   const wet = soil.wetUntil > now ? "watered" : "dry";
   if (!soil.plant) {
     if (cur.kind === "seed") return `Right-click: sow ${CROPS[cur.crop].name.toLowerCase()} · soil ${Math.round(soil.q * 100)}%`;
-    return `Ploughed soil · press 4, 5 or 6 for seeds, then right-click`;
+    return `Ploughed soil · no seeds left — Sitabai sells more`;
   }
   const p = advance(soil.plant, soil.wetUntil, now);
   const c = CROPS[p.crop];
   if (p.progress >= 1) return `${c.name} is ripe · left-click to harvest`;
-  if (wet === "dry" && cur.kind === "tool" && cur.tool === "can") return `${c.name} · ${Math.floor(p.progress * 100)}% · right-click to water`;
+  if (wet === "dry" && ((cur.kind === "tool" && cur.tool === "can") || cur.kind === "hand")) return `${c.name} · ${Math.floor(p.progress * 100)}% · ${game.save.inv.water ? "right-click to water" : "the can is empty — fill it at a well"}`;
   const mins = Math.ceil(msToRipe(p) / 60000);
   return `${c.name} · ${Math.floor(p.progress * 100)}% grown · ${wet === "dry" ? "dry — water it (press 3)" : "watered"} · ripe in ~${mins} min`;
 }
@@ -983,7 +1037,12 @@ controls.onDig = () => {
   if (fishing.active) return fishing.press();
   void useLeft();
 };
-controls.onPlace = () => void (!windowOpen() && !kabaddi.active && !fishing.active && useRight());
+controls.onPlace = () => {
+  if (windowOpen()) return;
+  if (kabaddi.active) return kabaddi.tag(body.pos); // (on a phone the Use button reads "Tag")
+  if (fishing.active) return fishing.press();
+  void useRight();
+};
 controls.onSelect = (i) => {
   hotbar.select(i);
   hud.refresh();
@@ -1289,7 +1348,7 @@ renderer.setAnimationLoop(() => {
     // aim along the crosshair; you can only reach what's near your farmer
     const ray = rig.ray();
     const cur = hotbar.current;
-    const hit = raycast({ x: ray.o.x, y: ray.o.y, z: ray.o.z }, { x: ray.d.x, y: ray.d.y, z: ray.d.z }, MOVE.reach + (rig.view === "third" ? rig.distance + 1 : 0), cur.kind === "tool" && cur.tool === "can" ? pickWater : pickable, plantBox);
+    const hit = raycast({ x: ray.o.x, y: ray.o.y, z: ray.o.z }, { x: ray.d.x, y: ray.d.y, z: ray.d.z }, MOVE.reach + (rig.view === "third" ? rig.distance + 1 : 0), (cur.kind === "tool" && cur.tool === "can") || (cur.kind === "hand" && game.save.inv.can) ? pickWater : pickable, plantBox);
     target = hit && Math.hypot(hit.x + 0.5 - body.pos.x, hit.y + 0.5 - (body.pos.y + 1), hit.z + 0.5 - body.pos.z) <= MOVE.reach ? hit : null;
     outline.visible = false;
     // mark the field cell you'd act on (the soil under a crop, or the ground you look at)
@@ -1345,7 +1404,8 @@ renderer.setAnimationLoop(() => {
   }
   // what's in your hand shows in your hand, and using it shows too
   const cur = hotbar.current;
-  farmer.hold(fishing.active ? "rod" : cur.kind === "tool" ? (cur.tool === "hoe" ? "hoe" : "can") : cur.kind === "seed" ? "bag" : "none");
+  if (now > actionUntil) smartHold = null;
+  farmer.hold(fishing.active ? "rod" : smartHold && cur.kind === "hand" ? smartHold : cur.kind === "tool" ? (cur.tool === "hoe" ? "hoe" : "can") : cur.kind === "seed" ? "bag" : "none");
   if (now > actionUntil && !fishing.active) farmer.action = "none";
   updateDrops(dt);
   worldRenderer.cull(camera.position, mode === "title" ? 200 : settings.renderDistance);
@@ -1372,7 +1432,11 @@ renderer.setAnimationLoop(() => {
       body.pos.z = playerBody.pos.z;
     }
   }
-  if (touch) touch.visible = mode === "play" && !titleScreen.open && !windowOpen() && !farmyard.ride;
+  if (touch) {
+    touch.visible = mode === "play" && !titleScreen.open && !windowOpen() && !farmyard.ride;
+    touch.setUse(kabaddi.active ? "Tag" : hotbar.current.kind === "hand" ? (smartFor(target)?.label ?? "Use") : "Use");
+    touch.setTag(null);
+  }
   farmer.root.position.set(body.pos.x, body.pos.y, body.pos.z);
   farmer.root.rotation.y = body.heading;
   farmer.visible = mode !== "title" && (rig.view === "third" || !!farmyard.ride);

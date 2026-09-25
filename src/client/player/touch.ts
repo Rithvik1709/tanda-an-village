@@ -117,6 +117,25 @@ export class TouchControls {
     this.padKnob.style.transform = "";
   }
 
+  private useLabel = "";
+  private tagLabel: string | null = "";
+  /** The Use button says what it will do ("Plough", "Sow onion", "Water", "Harvest"). */
+  setUse(label: string) {
+    if (label === this.useLabel) return;
+    this.useLabel = label;
+    const b = this.el.querySelector(".t-use") as HTMLElement;
+    b.textContent = label;
+    b.classList.toggle("long", label.length > 6);
+  }
+  /** The second action button only when there's a second action (a kabaddi tag). */
+  setTag(label: string | null) {
+    if (label === this.tagLabel) return;
+    this.tagLabel = label;
+    const b = this.el.querySelector(".t-harvest") as HTMLElement;
+    b.hidden = !label;
+    if (label) b.textContent = label;
+  }
+
   /** The action hint ("R Load the cart…") becomes a button: tapping it presses that key. */
   bindHint(hint: HTMLElement) {
     // looked up at tap time: the game sets these handlers after the touch controls are made

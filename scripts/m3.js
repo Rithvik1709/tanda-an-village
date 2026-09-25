@@ -82,6 +82,10 @@
   }
   log.harvests = harvests;
   log.inv = g.inv();
+  // (a ripe crop is harvested by a right-click with any tool, so watering rounds pick the early ones)
+  log.produce = ["jowar", "onion", "sugarcane"].map((c) => [c, log.inv[c] ?? 0]);
+  if (log.produce.some(([, n]) => !n)) log.errors.push("a crop was never harvested");
+  log.leftInField = Object.values(g.farm()).filter((f) => f.plant).length;
   g.setView("third");
   g.teleport(p.x0 + 2.2, y, p.z0 + 1.6, -Math.PI / 2 - 0.55, -0.32);
   await wait(600);

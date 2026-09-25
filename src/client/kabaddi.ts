@@ -6,7 +6,7 @@ import { Q } from "./quality";
 import { isTouch } from "./player/touch";
 
 /** How a tag is made: a click, or on a phone the Harvest button. */
-const TAG = isTouch() ? "tap Harvest" : "click";
+const TAG = isTouch() ? "tap Tag" : "click";
 
 /** The boys only matter near the maidan: past this they aren't drawn. */
 const BOYS_FAR = 75;

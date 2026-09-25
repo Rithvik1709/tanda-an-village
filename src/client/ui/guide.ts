@@ -112,7 +112,7 @@ export class Guide {
         <div><b>Harvest</b><span>Look at a ripe crop and tap <b>Harvest</b>.</span></div>
         <div><b>Talk &amp; trade</b><span>Tap <b>Talk</b> near a stall or person.</span></div>
         <div><b>Bulls &amp; cart</b><span><b>Plough</b> in your field · <b>Tie</b> behind your house · <b>Feed</b> near your bulls · <b>Cart</b> by your cart to ride to the mandi.</span></div>
-        <div><b>Pastimes</b><span>📋 <b>Kaam</b>: a <b>!</b> over someone's head means they have a job for you · 🤼 <b>Kabaddi</b> on the maidan behind the school (tap <b>Harvest</b> to tag) · 🎣 <b>Fishing</b> in the talav beyond it (a gal from Sitabai; hold the button to reel)</span></div>
+        <div><b>Pastimes</b><span>📋 <b>Kaam</b>: a <b>!</b> over someone's head means they have a job for you · 🤼 <b>Kabaddi</b> on the maidan behind the school (tap <b>Tag</b>) · 🎣 <b>Fishing</b> in the talav beyond it (a gal from Sitabai; hold the button to reel)</span></div>
         <div><b>Other</b><span><b>Map</b> · <b>View</b> (first/third person) · <b>Torch</b> at night · at night, tap <b>Sleep till morning</b> · 🏆 leaderboard</span></div>
       </div><div hidden>` : ""}
         <div><b>Move</b><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump · mouse look</span></div>
