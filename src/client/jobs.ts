@@ -262,7 +262,7 @@ export class Jobs {
         g.ready = ready;
         g.mark.material = ready ? this.tick : this.bang;
       }
-      if (g.mark.visible) g.mark.position.y = this.d.ground(g.at.x, g.at.z) + 2.35 + Math.sin(t * 2.5) * 0.08;
+      if (g.mark.visible) g.mark.position.y = this.d.ground(g.at.x, g.at.z) + 2.35 + (document.documentElement.classList.contains("reduce-motion") ? 0 : Math.sin(t * 2.5) * 0.08);
     }
     // Chinki: lost somewhere (if that's today's job), following you, or home with Lakshmi
     const gj = jobs.find((j) => j.kind === "goat");

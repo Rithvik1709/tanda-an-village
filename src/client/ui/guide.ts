@@ -265,7 +265,7 @@ export class Guide {
     this.marker.position.set(tg.x, this.groundAt(tg.x, tg.z), tg.z);
     const gem = this.marker.getObjectByName("gem")!;
     gem.rotation.y = t * 1.5;
-    gem.position.y = 3 + Math.sin(t * 2) * 0.25;
+    gem.position.y = 3 + (document.documentElement.classList.contains("reduce-motion") ? 0 : Math.sin(t * 2) * 0.25);
     const p = new THREE.Vector3(tg.x, tg.y + 2, tg.z);
     const dist = p.distanceTo(camera.position);
     const v = p.clone().project(camera);

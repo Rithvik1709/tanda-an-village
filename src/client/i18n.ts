@@ -197,6 +197,7 @@ const D: Record<string, [string, string]> = {
   "Settings are kept on this device. Your farm itself is saved online.": ["सेटिंग्ज या फोनवर राहतात. तुमचे शेत ऑनलाइन जतन होते.", "सेटिंग्स इसी फ़ोन पर रहती हैं. आपका खेत ऑनलाइन सहेजा जाता है."],
   Done: ["झाले", "हो गया"],
   "Easy fishing: a gentler fight, and the line never snaps": ["सोपी मासेमारी: मासा हळू ओढतो आणि दोरी कधी तुटत नाही", "आसान मछली: मछली धीरे खींचती है और डोरी कभी नहीं टूटती"],
+  "Reduce motion: no confetti, shaking or bobbing markers": ["कमी हालचाल: रंगांची उधळण, हलणे किंवा उडणाऱ्या खुणा नाहीत", "कम हलचल: रंगों की बौछार, हिलना या उछलते निशान नहीं"],
   "running at {tier}": ["सध्या {tier}", "अभी {tier}"],
   ", no shadows": [", सावल्या नाहीत", ", छाया नहीं"],
   low: ["कमी", "कम"],

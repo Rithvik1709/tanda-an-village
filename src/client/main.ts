@@ -45,7 +45,7 @@ import { Leaderboard } from "./ui/leaderboard";
 import { PhoneMenu } from "./ui/phonemenu";
 import { AccountCard } from "./ui/account";
 import { current } from "../shared/missions";
-import { applyUiScale, loadSettings, SettingsPanel, TitleScreen } from "./ui/screens";
+import { applyMotion, applyUiScale, calm, loadSettings, SettingsPanel, TitleScreen } from "./ui/screens";
 import { isTouch, TouchControls } from "./player/touch";
 import { FrameWatch, Q } from "./quality";
 import { closedText, hoursText, isOpen } from "../shared/hours";
@@ -199,7 +199,7 @@ const syncFields = () => {
     const t = performance.now();
     save = { ...save, farm: Object.fromEntries(Object.entries(save.farm).filter(([k]) => !(reveal.get(k)! > t))) };
   }
-  fields.sync(save, game.now(), (x, z) => hf.at(x, z));
+  fields.sync(save, game.now(), (x, z) => hf.at(x, z), (x, z) => game.save.plots.includes(world.plotMap[x + W * z]));
 };
 const farmer = new Figure(FARMER);
 scene.add(farmer.root);
@@ -255,6 +255,7 @@ const uiRoot = document.getElementById("ui")!;
 uiRoot.classList.add("ui-title");
 const settings = loadSettings();
 applyUiScale(settings);
+applyMotion(settings);
 controls.sensitivity = settings.sensitivity;
 audio.setVolume(settings.volume);
 const titleScreen = new TitleScreen(uiRoot);
@@ -1663,7 +1664,7 @@ renderer.setAnimationLoop(() => {
     torchModel.rotation.y = Math.atan2(ray.d.x, ray.d.z) - farmer.root.rotation.y;
   }
   grass.lights({ on: torchOn, pos: torch.position, dir: torchAim.position.clone().sub(torch.position) }, BULB_LIGHTS.map((l) => l.position), nightK);
-  fields.update(now / 1000);
+  fields.update(now / 1000, calm());
   const grassAt = mode === "play" ? new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z) : camera.position;
   grass.update(now / 1000, grassAt, mode === "title" ? Q.grassFar : Math.min(Q.grassFar, settings.renderDistance * 0.55), sunDirection(hour), sc.sun, sc.top);
   if (mode !== "title") applyRenderDistance();
@@ -1685,7 +1686,7 @@ renderer.setAnimationLoop(() => {
 const confetti: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
 function celebrate() {
   const cols = ["#e8327a", "#f2a01e", "#f6e04a", "#e8662a", "#ffffff"];
-  for (let i = 0; i < 160; i++) {
+  for (let i = 0; i < (calm() ? 0 : 160); i++) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.12), new THREE.MeshBasicMaterial({ color: cols[i % 5], side: THREE.DoubleSide }));
     m.position.set(body.pos.x + (Math.random() - 0.5) * 3, body.pos.y + 1.5, body.pos.z + (Math.random() - 0.5) * 3);
     scene.add(m);
@@ -1993,6 +1994,9 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     kabaddiStart: () => kabaddi.start(),
     kabaddiTag: () => kabaddi.tag(body.pos),
     fishing: () => ({ casts: fishing.castsLeft(), ...fishing.debug() }),
+    ripeMarks: () => fields.ripeCount,
+    confetti: () => confetti.length,
+    celebrate: () => celebrate(),
     fishPress: () => fishing.press(),
     jobs: () => ({ ...jobs.debug(), today: jobs.today() }),
     interact: () => controls.onInteract(),
