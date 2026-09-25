@@ -870,6 +870,14 @@ function report(r: Outcome, sfx: string): Outcome {
     sfxQueue.push(sfx);
     perform(sfx);
     if (r.msg) hud.toast(r.msg);
+    // a harvest rises from the plant and flies into what you carry
+    const got = Object.entries(r.gained ?? {}).find(([k]) => k in CROPS);
+    if (got && target) {
+      const v = new THREE.Vector3(target.x + 0.5, hf.at(target.x + 0.5, target.z + 0.5) + 0.9, target.z + 0.5).project(camera);
+      const box = canvas.getBoundingClientRect(), turned = document.documentElement.classList.contains("rotated");
+      const w = turned ? box.height : box.width, h = turned ? box.width : box.height;
+      hud.floater(`+${got[1]} ${CROPS[got[0] as keyof typeof CROPS].name.toLowerCase()}`, { x: (v.x * 0.5 + 0.5) * w, y: (-v.y * 0.5 + 0.5) * h }, hud.carryEl, "crop");
+    }
   } else hud.toast(r.error, "bad");
   return r;
 }
@@ -1037,6 +1045,28 @@ function sunDial(h: number) {
   return `<svg class="dial" viewBox="0 0 24 14" aria-hidden="true"><path d="M3 12 A9 9 0 0 1 21 12" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-width="1.5"/><circle cx="${x.toFixed(1)}" cy="${Math.min(12, y).toFixed(1)}" r="2.6" fill="${day ? "#ffc94a" : "#dfe6ff"}"/></svg>`;
 }
 game.onChange(refreshStatus);
+// money you earn pops up by the purse; the first harvest and the first sale get a moment of their own
+let lastMoney: number | null = null, lastHarvested = -1, lastEarned = -1;
+game.onChange(() => {
+  const s = game.save;
+  if (!booted_) return;
+  hud.setMoney(s.money);
+  if (lastMoney !== null && s.money > lastMoney) {
+    const m = hud.moneyEl?.getBoundingClientRect(), root = uiRoot.getBoundingClientRect();
+    if (m) hud.floater(`+₹${(s.money - lastMoney).toLocaleString("en-IN")}`, { x: m.left - root.left + m.width / 2, y: m.bottom - root.top + 52 }, hud.moneyEl, "money"); // (rises into the purse from below)
+  }
+  if (lastHarvested === 0 && s.stats.harvested > 0) {
+    celebrate();
+    hud.toast("Your first harvest! Take it to Ganpat Seth on the chowk.");
+  }
+  if (lastEarned === 0 && s.stats.earned > 0 && s.ledger.some((l) => l.kind === "sell")) {
+    celebrate();
+    hud.toast("Your first sale — the tanda's newest farmer is in business!");
+  }
+  lastMoney = s.money;
+  lastHarvested = s.stats.harvested;
+  lastEarned = s.stats.earned;
+});
 game.onChange(() => syncFields());
 const sfxQueue = { push: (name: string) => audio.play(name) };
 
@@ -1435,6 +1465,7 @@ renderer.setAnimationLoop(() => {
   farmer.hold(fishing.active ? "rod" : smartHold && cur.kind === "hand" ? smartHold : cur.kind === "tool" ? (cur.tool === "hoe" ? "hoe" : "can") : cur.kind === "seed" ? "bag" : "none");
   if (now > actionUntil && !fishing.active) farmer.action = "none";
   updateDrops(dt);
+  hud.tickMoney(dt);
   worldRenderer.cull(camera.position, mode === "title" ? 200 : settings.renderDistance);
   const electionOn = current(game.save)?.id === "election";
   campaign.visible = electionOn;

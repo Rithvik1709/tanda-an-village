@@ -78,6 +78,63 @@ export class Hud {
 
   setInfo(html: string) {
     this.info.innerHTML = html;
+    if (this.moneyShown !== null) this.paintMoney();
+  }
+
+  /*
+   * The payoff you can see: harvests float up and fly to what you carry; money pops and counts up.
+   * Plain DOM and CSS transitions, so it costs nothing on a cheap phone.
+   */
+  private moneyShown: number | null = null;
+  private moneyTarget = 0;
+  /** The money figure eases towards `to` instead of jumping. */
+  setMoney(to: number) {
+    if (this.moneyShown === null) this.moneyShown = to;
+    this.moneyTarget = to;
+  }
+  tickMoney(dt: number) {
+    if (this.moneyShown === null || this.moneyShown === this.moneyTarget) return;
+    const d = this.moneyTarget - this.moneyShown;
+    const step = Math.sign(d) * Math.max(1, Math.abs(d) * Math.min(1, dt * 6));
+    this.moneyShown = Math.abs(step) >= Math.abs(d) ? this.moneyTarget : Math.round(this.moneyShown + step);
+    this.paintMoney();
+  }
+  private paintMoney() {
+    const el = this.info.querySelector(".money");
+    if (el) el.textContent = `₹${this.moneyShown!.toLocaleString("en-IN")}`;
+  }
+  /** Text that rises from a point on screen (in CSS px of the game area) and flies into `to`. */
+  floater(text: string, from: { x: number; y: number }, to: Element | null, kind: "crop" | "money" = "crop") {
+    const f = el("div", `floater ${kind}`, this.root);
+    f.textContent = text;
+    f.style.left = `${from.x}px`;
+    f.style.top = `${from.y}px`;
+    const rootBox = this.root.getBoundingClientRect();
+    const tb = to && !(to as HTMLElement).hidden ? to.getBoundingClientRect() : null;
+    requestAnimationFrame(() => {
+      f.classList.add("up");
+      setTimeout(() => {
+        if (tb && !document.documentElement.classList.contains("reduce-motion")) {
+          f.style.left = `${tb.left - rootBox.left + tb.width / 2}px`;
+          f.style.top = `${tb.top - rootBox.top + tb.height / 2}px`;
+          f.classList.add("fly");
+        } else f.classList.add("fade");
+      }, 420);
+    });
+    setTimeout(() => {
+      f.remove();
+      if (to && !(to as HTMLElement).hidden) {
+        to.classList.remove("bump");
+        void (to as HTMLElement).offsetWidth;
+        to.classList.add("bump");
+      }
+    }, 1150);
+  }
+  get moneyEl() {
+    return this.info.querySelector(".money");
+  }
+  get carryEl() {
+    return this.goods.hidden ? this.info.querySelector(".basket") : this.goods;
   }
 
   setTip(text: string) {

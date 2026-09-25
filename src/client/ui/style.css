@@ -548,3 +548,14 @@ body:not(.is-touch) .fishing.reeling .fish-foot::after { content: " · hold the 
 small.why { font: 700 10px system-ui; text-transform: uppercase; letter-spacing: .05em; padding: 2px 5px; border-radius: 4px; margin-left: 4px; }
 small.why.glut { background: rgba(255,158,132,.18); color: var(--bad); }
 small.why.shortage { background: rgba(158,214,122,.18); color: var(--good); }
+/* the payoff: floaters and a bump where they land */
+.floater { position: absolute; transform: translate(-50%, -50%); font: 800 17px system-ui; color: #fff6dc; text-shadow: 0 2px 6px rgba(0,0,0,.7); pointer-events: none; white-space: nowrap; transition: transform .42s cubic-bezier(.2,1.4,.4,1), opacity .3s; z-index: 7; }
+.floater.money { color: #ffd98a; font-size: 18px; }
+.floater.up { transform: translate(-50%, calc(-50% - 34px)) scale(1.15); }
+.floater.fly { transition: left .6s cubic-bezier(.5,0,.8,.4), top .6s cubic-bezier(.5,0,.8,.4), transform .6s, opacity .6s; transform: translate(-50%, -50%) scale(.6); opacity: .2; }
+.floater.fade { opacity: 0; transition: opacity .6s; }
+.bump { animation: bump .35s ease-out; }
+@keyframes bump { 40% { transform: scale(1.12); } }
+.info.bump, .info .money.bump { animation: bump .35s ease-out; }
+.info .money { display: inline-block; }
+@media (prefers-reduced-motion: reduce) { .floater { transition: opacity .6s !important; } .bump { animation: none; } }
