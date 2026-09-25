@@ -19,7 +19,19 @@ export const forDevice = (t: string) =>
         .replace(/Shift \+ right-click with the hoe/g, "tap Use with the hoe, your bulls nearby")
         .replace(/press P in your field/g, "tap the Plough button in your field")
         .replace(/press E/gi, "tap the button that appears")
-        .replace(/Press <kbd>H<\/kbd> any time for the controls/g, "Tap ☰ any time for help");
+        .replace(/Press <kbd>H<\/kbd> any time for the controls/g, "Tap ☰ any time for help")
+        // the crosshair tips and the first-steps card
+        .replace(/Right-click: /g, "Tap Use: ")
+        .replace(/\bright-click (the|your|tilled) /gi, "tap Use on $1 ")
+        .replace(/\bleft-click (it )?to harvest/gi, "tap Harvest")
+        .replace(/\bright-click(ing)?\b/gi, "tap Use")
+        .replace(/\bleft-click(ing)?\b/gi, "tap Harvest")
+        .replace(/Press M for the map|Press <kbd>M<\/kbd> for the map/g, "Tap Map to see where")
+        .replace(/press 2 for the hoe|Press 2 for the hoe/g, "pick the hoe below")
+        .replace(/press 3 for the can|\(press 3\)/g, "(pick the can below)")
+        .replace(/press 4, 5 or 6 for seeds/g, "pick a seed bag below")
+        .replace(/ ?<kbd>\d<\/kbd>(–<kbd>\d<\/kbd>)?/g, "")
+        .replace(/press <kbd>E<\/kbd>/gi, "tap the button that appears");
 
 const seen = (id: string) => { try { return localStorage.getItem(`tanda.mission.${id}`) === "1"; } catch { return false; } };
 const markSeen = (id: string) => { try { localStorage.setItem(`tanda.mission.${id}`, "1"); } catch { /* ignore */ } };

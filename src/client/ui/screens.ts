@@ -1,3 +1,4 @@
+import { forDevice } from "./guide";
 import { detectTier, graphicsChoice, Q, setGraphicsChoice, type TierChoice } from "../quality";
 import type { Save } from "../../shared/save";
 
@@ -217,10 +218,10 @@ export class Tutorial {
     const cells = Object.values(save.farm);
     const steps: [boolean, string][] = [
       [onOwnLand || cells.length > 0, "Walk to <b>Aamrai</b>, your field — just north-west of the village square. Press <kbd>M</kbd> for the map."],
-      [cells.length > 0, "Pick the <b>hoe</b> <kbd>2</kbd> and <b>right-click</b> the soil to till it."],
+      [cells.length > 0, "Pick the <b>hoe</b> <kbd>2</kbd> and right-click the soil to till it."],
       [save.stats.planted > 0, "Pick <b>seeds</b> <kbd>4</kbd>–<kbd>6</kbd> and right-click tilled soil to sow."],
-      [cells.some((c) => c.wetUntil > 0), "Fill the <b>watering can</b> <kbd>3</kbd> at the well in the square, then right-click your sown soil. Wet soil grows crops three times faster."],
-      [save.stats.harvested > 0, "Crops grow while you're away too. When one is ripe, <b>left-click</b> it to harvest."],
+      [cells.some((c) => c.wetUntil > 0), "Fill the <b>watering can</b> <kbd>3</kbd> at the well in the square, then right-click your sown soil. Watered soil grows crops twice as fast."],
+      [save.stats.harvested > 0, "Crops grow while you're away too. When one is ripe, left-click it to harvest."],
       [save.stats.earned > 0, "Take your harvest to <b>Ganpat's stall</b> in the square and press <kbd>E</kbd> to sell."],
     ];
     const i = steps.findIndex(([done]) => !done);
@@ -231,6 +232,6 @@ export class Tutorial {
       if (now - this.doneAt > 20000) this.finish();
       return;
     }
-    this.el.innerHTML = `<div class="tut-head">Getting started · ${i + 1} of ${steps.length}<button data-skip title="Hide these tips">skip</button></div>${steps[i][1]}`;
+    this.el.innerHTML = `<div class="tut-head">Getting started · ${i + 1} of ${steps.length}<button data-skip title="Hide these tips">skip</button></div>${forDevice(steps[i][1])}`;
   }
 }

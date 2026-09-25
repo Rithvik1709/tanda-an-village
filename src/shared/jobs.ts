@@ -14,7 +14,7 @@ export const GIVERS: Record<GiverId, { name: string; local: string; about: strin
   bhimrao: { name: "Bhimrao kaka", local: "भीमराव काका", about: "under the banyan in the chowk" },
   tulsa: { name: "Tulsa aaji", local: "तुळसा आजी", about: "on her doorstep, south of the chowk" },
   guruji: { name: "Pawar guruji", local: "पवार गुरुजी", about: "behind the Z.P. school, by the kabaddi maidan" },
-  lakshmi: { name: "Lakshmi", local: "लक्ष्मी", about: "by the Hanuman mandir" },
+  lakshmi: { name: "Lakshmi", local: "लक्ष्मी", about: "behind the Hanuman mandir, by the maidan" },
   savitri: { name: "Savitribai", local: "सावित्रीबाई", about: "by Rathod Bhuvan's aangan" },
 };
 

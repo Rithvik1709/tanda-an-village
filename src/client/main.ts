@@ -40,7 +40,7 @@ import { FIRESIDE, Nights } from "./nights";
 import { Infrastructure } from "./scene/infrastructure";
 import { Nav, separate } from "./player/nav";
 import { Audio, renderRms, SOUNDS } from "./audio";
-import { Guide } from "./ui/guide";
+import { forDevice, Guide } from "./ui/guide";
 import { Leaderboard } from "./ui/leaderboard";
 import { PhoneMenu } from "./ui/phonemenu";
 import { AccountCard } from "./ui/account";
@@ -1300,7 +1300,7 @@ renderer.setAnimationLoop(() => {
     game.tick();
     syncFields();
     refreshStatus();
-    hud.setTip(mode === "play" ? tipFor(target) : "");
+    hud.setTip(mode === "play" ? forDevice(tipFor(target)) : "");
     refreshSigns();
     if (mode === "play") checkPlotEntry();
     const st = mode === "play" && !panels.open && !farmyard.ride ? nearStall() : undefined;
@@ -1386,7 +1386,7 @@ renderer.setAnimationLoop(() => {
     playground.update(dt, DAYTIME(h), camera.position);
     kabaddi.update(dt, h, body.pos, body.vel, camera.position);
     jobs.update(dt, now / 1000, h, camera.position, body.pos);
-    jobs.hidden = mode !== "play" || titleScreen.open || !!farmyard.ride;
+    jobs.hidden = mode !== "play" || titleScreen.open || !!farmyard.ride || windowOpen(); // never over a window
     if (fishing.active && (farmyard.ride || mode !== "play" || !!ploughJob)) fishing.stop();
     if (kabaddi.active && (farmyard.ride || !!ploughJob)) kabaddi.quit("You left the match.");
   }
@@ -1744,6 +1744,12 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     fishPress: () => fishing.press(),
     jobs: () => ({ ...jobs.debug(), today: jobs.today() }),
     interact: () => controls.onInteract(),
+    // for filming on a virtual clock: hold a key until told otherwise, and turn the view
+    setHeld: (code: string, on: boolean) => (on ? controls.held.add(code) : controls.held.delete(code)),
+    look: (yaw: number, pitch = controls.pitch) => {
+      controls.yaw = yaw;
+      controls.pitch = pitch;
+    },
     hint: () => document.querySelector(".interact")?.textContent ?? "",
   });
 });

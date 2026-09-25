@@ -64,7 +64,7 @@ export class Jobs {
       bhimrao: { x: 104.5, z: 119.8 }, // by the banyan, clear of the stalls
       tulsa: near({ x: 110, z: 132 }),
       guruji: { x: 131.5, z: 92.2 }, // at the school's back corner, watching the boys on the maidan
-      lakshmi: { x: L.hanuman.x - 1.8, z: L.hanuman.z + 2.7 },
+      lakshmi: { x: L.hanuman.x + 7.5, z: L.hanuman.z }, // on the open ground behind the mandir, by the maidan
       savitri: { x: 94.5, z: 123.5 },
     };
     for (const id of Object.keys(GIVERS) as GiverId[]) {
