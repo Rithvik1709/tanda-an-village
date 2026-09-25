@@ -642,3 +642,6 @@ small.why.shortage { background: rgba(158,214,122,.18); color: var(--good); }
 /* Settings → Reduce motion (defaults to the system setting) */
 .reduce-motion .fishing.surge .fish-status, .reduce-motion .kb-breath span, .reduce-motion .bump, .reduce-motion .rotate-icon, .reduce-motion .sk { animation: none !important; }
 .reduce-motion .floater { transition: opacity .6s !important; }
+.cart-stuck { margin: 8px 0 12px; padding: 10px 14px; border-radius: 12px; background: rgba(224,118,42,0.14); border: 1px solid rgba(224,118,42,0.45); }
+.cart-stuck .big-acts { margin-top: 8px; justify-content: flex-start; }
+.cart-stuck .why { color: #ffd9a8; }

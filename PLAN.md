@@ -208,6 +208,17 @@ looked at), tick it, log it, commit. Push once at the end.
 - [x] **U16 · Not by colour alone, and less motion.** Ripe crops in your fields get a small bobbing marker (one instanced draw); a "reduce motion" setting turns off confetti, shakes and bobbing. *Done when:* screenshots show the markers; the setting removes them.
 - [x] **U17 · Measure it.** Vercel Analytics events: started, first harvest, first sale, mission done, returned next day. *Done when:* events fire in a script (dev mode logs them).
 
+### F · Play-test fixes (reported 2026-09-25)
+Loop: fix, test with a script and screenshots, tick, log, commit; push at the end.
+- [x] **F1 · The cart card can always go somewhere.** When the bulls are sulking or tired, the card says so by the button and offers "Feed them" (using your kadba), or tells you where to buy kadba; Set off is disabled with the reason until they can go.
+- [ ] **F2 · E continues a story card.** Single-button cards take E, Enter, Space or a click; choice cards take 1/2/3; the footer says so. A held key doesn't skip the card it opened.
+- [ ] **F3 · The kaam list opens from the keyboard.** K opens and folds it (the chip shows "K"); it starts open the first time it appears; a phone taps it as before.
+- [ ] **F4 · A drip set installs itself.** Buying one installs it on the field you're standing in, or else your first field without drip, and says which; the Your land tab still moves the spare ones.
+- [ ] **F5 · People you can talk to.** No neighbour stands in a shop doorway (Tulsa aaji was at the bank door); E and the hint go to whoever is nearest, a neighbour or a stall; the neighbours by the well, the mandir and the banyan say Ram Ram.
+- [ ] **F6 · Up the tanki.** A proper ladder outside the bowl, with a safety cage and a landing; E at its foot climbs up, you sit on the rim looking over the tanda, and moving climbs back down.
+- [ ] **F7 · Sit with your friends.** E by the fire sits you in the circle (the chai and +1 once a night); moving stands you up; the hint changes once you're sitting and once tonight's visit is done.
+- [ ] **F8 · Offerings stop at the count.** Offering and delivery buttons show what's still needed and become "Given ✓" once the objective is met; the rules refuse to take more than is asked (Sitabai's 20, the mandir's 10 and 10); "Join the gathering" says ✓ once joined.
+
 ## 6. Not in v1 (on purpose)
 Multiplayer shared district, Google sign-in, more crops and buildings, processing units, festivals (Bail Pola), mobile controls.
 
@@ -230,6 +241,7 @@ _(one line per loop iteration: date · task · how it was verified · commit)_
 - 2026-09-24 · The user's requests: (1) a living tanda: villagers hoe and tend neighbours' fields (those fields grow their own crops), women carry matkas from the well, people walk the real roads, children play in the chowk; work poses and props on the figure rig. (2) The real Ukhali map: roads and lanes from OpenStreetMap, fields, village extent, red scrub and the field vihir placed from satellite imagery; ~4.2 m per block; the Jalna road runs north and the town mandi sits at its west end; 41 houses fill the gaothan; river removed (village well + vihir). (3) Easier to follow: a welcome card, an 11-step goal chain, a golden world marker with distance arrow, H help card, plain-language tips. Verified: 66 vitest, build, m4 13/13, m3/m5/m6/m7/m8 error-free; screenshots of the map, village, lanes, working fields, ride and guide looked at. Fixed: nearest-stall selection (the Naik's door is next to Ganpat's stall), starter keeps the name Aamrai.
 
 ---
+- 2026-09-25 · F1 the cart card can always go somewhere · When Sarja and Raja are sulking or too tired, a box above the load table says so and offers "Feed them kadba" (with your count), or says where to buy kadba; Set off reads "Feed them first to set off" and is disabled until they can go. Verified: tsc, scripts/fix/f1.js (no fodder: reason + where to buy, button disabled; with fodder: Feed button; after feeding the box goes), screenshots looked at.
 
 ## 8. Missions (proposed · v1.1)
 A 10-mission story arc for Ukhali Tanda. It replaces the flat goal chain, and each mission teaches one system.

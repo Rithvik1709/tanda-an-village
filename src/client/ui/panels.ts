@@ -5,7 +5,7 @@ import { block } from "../../shared/blocks";
 import type { Action, Result } from "../../shared/rules";
 import type { Save } from "../../shared/save";
 import { askingPrice, forSale, offersFor, valuePlot } from "../../shared/land";
-import { BULL_NAMES, bullsMoodWord, bullsNow, CART_CAPACITY, TRIP_COST } from "../../shared/bulls";
+import { BULL_NAMES, bullsMoodWord, bullsNow, CART_CAPACITY, MIN_MOOD, TRIP_COST } from "../../shared/bulls";
 import { carried, CARRY, creditLimit, GODOWN_CAPACITY, GODOWN_RENT, isOverdue, LENDERS, type Lender, netWorth, owed, rentFor, stored, titleFor } from "../../shared/bank";
 import { DAY_MS } from "../../shared/time";
 import { current } from "../../shared/missions";
@@ -77,6 +77,11 @@ export class Panels {
     if (what === "rideHome") {
       this.close();
       return this.ctx.ride("home");
+    }
+    if (what === "feed") {
+      const res = this.ctx.act({ t: "feed" });
+      this.ctx.toast(res.ok ? (res.msg ?? "Fed") : res.error, res.ok ? "ok" : "bad");
+      return this.render();
     }
     if (what === "setOff") {
       const load: Record<string, number> = {};
@@ -423,8 +428,15 @@ export class Panels {
         <td class="acts"><input class="qty" data-load="${c}" type="number" min="0" max="${have}" value="${n}" ${have ? "" : "disabled"}></td></tr>`;
     }).join("");
     const any = CROP_IDS.some((c) => (s.inv[c] ?? 0) > 0);
-    return `${status}<table><thead><tr><th>Produce</th><th class="num">You have</th><th class="num">Village</th><th class="num">Town</th><th class="num">Load</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="big-acts"><button data-do="setOff" ${any ? "" : "disabled"}>Set off for the town mandi →</button></div>
+    // the bulls must be willing and rested: say why not, and let you feed them right here
+    const fodder = s.inv.fodder ?? 0;
+    const why = !b ? "" : b.mood < MIN_MOOD ? "Sarja and Raja are sulking and won't pull." : b.stamina < TRIP_COST ? "Sarja and Raja are too tired for the road." : "";
+    const fix = !why ? "" : fodder
+      ? `<button data-do="feed">🌾 Feed them kadba <small>you have ${fodder}</small></button>`
+      : `<span class="why">No kadba left — buy fodder at Sitabai's stall (₹5 a bundle), then feed them here or press F by them.</span>`;
+    const stuck = why ? `<div class="cart-stuck"><b>${why}</b> ${fodder ? "Each bundle of kadba cheers them up and gives +30 stamina." : ""}<div class="big-acts">${fix}</div></div>` : "";
+    return `${status}${stuck}<table><thead><tr><th>Produce</th><th class="num">You have</th><th class="num">Village</th><th class="num">Town</th><th class="num">Load</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="big-acts"><button data-do="setOff" ${any && !why ? "" : "disabled"}>${why ? "Feed them first to set off" : any ? "Set off for the town mandi →" : "Nothing to load yet"}</button></div>
       <p class="hint">The cart holds ${CART_CAPACITY}. The ride takes about half a minute along the road east.</p>`;
   }
 

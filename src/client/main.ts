@@ -1887,6 +1887,8 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
       return r;
     },
     inv: () => ({ ...game.save.inv }),
+    local: () => game.save, // the live local save, for tests that set up odd states
+
     // what a cheater could do in devtools: edit the local save. The server must undo it.
     tamperLocal: (item: string, n: number) => {
       game.save.inv[item] = n;
