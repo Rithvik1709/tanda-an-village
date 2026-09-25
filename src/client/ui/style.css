@@ -559,3 +559,12 @@ small.why.shortage { background: rgba(158,214,122,.18); color: var(--good); }
 .info.bump, .info .money.bump { animation: bump .35s ease-out; }
 .info .money { display: inline-block; }
 @media (prefers-reduced-motion: reduce) { .floater { transition: opacity .6s !important; } .bump { animation: none; } }
+.summary { z-index: 26; background: rgba(20,14,10,0.5); }
+.summary .panel-card { max-width: 520px; }
+.sum-rows { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.sum-rows li { display: flex; flex-direction: column; gap: 2px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.sum-rows li:last-child { border-bottom: 0; }
+.sum-rows b { font-size: 15.5px; }
+.sum-rows b.due { color: var(--bad); }
+.sum-rows span { font-size: 13px; color: var(--ink-2); }
+.summary .dlg-who { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }

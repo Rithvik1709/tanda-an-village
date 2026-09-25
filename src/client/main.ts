@@ -54,6 +54,8 @@ import { Kabaddi, RAIDS } from "./kabaddi";
 import { atTalavEdge, Fishing } from "./fishing";
 import { DAYTIME, Jobs } from "./jobs";
 import { GIVERS } from "../shared/jobs";
+import { awaySummary, daySummary } from "../shared/summary";
+import { SummaryCard } from "./ui/summary";
 
 type Hooks = {
   ready: boolean;
@@ -342,6 +344,8 @@ function showAccount(prompted = false) {
   releaseMouse();
 }
 hud.onAccountCard = () => showAccount();
+const summary = new SummaryCard(uiRoot);
+summary.onClose = () => resumePlay();
 const WINDOWS = () => [
   { open: () => !!panels.open, close: () => panels.close() },
   { open: () => map.open, close: () => map.close() },
@@ -350,6 +354,7 @@ const WINDOWS = () => [
   { open: () => guide.helpOpen, close: () => guide.toggleHelp(false) },
   { open: () => phoneMenu.open, close: () => phoneMenu.close() },
   { open: () => accountCard.open, close: () => accountCard.close() },
+  { open: () => summary.open, close: () => summary.close() },
 ];
 function closeWindows() {
   switching = true;
@@ -1169,6 +1174,7 @@ let sleeping = false;
 /** Go home: the door swings open, you step in, the screen fades to night and back to dawn. */
 async function goHomeToSleep() {
   if (sleeping) return;
+  const dayBefore = clock(game.now()).day;
   const r = game.act({ t: "sleep" });
   if (!r.ok) return hud.toast(r.error, "bad");
   sleeping = true;
@@ -1184,9 +1190,14 @@ async function goHomeToSleep() {
   await net.flush();
   await new Promise((res) => setTimeout(res, 900));
   hud.fade(false, "");
-  hud.toast("Good morning, Ukhali! The bulls are rested and the crops grew overnight.");
   audio.play("chirp");
   sleeping = false;
+  // the morning card: how yesterday went, and what today holds
+  const c = clock(game.now());
+  closeWindows();
+  summary.morning(`Day ${c.dayOfSeason + 1} of ${SEASON_NAMES[c.season].split(" · ")[0]}`, daySummary(game.save, dayBefore), awaySummary(world, game.save, game.now()));
+  hud.setPlaying(true);
+  releaseMouse();
 }
 /** Can you still sleep tonight? (once a night, after 7:30 pm) */
 const canSleep = () => isNight(nowHour()) && game.save.sleptDay !== clock(game.now() + untilMorning(clock(game.now()).hour)).day;
@@ -1432,6 +1443,17 @@ renderer.setAnimationLoop(() => {
     BULB_LIGHTS.forEach((l) => (l.intensity = nightK * 9));
     const elec = current(game.save)?.id === "election";
     guide.nearChoice = elec ? schoolHere() && (game.save.missions.c["visit:gramsabha"] ?? 0) > (game.save.missions.base["visit:gramsabha"] ?? 0) : Math.hypot(body.pos.x - 99.5, body.pos.z - 124) < 5;
+    // back after a while (20 real minutes, two game days): what's waiting — once, when play begins
+    if (!awayShown && booted_ && mode === "play" && !titleScreen.open && !windowOpen() && !farmyard.ride) {
+      awayShown = true;
+      const gone = game.now() - awaySince;
+      if (awaySince && gone > 20 * 60 * 1000 && (game.save.stats.planted > 0 || game.save.missions.i > 0)) {
+        const h = gone / 3600e3;
+        summary.away(h < 1 ? `${Math.round(h * 60)} minutes` : h < 48 ? `${Math.round(h)} hour${Math.round(h) === 1 ? "" : "s"}` : `${Math.round(h / 24)} days`, awaySummary(world, game.save, game.now()));
+        hud.setPlaying(true);
+        releaseMouse();
+      }
+    }
     // the first mission is done: offer to save the farm to an account (once a session, if it's due)
     if (!signInOffered && net.authEnabled && !net.account && mode === "play" && !titleScreen.open && !windowOpen() && !farmyard.ride && AccountCard.due(game.save.missions.i)) {
       signInOffered = true;
@@ -1653,6 +1675,7 @@ function debugText(dt: number) {
 /** Sign in and load the farm, retrying until the village server answers. */
 /** A message to show once the game is up (e.g. "Signed in"). */
 let signInOffered = false;
+let awayShown = false, awaySince = 0; // when the save was last touched, as it came from the server
 let bootToast: { msg: string; kind: "ok" | "bad" } | null = null;
 async function bootNet() {
   for (let attempt = 0; ; attempt++) {
@@ -1704,6 +1727,7 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
   bootStep(0.74, "Building the houses…");
   hud.setBanner("");
   game.save = boot.save;
+  awaySince = boot.save.updatedAt;
   booted_ = true;
   game.skew = boot.serverNow - Date.now();
   net.attach(game);
@@ -1817,6 +1841,10 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
       return n;
     },
     home: () => ({ door: { ...nights.home.door }, fire: { ...nights.fire } }),
+    showAway: (ms: number) => {
+      awaySince = game.now() - ms;
+      awayShown = false;
+    },
     clockNow: () => ({ hour: clock(game.now()).hour, day: clock(game.now()).day }),
     noFog: () => {
       settings.renderDistance = 2000;
