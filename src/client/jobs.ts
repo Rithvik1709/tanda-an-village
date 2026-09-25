@@ -8,6 +8,7 @@ import { clock } from "../shared/time";
 import type { World } from "../shared/world";
 import { Npc, type NpcLook } from "./engine/npc";
 import { mergeParts } from "./engine/merge";
+import { giverName, jobLineT, jobWhat, t } from "./i18n";
 import { Q } from "./quality";
 import type { Nav } from "./player/nav";
 
@@ -156,17 +157,17 @@ export class Jobs {
   /** The E hint near a neighbour or the goat. */
   hint(p: P, hour: number): string {
     if (!DAYTIME(hour)) return "";
-    if (this.nearGoat(p)) return "<kbd>E</kbd> Call Chinki — she'll follow you";
+    if (this.nearGoat(p)) return `<kbd>E</kbd> ${t("Call Chinki — she'll follow you")}`;
     const id = this.nearGiver(p);
     if (!id) return "";
     const w = this.wants(id);
-    const who = GIVERS[id].name;
-    if (!w.length) return `<kbd>E</kbd> Talk to ${who}`;
+    const who = giverName(id);
+    if (!w.length) return `<kbd>E</kbd> ${t("Talk to {who}", { who })}`;
     const j = w.find((x) => this.ready(x, id)) ?? w[0]; // what you can hand over comes first
-    if (j.kind === "parcel" && j.to === id) return `<kbd>E</kbd> Give ${who} his tiffin ✓`;
-    if (j.kind === "goat" && this.goatFollowing) return `<kbd>E</kbd> Bring Chinki home to ${who} ✓`;
-    if (this.ready(j, id)) return `<kbd>E</kbd> Give ${who} ${jobLine(j).split(": ")[1].replace(/ from the talav| \(12 pours\)/, "")} ✓`;
-    return `<kbd>E</kbd> ${who} needs a hand <small class="hours">· ${jobLine(j).split(": ")[1]}</small>`;
+    if (j.kind === "parcel" && j.to === id) return `<kbd>E</kbd> ${t("Give {who} his tiffin ✓", { who })}`;
+    if (j.kind === "goat" && this.goatFollowing) return `<kbd>E</kbd> ${t("Bring Chinki home to {who} ✓", { who })}`;
+    if (this.ready(j, id)) return `<kbd>E</kbd> ${t("Give {who} {what} ✓", { who, what: jobWhat(j).replace(/ from the talav| \(12 pours\)/, "") })}`;
+    return `<kbd>E</kbd> ${t("{who} needs a hand", { who })} <small class="hours">· ${jobWhat(j)}</small>`;
   }
 
   /** E: talk to whoever is here. Returns false if nobody is. */
@@ -293,9 +294,9 @@ export class Jobs {
 
   private renderList(jobs: Job[], done: number[], day: boolean) {
     const left = jobs.filter((j) => !done.includes(j.slot)).length;
-    const html = `<div class="kaam-head">📋 Kaam today <span>${left ? `${left} of ${jobs.length} open` : "all done!"}</span><b class="fold" aria-hidden="true"></b></div>
-      <ul>${jobs.map((j) => `<li class="${done.includes(j.slot) ? "done" : ""}"><i>${done.includes(j.slot) ? "✓" : ""}</i><span>${jobLine(j)}</span><em>₹${j.pay}</em></li>`).join("")}</ul>
-      <small>${day ? "Look for the <b>!</b> over their heads · new jobs every day" : "Everyone's gone in for the night — new jobs in the morning"}</small>`;
+    const html = `<div class="kaam-head">${t("📋 Kaam today")} <span>${left ? t("{a} of {b} open", { a: left, b: jobs.length }) : t("all done!")}</span><b class="fold" aria-hidden="true"></b></div>
+      <ul>${jobs.map((j) => `<li class="${done.includes(j.slot) ? "done" : ""}"><i>${done.includes(j.slot) ? "✓" : ""}</i><span>${jobLineT(j)}</span><em>₹${j.pay}</em></li>`).join("")}</ul>
+      <small>${t(day ? "Look for the <b>!</b> over their heads · new jobs every day" : "Everyone's gone in for the night — new jobs in the morning")}</small>`;
     if (html !== this.listHtml) this.el.innerHTML = this.listHtml = html;
   }
 

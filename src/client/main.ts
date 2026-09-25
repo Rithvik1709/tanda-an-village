@@ -56,6 +56,8 @@ import { DAYTIME, Jobs } from "./jobs";
 import { GIVERS } from "../shared/jobs";
 import { awaySummary, daySummary } from "../shared/summary";
 import { SummaryCard } from "./ui/summary";
+import { cropName, isEnglish, t as tr } from "./i18n";
+import { SHOP_HOURS } from "../shared/hours";
 
 type Hooks = {
   ready: boolean;
@@ -609,12 +611,12 @@ function pastimeHint(): string {
   const h = nowHour();
   const job = jobs.hint(body.pos, h);
   if (job) return job;
-  if (nearDagdu() && DAYTIME(h)) return "<kbd>E</kbd> Talk to Dagdu mama, the old fisherman";
+  if (nearDagdu() && DAYTIME(h)) return `<kbd>E</kbd> ${tr("Talk to Dagdu mama, the old fisherman")}`;
   if (atTalavEdge(body.pos.x, body.pos.z) && !body.inWater) {
-    if (!game.save.inv.rod) return "🎣 Fish here with a gal (rod) — Sitabai sells one";
-    return fishing.castsLeft() > 0 ? `<kbd>E</kbd> Cast your line into the talav <small class="hours">· ${fishing.castsLeft()} casts left today</small>` : "🎣 The fish have stopped biting today — come back tomorrow";
+    if (!game.save.inv.rod) return tr("🎣 Fish here with a gal (rod) — Sitabai sells one");
+    return fishing.castsLeft() > 0 ? `<kbd>E</kbd> ${tr("Cast your line into the talav")} <small class="hours">${tr(" · {n} casts left today", { n: fishing.castsLeft() })}</small>` : tr("🎣 The fish have stopped biting today — come back tomorrow");
   }
-  if (onMaidan()) return Kabaddi.canPlay(h) ? `<kbd>E</kbd> Play kabaddi with the boys <small class="hours">· ${RAIDS} raids each · ₹101 for the day's first win</small>` : "The boys play kabaddi here by day, 8 am to 7 pm";
+  if (onMaidan()) return Kabaddi.canPlay(h) ? `<kbd>E</kbd> ${tr("Play kabaddi with the boys")} <small class="hours">${tr(" · {r} raids each · ₹101 for the day's first win", { r: RAIDS })}</small>` : tr("The boys play kabaddi here by day, 8 am to 7 pm");
   return "";
 }
 /** E among the pastimes: true if it did something. */
@@ -745,26 +747,33 @@ function feedBulls() {
   const r = game.act({ t: "feed" });
   hud.toast(r.ok ? (r.msg ?? "Fed") : r.error, r.ok ? "ok" : "bad");
 }
+/** "Sitabai's shop is closed · opens at 8 am (open 8 am – 8 pm)", in the chosen language. */
+function closedMsg(kind: string) {
+  const h = SHOP_HOURS[kind];
+  if (!h || isEnglish) return closedText(kind);
+  const open = hoursText(kind).split(" – ")[0];
+  return tr("{name} is closed · opens at {open} (open {hours})", { name: tr(h.name), open, hours: hoursText(kind) });
+}
 function cartHint(): string {
   if (nearCart()) {
-    if (game.save.trip) return cartInTown() ? "<kbd>R</kbd> Sell the load at the mandi" : "<kbd>R</kbd> Continue to the town mandi";
-    return cartInTown() ? "<kbd>R</kbd> Ride home" : "<kbd>R</kbd> Load the cart for the town mandi";
+    if (game.save.trip) return `<kbd>R</kbd> ${tr(cartInTown() ? "Sell the load at the mandi" : "Continue to the town mandi")}`;
+    return `<kbd>R</kbd> ${tr(cartInTown() ? "Ride home" : "Load the cart for the town mandi")}`;
   }
-  if (polaHere()) return "<kbd>E</kbd> Lead Sarja & Raja in the Pola procession";
-  if (isNight(nowHour()) && nearHome()) return "<kbd>E</kbd> Go home and sleep till morning";
-  if (Nights.evening(nowHour()) && nearFire()) return "<kbd>E</kbd> Sit with your friends by the fire";
+  if (polaHere()) return `<kbd>E</kbd> ${tr("Lead Sarja & Raja in the Pola procession")}`;
+  if (isNight(nowHour()) && nearHome()) return `<kbd>E</kbd> ${tr("Go home and sleep till morning")}`;
+  if (Nights.evening(nowHour()) && nearFire()) return `<kbd>E</kbd> ${tr("Sit with your friends by the fire")}`;
   if (schoolHere()) {
     const ms = game.save.missions;
     const sabha = (ms.c["visit:gramsabha"] ?? 0) > (ms.base["visit:gramsabha"] ?? 0);
-    return !sabha ? "<kbd>E</kbd> Join the gram sabha" : !ms.choice ? "Decide whom you back…" : "<kbd>E</kbd> Vote at the polling booth";
+    return !sabha ? `<kbd>E</kbd> ${tr("Join the gram sabha")}` : !ms.choice ? tr("Decide whom you back…") : `<kbd>E</kbd> ${tr("Vote at the polling booth")}`;
   }
   const pastime = pastimeHint();
   if (pastime) return pastime;
-  if (game.save.bulls && !game.save.bulls.tied && nearYard()) return `<kbd>G</kbd> Tie Sarja & Raja ${game.save.inv.gotha ? "in their gotha" : "at the khunta"}`;
-  if (game.save.bulls?.tied && nearYard()) return `<kbd>G</kbd> Untie Sarja & Raja`;
-  if (game.save.bulls && game.save.inv.plough && game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)])) return "<kbd>P</kbd> Let Sarja & Raja plough this field";
-  if (nearBulls() && game.save.inv.gerua && current(game.save)?.id === "pola" && !game.save.missions.flags.decorated) return "<kbd>F</kbd> Paint Sarja & Raja's horns with gerua";
-  if (nearBulls()) return `<kbd>F</kbd> Feed Sarja & Raja (${game.save.inv.fodder ?? 0} kadba)`;
+  if (game.save.bulls && !game.save.bulls.tied && nearYard()) return `<kbd>G</kbd> ${tr(game.save.inv.gotha ? "Tie Sarja & Raja in their gotha" : "Tie Sarja & Raja at the khunta")}`;
+  if (game.save.bulls?.tied && nearYard()) return `<kbd>G</kbd> ${tr("Untie Sarja & Raja")}`;
+  if (game.save.bulls && game.save.inv.plough && game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)])) return `<kbd>P</kbd> ${tr("Let Sarja & Raja plough this field")}`;
+  if (nearBulls() && game.save.inv.gerua && current(game.save)?.id === "pola" && !game.save.missions.flags.decorated) return `<kbd>F</kbd> ${tr("Paint Sarja & Raja's horns with gerua")}`;
+  if (nearBulls()) return `<kbd>F</kbd> ${tr("Feed Sarja & Raja ({n} kadba)", { n: game.save.inv.fodder ?? 0 })}`;
   return "";
 }
 function bullsChip(): string {
@@ -934,6 +943,8 @@ function smartFor(t: Hit | null): Smart | null {
   return null;
 }
 let smartHold: Smart["hold"] | null = null;
+/** What the smart action is called, in the chosen language. */
+const smartLabel = (s: Smart) => (s.t === "plant" ? (isEnglish ? s.label : tr("Sow {crop}", { crop: cropName(s.crop!) })) : tr(s.label));
 const soilQ = (t: Hit) => soilQuality(world, t.x, t.z, get(t.x, t.y, t.z));
 function useSmart(): Outcome {
   const s = smartFor(target);
@@ -1017,28 +1028,28 @@ function tipFor(t: Hit | null): string {
   const cur = hotbar.current;
   if (cur.kind === "hand") {
     const s = smartFor(t);
-    if (s) return `Right-click: ${s.label.toLowerCase()}${s.t === "till" || s.t === "plant" ? ` · soil ${Math.round(((soil?.q ?? soilQ(t)) * 100))}%` : ""}`;
+    if (s) return tr("Right-click: {a}", { a: isEnglish ? smartLabel(s).toLowerCase() : smartLabel(s) }) + (s.t === "till" || s.t === "plant" ? tr(" · soil {n}%", { n: Math.round((soil?.q ?? soilQ(t)) * 100) }) : "");
   }
   if (!soil) {
-    if (cur.kind === "tool" && cur.tool === "can" && nearWater(t)) return "Right-click: fill the can";
+    if (cur.kind === "tool" && cur.tool === "can" && nearWater(t)) return tr("Right-click: {a}", { a: tr("fill the can") });
     const plotId = world.plotMap[t.x + W * t.z];
-    if (plotId < 0 || t.ny !== 1) return nearWater(t) && !(cur.kind === "tool" && cur.tool === "can") ? "Water here — press 3 for the can" : "";
-    if (!game.save.plots.includes(plotId)) return `✋ ${world.plots[plotId].name} is a neighbour's field`;
+    if (plotId < 0 || t.ny !== 1) return nearWater(t) && !(cur.kind === "tool" && cur.tool === "can") ? tr("Water here — press 3 for the can") : "";
+    if (!game.save.plots.includes(plotId)) return tr("✋ {plot} is a neighbour's field", { plot: world.plots[plotId].name });
     if (!block(id).farmable) return "";
-    return cur.kind === "tool" && cur.tool === "hoe" ? "Right-click: plough this soil" : "Press 2 for the hoe to plough here";
+    return cur.kind === "tool" && cur.tool === "hoe" ? tr("Right-click: {a}", { a: tr("plough this soil") }) : tr("Press 2 for the hoe to plough here");
   }
   const now = game.now();
   const wet = soil.wetUntil > now ? "watered" : "dry";
   if (!soil.plant) {
-    if (cur.kind === "seed") return `Right-click: sow ${CROPS[cur.crop].name.toLowerCase()} · soil ${Math.round(soil.q * 100)}%`;
-    return `Ploughed soil · no seeds left — Sitabai sells more`;
+    if (cur.kind === "seed") return tr("Right-click: {a}", { a: isEnglish ? `sow ${CROPS[cur.crop].name.toLowerCase()}` : tr("Sow {crop}", { crop: cropName(cur.crop) }) }) + tr(" · soil {n}%", { n: Math.round(soil.q * 100) });
+    return tr("Ploughed soil · no seeds left — Sitabai sells more");
   }
   const p = advance(soil.plant, soil.wetUntil, now);
-  const c = CROPS[p.crop];
-  if (p.progress >= 1) return `${c.name} is ripe · left-click to harvest`;
-  if (wet === "dry" && ((cur.kind === "tool" && cur.tool === "can") || cur.kind === "hand")) return `${c.name} · ${Math.floor(p.progress * 100)}% · ${game.save.inv.water ? "right-click to water" : "the can is empty — fill it at a well"}`;
+  const name = cropName(p.crop) || CROPS[p.crop].name, pc = Math.floor(p.progress * 100);
+  if (p.progress >= 1) return tr("{crop} is ripe · left-click to harvest", { crop: name });
+  if (wet === "dry" && ((cur.kind === "tool" && cur.tool === "can") || cur.kind === "hand")) return tr(game.save.inv.water ? "{crop} · {p}% · right-click to water" : "{crop} · {p}% · the can is empty — fill it at a well", { crop: name, p: pc });
   const mins = Math.ceil(msToRipe(p) / 60000);
-  return `${c.name} · ${Math.floor(p.progress * 100)}% grown · ${wet === "dry" ? "dry — water it (press 3)" : "watered"} · ripe in ~${mins} min`;
+  return tr("{crop} · {p}% grown · {state} · ripe in ~{m} min", { crop: name, p: pc, state: tr(wet === "dry" ? "dry — water it (press 3)" : "watered"), m: mins });
 }
 
 function refreshStatus() {
@@ -1053,9 +1064,9 @@ function refreshStatus() {
   if (booted_) lastTitle = s.bestTitle;
   // one compact cluster: who you are, money, reputation, the time on a little sun-dial, the season's day;
   // "saved" only speaks up while saving or when the server can't be reached
-  const sync = net.status === "saved" ? "" : `<span class="sync ${net.status}">${net.status === "saving" ? "saving…" : "offline — retrying"}</span>`;
+  const sync = net.status === "saved" ? "" : `<span class="sync ${net.status}">${tr(net.status === "saving" ? "saving…" : "offline — retrying")}</span>`;
   const h = hourOverride ?? c.hour;
-  hud.setInfo(`${s.perks.includes("sarpanch") ? `<span class="title">Sarpanch</span>` : ""}<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${title.name}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${s.rep ? `<span class="rep" title="Reputation with the tanda: better prices from Ganpat">★ ${s.rep}</span>` : ""}${overdue ? `<span class="debt">loan overdue!</span>` : ""}${sync}${TOUCH && carriedNow(s) ? `<span class="basket" title="What you're carrying">🧺 ${carriedNow(s)}</span>` : ""}<span class="clock" title="${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}">${sunDial(h)}${fmtHour(h)}</span><span class="season">${SEASON_NAMES[c.season].split(" · ")[0]} · ${c.dayOfSeason + 1}/${SEASON_DAYS}</span>`);
+  hud.setInfo(`${s.perks.includes("sarpanch") ? `<span class="title">${tr("Sarpanch")}</span>` : ""}<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${tr(title.name)}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${s.rep ? `<span class="rep" title="Reputation with the tanda: better prices from Ganpat">★ ${s.rep}</span>` : ""}${overdue ? `<span class="debt">${tr("loan overdue!")}</span>` : ""}${sync}${TOUCH && carriedNow(s) ? `<span class="basket" title="What you're carrying">🧺 ${carriedNow(s)}</span>` : ""}<span class="clock" title="${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}">${sunDial(h)}${fmtHour(h)}</span><span class="season">${tr(SEASON_NAMES[c.season].split(" · ")[0])} · ${c.dayOfSeason + 1}/${SEASON_DAYS}</span>`);
 }
 /** Produce and fish in hand (phones show this in the info chip; the counts chip is too wide for them). */
 const carriedNow = (s: typeof game.save) => Object.entries(s.inv).reduce((a, [k, n]) => a + (CROPS[k as keyof typeof CROPS] || k.startsWith("fish:") ? n : 0), 0);
@@ -1442,7 +1453,7 @@ renderer.setAnimationLoop(() => {
     refreshSigns();
     if (mode === "play") checkPlotEntry();
     const st = mode === "play" && !panels.open && !farmyard.ride ? nearStall() : undefined;
-    hud.setHint(farmyard.ride || windowOpen() || ploughJob ? "" : st ? (isOpen(st.kind, nowHour()) ? `<kbd>E</kbd> ${st.label}${hoursText(st.kind) ? ` <small class="hours">· open till ${hoursText(st.kind).split(" – ")[1]}</small>` : ""}` : `🔒 ${closedText(st.kind)}`) : cartHint() || (mode === "play" && canSleep() ? "<kbd>Z</kbd> Sleep till morning (you walk home)" : nightK > 0.6 && !torchOn && mode === "play" ? "<kbd>T</kbd> Switch on your torch" : ""));
+    hud.setHint(farmyard.ride || windowOpen() || ploughJob ? "" : st ? (isOpen(st.kind, nowHour()) ? `<kbd>E</kbd> ${tr(st.label)}${hoursText(st.kind) ? ` <small class="hours">· ${tr("open till {h}", { h: hoursText(st.kind).split(" – ")[1] })}</small>` : ""}` : `🔒 ${closedMsg(st.kind)}`) : cartHint() || (mode === "play" && canSleep() ? `<kbd>Z</kbd> ${tr("Sleep till morning (you walk home)")}` : nightK > 0.6 && !torchOn && mode === "play" ? `<kbd>T</kbd> ${tr("Switch on your torch")}` : ""));
     hud.setBulls(bullsChip());
     // the watchdog: nothing may leave the player stuck — no pause panel on a phone, controls back when windows close
     if (TOUCH) {
@@ -1531,7 +1542,8 @@ renderer.setAnimationLoop(() => {
   }
   if (touch) {
     touch.visible = mode === "play" && !titleScreen.open && !windowOpen() && !farmyard.ride;
-    touch.setUse(kabaddi.active ? "Tag" : hotbar.current.kind === "hand" ? (smartFor(target)?.label ?? "Use") : "Use");
+    const sm = hotbar.current.kind === "hand" ? smartFor(target) : null;
+    touch.setUse(kabaddi.active ? tr("Tag") : sm ? smartLabel(sm) : tr("Use"));
     touch.setTag(null);
   }
   farmer.root.position.set(body.pos.x, body.pos.y, body.pos.z);

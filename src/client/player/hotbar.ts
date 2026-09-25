@@ -1,5 +1,6 @@
 import { block } from "../../shared/blocks";
 import { CROPS, type CropId } from "../../shared/crops";
+import { cropName, t } from "../i18n";
 
 /** What a hotbar slot holds. */
 export type Slot =
@@ -18,7 +19,7 @@ export const DEFAULT_HOTBAR: Slot[] = [
 ];
 
 export const slotName = (s: Slot) =>
-  s.kind === "hand" ? "Hand · does what the soil needs" : s.kind === "tool" ? (s.tool === "hoe" ? "Hoe" : "Watering can") : s.kind === "seed" ? `${CROPS[s.crop].name} seeds` : block(s.block).name;
+  s.kind === "hand" ? t("Hand · does what the soil needs") : s.kind === "tool" ? t(s.tool === "hoe" ? "Hoe" : "Watering can") : s.kind === "seed" ? t("{crop} seeds", { crop: cropName(s.crop) || CROPS[s.crop].name }) : block(s.block).name;
 
 export class Hotbar {
   selected = 0;

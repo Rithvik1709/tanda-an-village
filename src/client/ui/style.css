@@ -611,3 +611,12 @@ small.why.shortage { background: rgba(158,214,122,.18); color: var(--good); }
 .settings .seg span { flex: 1; text-align: center; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); cursor: pointer; }
 .settings .seg input:checked + span { background: var(--rust); color: #fff; border-color: var(--rust); }
 .settings .seg input:focus-visible + span { outline: 2px solid var(--gold); }
+/* Marathi and Hindi: a Devanagari face, set a little larger so the matras read */
+:root[lang="mr"] body, :root[lang="hi"] body { font-family: "Noto Sans Devanagari", "Kohinoor Devanagari", "Mangal", system-ui, sans-serif; }
+:root[lang="mr"] .tip, :root[lang="hi"] .tip, :root[lang="mr"] .interact, :root[lang="hi"] .interact { font-size: 15px; }
+:root[lang="mr"] .kaam, :root[lang="hi"] .kaam, :root[lang="mr"] .help-grid, :root[lang="hi"] .help-grid { font-size: 14px; line-height: 1.55; }
+:root[lang="mr"] .info, :root[lang="hi"] .info { font-size: 15px; }
+:root[lang="mr"] .kaam-head, :root[lang="hi"] .kaam-head { text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.title-langs { display: flex; gap: 6px; margin-top: 10px; }
+.title-langs button { font: 600 13px "Noto Sans Devanagari", system-ui, sans-serif; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(20,12,4,0.35); color: var(--ink); cursor: pointer; pointer-events: auto; }
+.title-langs button.on { background: var(--gold); color: #2a1a08; border-color: var(--gold); }

@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { Controls } from "./controls";
 
 /*
@@ -34,12 +35,12 @@ export class TouchControls {
       <div class="t-look"></div>
       <div class="t-move"></div>
       <div class="t-stick"><div class="t-knob"></div></div>
-      <div class="t-pad"><div class="t-pad-knob"></div><span>look</span></div>
+      <div class="t-pad"><div class="t-pad-knob"></div><span>${t("look")}</span></div>
       <button data-a="use" class="t-act t-use">Use</button>
       <button data-a="harvest" class="t-act t-harvest">Harvest</button>
-      <button data-a="jump" class="t-act t-jump">Jump</button>
+      <button data-a="jump" class="t-act t-jump">${t("Jump")}</button>
       <div class="t-top">
-        <button data-a="map" class="t-map">Map</button>
+        <button data-a="map" class="t-map">${t("Map")}</button>
         <button data-a="menu" class="t-menu">☰</button>
       </div>`;
     parent.appendChild(this.el);

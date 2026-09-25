@@ -1,5 +1,6 @@
 import { CROP_IDS, CROPS } from "../../shared/crops";
 import { FISH_IDS } from "../../shared/fish";
+import { cropName, t } from "../i18n";
 import { type Hotbar, type Slot, slotName } from "../player/hotbar";
 
 /** The in-game HTML overlay: crosshair, hotbar, info chips, toasts, tooltip, F3 panel, play prompt. */
@@ -34,7 +35,7 @@ export class Hud {
     this.debug = el("pre", "debug", this.root);
     this.debug.hidden = true;
     this.prompt = el("div", "play-prompt", this.root);
-    this.prompt.innerHTML = `<b>Click to play</b><span>Paused · <b>H</b> shows all the controls</span>`;
+    this.prompt.innerHTML = `<b>${t("Click to play")}</b><span>${t("Paused · <b>H</b> shows all the controls")}</span>`;
     this.account = el("div", "account", this.prompt);
     this.banner = el("div", "banner", this.root);
     this.hint = el("div", "interact", this.root);
@@ -72,7 +73,7 @@ export class Hud {
     });
     // what you carry, only when you carry something (and only the kinds you have)
     const fish = FISH_IDS.reduce((a, f) => a + (inv[`fish:${f}`] ?? 0), 0);
-    const html = CROP_IDS.filter((id) => inv[id] > 0).map((id) => `<span><b>${inv[id]}</b> ${CROPS[id].name}</span>`).join("") + (fish ? `<span><b>${fish}</b> fish</span>` : "");
+    const html = CROP_IDS.filter((id) => inv[id] > 0).map((id) => `<span><b>${inv[id]}</b> ${cropName(id) || CROPS[id].name}</span>`).join("") + (fish ? `<span><b>${fish}</b> ${t("fish")}</span>` : "");
     if (this.goods.innerHTML !== html) this.goods.innerHTML = html;
     this.goods.hidden = !html;
   }
@@ -166,7 +167,7 @@ export class Hud {
       });
       return e;
     })();
-    this.logEl.innerHTML = `<div class="panel-card"><button class="x" data-close>✕</button><h2>Recent messages</h2>
+    this.logEl.innerHTML = `<div class="panel-card"><button class="x" data-close>✕</button><h2>${t("Recent messages")}</h2>
       ${this.log.length ? `<ul class="log-list">${[...this.log].reverse().map((l) => `<li class="${l.kind}"><time>${l.at}</time><span>${escapeHtml(l.msg)}${l.n > 1 ? ` <em>×${l.n}</em>` : ""}</span></li>`).join("")}</ul>` : `<p class="empty">Nothing yet. Messages from the village show up here.</p>`}</div>`;
     this.logEl.hidden = false;
     this.unread = 0;
@@ -180,7 +181,7 @@ export class Hud {
   private paintBell() {
     if (!this.bell) {
       this.bell = el("button", "log-bell", this.root);
-      this.bell.title = "Recent messages";
+      this.bell.title = t("Recent messages");
       this.bell.addEventListener("click", () => this.showLog());
     }
     this.bell.innerHTML = `🔔${this.unread ? `<b>${Math.min(99, this.unread)}</b>` : ""}`;
