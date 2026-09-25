@@ -105,9 +105,14 @@ export class TouchControls {
       b.addEventListener("touchstart", (e) => {
         e.preventDefault();
         b.classList.add("down");
+        if (a === "use") c.useHeld = true;
         ({ use: c.onPlace, harvest: c.onDig, talk: c.onInteract, map: c.onMap, view: c.onView, torch: c.onTorch, cart: c.onRide, feed: c.onFeed, board: c.onBoard, help: c.onHelp, menu: this.onMenu, plough: c.onPloughField, tie: c.onTie } as Record<string, () => void>)[a]?.call(c);
       }, { passive: false });
-      b.addEventListener("touchend", () => b.classList.remove("down"));
+      b.addEventListener("touchend", () => {
+        b.classList.remove("down");
+        if (a === "use") c.useHeld = false;
+      });
+      b.addEventListener("touchcancel", () => a === "use" && (c.useHeld = false));
     });
   }
 

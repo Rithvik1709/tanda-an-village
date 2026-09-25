@@ -32,6 +32,7 @@ export const forDevice = (t: string) =>
         .replace(/press 4, 5 or 6 for seeds/g, "pick a seed bag below")
         .replace(/Pick the hoe \(2\)/g, "Pick the hoe below").replace(/Pick the onion seeds \(5\)/g, "Pick the onion seeds below").replace(/Pick the can \(3\)/g, "Pick the can below")
         .replace(/look at (the |ploughed )?soil and right-click/g, "look at $1soil and tap Use")
+        .replace(/Hold it and walk/g, "Hold Use and walk").replace(/or hold it and walk/g, "or hold Use and walk")
         .replace(/, then press E\./g, ", then tap the button that appears.").replace(/Press E and open/g, "Tap the button and open")
         .replace(/or press M for the map/g, "or tap Map")
         .replace(/ ?<kbd>\d<\/kbd>(–<kbd>\d<\/kbd>)?/g, "")

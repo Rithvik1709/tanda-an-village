@@ -854,8 +854,18 @@ function updateDrops(dt: number) {
   }
 }
 
+/** While the use button is held and you sweep along a row: failures stay quiet, bar one "the can is empty". */
+let repeating = false;
+let repeatWarned = false;
 function report(r: Outcome, sfx: string): Outcome {
   if (!r) return r;
+  if (!r.ok && repeating) {
+    if (!repeatWarned && /empty|No .* seeds|full/.test(r.error)) {
+      repeatWarned = true;
+      hud.toast(r.error, "bad");
+    }
+    return r;
+  }
   if (r.ok) {
     sfxQueue.push(sfx);
     perform(sfx);
@@ -1402,6 +1412,23 @@ renderer.setAnimationLoop(() => {
     updatePloughJob(now);
     syncFields();
   }
+  // hold to work a row: every new tile you aim at gets the same kind of use, about 8 a second
+  if (controls.useHeld && mode === "play" && !windowOpen() && !kabaddi.active && !fishing.active && !farmyard.ride && target) {
+    const k = `${target.x},${target.y},${target.z}`;
+    if (k !== lastWorked && now - lastWorkedAt > 120) {
+      if (lastWorked) {
+        repeating = true;
+        const cur = hotbar.current;
+        if (cur.kind !== "block") useRight(); // (never build by holding)
+        repeating = false;
+      }
+      lastWorked = k;
+      lastWorkedAt = now;
+    }
+  } else if (!controls.useHeld) {
+    lastWorked = "";
+    repeatWarned = false;
+  }
   // what's in your hand shows in your hand, and using it shows too
   const cur = hotbar.current;
   if (now > actionUntil) smartHold = null;
@@ -1525,6 +1552,7 @@ function celebrate() {
   audio.play("bells");
 }
 let lastTick = 0;
+let lastWorked = "", lastWorkedAt = 0;
 const prof = { villagers: 0, frame: 0, render: 0 };
 let frameNo = 0;
 /*
@@ -1821,6 +1849,10 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     interact: () => controls.onInteract(),
     // for filming on a virtual clock: hold a key until told otherwise, and turn the view
     setHeld: (code: string, on: boolean) => (on ? controls.held.add(code) : controls.held.delete(code)),
+    useHold: (on: boolean) => {
+      if (on) controls.onPlace();
+      controls.useHeld = on;
+    },
     look: (yaw: number, pitch = controls.pitch) => {
       controls.yaw = yaw;
       controls.pitch = pitch;

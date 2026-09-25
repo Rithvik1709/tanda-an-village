@@ -61,7 +61,7 @@ export const MISSIONS: Mission[] = [
     objectives: [
       { id: "talk", text: "Talk to Naik Dhavlu at his kacheri (press E near him)", need: 1, have: (s) => since(s, "talk:naik"), how: "Follow the golden marker to his door on the chowk, then press E." },
       { id: "visit", text: "Walk to your field, Aamrai", need: 1, have: (s) => since(s, "visit:aamrai"), how: "It's just north-west of the chowk. Follow the marker, or press M for the map." },
-      { id: "till", text: "Plough 6 patches of Aamrai's soil", need: 6, have: (s, c) => cellsIn(s, c.world, starter(c.world).id).length, how: "Look at the soil and right-click: your hand picks up the hoe." },
+      { id: "till", text: "Plough 6 patches of Aamrai's soil", need: 6, have: (s, c) => cellsIn(s, c.world, starter(c.world).id).length, how: "Look at the soil and right-click: your hand picks up the hoe. Hold it and walk to plough a whole row." },
     ],
     reward: { money: 500, items: { "seed:onion": 10 }, text: "₹500 and 10 onion seeds" },
   },
@@ -71,7 +71,7 @@ export const MISSIONS: Mission[] = [
     done: "Not bad for a city kid! Here — my old sickle. It'll bring in more from every plant.",
     objectives: [
       // (sowing and watering were added later: a farmer who has already harvested counts them done)
-      { id: "sow", text: "Sow 6 onions in your ploughed soil", need: 6, have: (s) => (harvested6(s) ? 6 : since(s, "plant:onion")), how: "Look at ploughed soil and right-click to sow onions." },
+      { id: "sow", text: "Sow 6 onions in your ploughed soil", need: 6, have: (s) => (harvested6(s) ? 6 : since(s, "plant:onion")), how: "Look at ploughed soil and right-click to sow onions — or hold it and walk along the row." },
       { id: "wet", text: "Water them", need: 6, have: (s) => (harvested6(s) ? 6 : since(s, "water")), how: "Fill your can at the well by the chowk (right-click the water), then right-click each sown patch." },
       { id: "harvest", text: "Harvest 6 onions", need: 6, have: (s) => Math.max(since(s, "harvestN:onion"), since(s, "harvest:onion")), how: "Watered onions ripen in 15–20 minutes; dry ones take twice as long. Left-click a ripe one." }, // (older saves only counted harvests, not onions)
       { id: "prices", text: "Check today's prices at Ganpat's stall (Prices tab)", need: 1, have: (s) => since(s, "visit:prices"), how: "Ganpat's stall is on the chowk. Press E and open the Prices tab." },
