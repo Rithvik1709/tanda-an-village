@@ -77,7 +77,7 @@ export type World = {
   chowk: { x0: number; z0: number; x1: number; z1: number; y: number };
   trees: Tree[];
   structures: Structure[];
-  landmarks: Record<"spawn" | "temple" | "hanuman" | "school" | "pir" | "tank" | "home" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat" | "kabaddi" | "talav", Landmark>;
+  landmarks: Record<"spawn" | "temple" | "hanuman" | "school" | "pir" | "tank" | "home" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat" | "kabaddi" | "talav" | "mukadam", Landmark>;
 };
 
 export const idx = (x: number, y: number, z: number) => x + W * (z + D * y);
@@ -583,6 +583,21 @@ export function generateWorld(seed = WORLD_SEED): World {
   })();
   plate(84.5, 77, height[col(84, 77)] + 1, Math.PI * 0.85, ["उखळी तांडा", "Ukhali Tanda · ता. जि. जालना"], "#7c2d12");
   void houses;
+  // Devidas Chavan the mukadam, who sends out labourers by the day: the brick house south of the
+  // chowk, its door facing east onto the open ground by the well, with a board beside the door
+  const mukadam = (() => {
+    const doorOf = (h: Extract<Structure, { kind: "house" }>) => {
+      const [sx, sz] = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] }[h.door];
+      return { x: h.x0 + h.w / 2 + sx * (h.w / 2 + 1), z: h.z0 + h.d / 2 + sz * (h.d / 2 + 1), facing: Math.atan2(sx, sz) };
+    };
+    const doors = structures.filter((s): s is Extract<Structure, { kind: "house" }> => s.kind === "house").map(doorOf);
+    const d = doors.sort((a, b) => Math.hypot(a.x - 102, a.z - 135.5) - Math.hypot(b.x - 102, b.z - 135.5))[0];
+    const y = height[col(Math.floor(d.x), Math.floor(d.z))] + 1;
+    // to the left of the door as you face it, a step out from the wall
+    const lx = Math.cos(d.facing), lz = -Math.sin(d.facing);
+    plate(d.x - lx * 2.1 - Math.sin(d.facing) * 0.7, d.z - lz * 2.1 - Math.cos(d.facing) * 0.7, y, d.facing, ["मुकादम · मजूर मिळतील", "Majoor · labourers by the day", "Devidas Chavan"], "#6b3a1f");
+    return { x: d.x, y, z: d.z, facing: d.facing };
+  })();
 
   /* ---------- 7. trees: neem everywhere, a few great banyans ---------- */
   const treeRng = mulberry32(seed ^ 0x7ee);
@@ -786,6 +801,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       ghat: { ...vihir, label: "Vihir (field well)" },
       kabaddi: lm(playground.kabaddi, "Kabaddi maidan"),
       talav: lm(playground.talav, "Talav (pond)"),
+      mukadam: lm({ x: mukadam.x, y: mukadam.y, z: mukadam.z }, "Mukadam Devidas Chavan"),
     },
   };
 }

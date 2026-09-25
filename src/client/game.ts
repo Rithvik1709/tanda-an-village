@@ -1,4 +1,4 @@
-import { type Action, apply, blockAt, type Result } from "../shared/rules";
+import { type Action, apply, blockAt, type Result, settleHelpers } from "../shared/rules";
 import type { Save } from "../shared/save";
 import { H, idx, type World } from "../shared/world";
 import type { WorldRenderer } from "./engine/world-renderer";
@@ -32,6 +32,7 @@ export class Game {
   onAct: (a: Action) => void = () => {};
 
   act(a: Action): Result {
+    this.settle();
     const r = apply(this.world, this.save, a, this.now());
     if (r.ok) {
       if ("x" in a) for (const dy of [-1, 0, 1]) this.sync(a.x, a.y + dy, a.z);
@@ -90,8 +91,17 @@ export class Game {
     this.tick();
   }
 
+  /** Hired labourers work on the clock too: bring their day up to now and redraw what they did. */
+  settle() {
+    this.each((x, y, z) => {
+      this.sync(x, y, z);
+      this.sync(x, y + 1, z);
+    }, settleHelpers(this.world, this.save, this.now()));
+  }
+
   /** Crops grow and soil dries on the clock: refresh every farm cell and the plant above it. */
   tick() {
+    this.settle();
     this.each((x, y, z) => {
       this.sync(x, y, z);
       this.sync(x, y + 1, z);

@@ -13,6 +13,7 @@ import { clock } from "../../shared/time";
 import type { World } from "../../shared/world";
 import { FISH, FISH_IDS, type FishId, fishPrice } from "../../shared/fish";
 import { GIVERS } from "../../shared/jobs";
+import { HELPERS, type HelperId } from "../../shared/helpers";
 
 /*
  * The trader's and shopkeeper's panels. They only ever call `act` — the same actions the server
@@ -277,6 +278,16 @@ export class Panels {
       if (e.item.startsWith("job:") || e.item === "kabaddi") {
         const giver = Object.values(GIVERS).find((g) => g.name === e.where);
         d.lines.push(`${e.item === "kabaddi" ? "Kabaddi prize" : `A job for ${giver?.name ?? e.where}`} · <b class="up">+${rs(e.amount)}</b>`);
+        byDay.set(e.day, d);
+        continue;
+      }
+      if (e.item.startsWith("unhire:")) {
+        d.lines.push(`Cancelled ${HELPERS[e.item.slice(7) as HelperId]?.name ?? "a labourer"} · <b class="up">+${rs(e.amount)}</b>`);
+        byDay.set(e.day, d);
+        continue;
+      }
+      if (e.item.startsWith("hire:")) {
+        d.lines.push(`Hired ${HELPERS[e.item.slice(5) as HelperId]?.name ?? "a labourer"} for a day · <b class="down">−${rs(e.amount)}</b>`);
         byDay.set(e.day, d);
         continue;
       }

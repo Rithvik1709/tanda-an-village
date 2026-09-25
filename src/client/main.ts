@@ -53,7 +53,9 @@ import { Playground } from "./scene/playground";
 import { Kabaddi, RAIDS } from "./kabaddi";
 import { atTalavEdge, Fishing } from "./fishing";
 import { DAYTIME, Jobs } from "./jobs";
+import { Helpers } from "./helpers";
 import { GIVERS } from "../shared/jobs";
+import { HELPER_MIN_PLOTS } from "../shared/helpers";
 
 type Hooks = {
   ready: boolean;
@@ -567,7 +569,21 @@ const jobs = new Jobs({
   closeDialogue: () => guide.onDialogue(false),
 });
 scene.add(jobs.group);
-fixedBodies.push(...jobs.bodies(), { pos: playground.dagduAt, r: 0.4, fixed: true });
+// ---- majoor: labourers from the mukadam's house, hired by the day ----
+const helpers = new Helpers({
+  world,
+  nav,
+  ground: (x, z) => hf.at(x, z),
+  save: () => game.save,
+  now: () => game.now(),
+  act: (a) => game.act(a),
+  toast: (m, k) => hud.toast(m, k),
+  sound: (n) => audio.play(n),
+  dialogue: (who, title, text, buttons) => guide.dialogue(who, title, text, buttons),
+  closeDialogue: () => guide.onDialogue(false),
+});
+scene.add(helpers.group);
+fixedBodies.push(...jobs.bodies(), ...helpers.bodies(), { pos: playground.dagduAt, r: 0.4, fixed: true });
 const kabaddi = new Kabaddi({
   ui: uiRoot,
   ground: (x, z) => hf.at(x, z),
@@ -593,7 +609,7 @@ const nearDagdu = () => Math.hypot(body.pos.x - playground.dagduAt.x, body.pos.z
 function pastimeHint(): string {
   if (kabaddi.active || fishing.active) return "";
   const h = nowHour();
-  const job = jobs.hint(body.pos, h);
+  const job = jobs.hint(body.pos, h) || helpers.hint(body.pos, h);
   if (job) return job;
   if (nearDagdu() && DAYTIME(h)) return "<kbd>E</kbd> Talk to Dagdu mama, the old fisherman";
   if (atTalavEdge(body.pos.x, body.pos.z) && !body.inWater) {
@@ -611,7 +627,7 @@ function pastimeInteract(): boolean {
   }
   if (kabaddi.active) return true;
   const h = nowHour();
-  if (jobs.interact(body.pos, h)) return true;
+  if (jobs.interact(body.pos, h) || helpers.interact(body.pos, h)) return true;
   if (nearDagdu() && DAYTIME(h)) {
     guide.dialogue("Dagdu mama · दगडू मामा", "The old fisherman", "Sit, sit. The talav fills from the tekdi every monsoon, and the fish come with it. Cast out past the lotus. When the float dips — strike! Then reel slowly: when the fish pulls hard, let it run, or your line will snap. They bite best at dawn and in the evening. And the maral… the maral you must earn.", [{ label: "Thank you, mama", onClick: () => guide.onDialogue(false) }]);
     return true;
@@ -658,7 +674,8 @@ const map = new MapView(document.getElementById("ui")!, world);
 map.onClose = () => (panels.open ? hud.setPlaying(true) : resumePlay());
 function showMap() {
   closeWindows();
-  const kaam = jobs.open().map((id) => ({ ...jobs.spots().find((g) => g.id === id)!, label: GIVERS[id].name }));
+  const kaam: { x: number; z: number; label: string }[] = jobs.open().map((id) => ({ ...jobs.spots().find((g) => g.id === id)!, label: GIVERS[id].name }));
+  if (game.save.plots.length >= HELPER_MIN_PLOTS) kaam.push({ ...helpers.mukadamAt, label: "Mukadam · labourers" });
   map.show(game.save, clock(game.now()).day, { x: body.pos.x, z: body.pos.z, yaw: controls.yaw }, kaam);
   hud.setPlaying(true);
   releaseMouse();
@@ -1386,6 +1403,8 @@ renderer.setAnimationLoop(() => {
     playground.update(dt, DAYTIME(h), camera.position);
     kabaddi.update(dt, h, body.pos, body.vel, camera.position);
     jobs.update(dt, now / 1000, h, camera.position, body.pos);
+    helpers.update(dt, h, camera.position);
+    helpers.group.visible = !titleScreen.open;
     jobs.hidden = mode !== "play" || titleScreen.open || !!farmyard.ride;
     if (fishing.active && (farmyard.ride || mode !== "play" || !!ploughJob)) fishing.stop();
     if (kabaddi.active && (farmyard.ride || !!ploughJob)) kabaddi.quit("You left the match.");
@@ -1743,6 +1762,7 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     fishing: () => ({ casts: fishing.castsLeft(), ...fishing.debug() }),
     fishPress: () => fishing.press(),
     jobs: () => ({ ...jobs.debug(), today: jobs.today() }),
+    helpers: () => ({ crew: helpers.debug(), mukadam: helpers.mukadamAt, hires: game.save.helpers ?? [] }),
     interact: () => controls.onInteract(),
     hint: () => document.querySelector(".interact")?.textContent ?? "",
   });

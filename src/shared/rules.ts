@@ -7,11 +7,12 @@ import { begin, BANDH_PLOT, bump, complete, current, deadlineAt, since } from ".
 import { FIELD_PLOUGH_MAX } from "./bulls.js";
 import { BULL_NAMES, bullsNow, CART_CAPACITY, FEED, MIN_MOOD, newBulls, PLOUGH_COST, PLOUGH_ROW, TRIP_COST, TRIP_MS } from "./bulls.js";
 import { hash2 } from "./rng.js";
-import type { LedgerEntry, Save } from "./save.js";
+import type { FarmCell, LedgerEntry, Save } from "./save.js";
 import { clock, DAY_MS, msBetween } from "./time.js";
 import { D, H, idx, talavOut, W, type World } from "./world.js";
 import { BASKET, biteFor, CASTS_PER_DAY, FISH, FISH_IDS, type FishId, fishCount, fishPrice, isFish } from "./fish.js";
 import { GIVERS, jobsFor } from "./jobs.js";
+import { CANCEL_REFUND, dawnOf, duskOf, HELPER_MIN_PLOTS, HELPERS, type HelperId, type HelperJob, hireDay, HIRE_MAX, type Hire, isHelper, MUKADAM, ORDER_BY, patchMs, WALK_MS } from "./helpers.js";
 
 /*
  * The rules of the game: the ONLY way a save changes. The client runs these for instant feedback;
@@ -56,7 +57,10 @@ export type Action =
   | { t: "job"; slot: number; step?: "take" }
   | { t: "fish"; got: boolean }
   | { t: "sellFish"; item: FishId; n: number }
-  | { t: "kabaddi"; won: boolean };
+  | { t: "kabaddi"; won: boolean }
+  | { t: "hire"; who: HelperId }
+  | { t: "cancelHire"; who: HelperId }
+  | { t: "orderHelper"; who: HelperId; job: HelperJob; plot: number; crop?: CropId; seeds?: number };
 
 export type Result = { ok: true; msg?: string; gained?: Record<string, number> } | { ok: false; error: string };
 
@@ -101,7 +105,7 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
-const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends", "tieBulls", "ploughField", "job", "fish", "sellFish", "kabaddi"]);
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends", "tieBulls", "ploughField", "job", "fish", "sellFish", "kabaddi", "hire", "cancelHire", "orderHelper"]);
 export const isNight = (hour: number) => hour >= 19.5 || hour < 4;
 /** How long until 6 am, from a night hour (ms). */
 export const untilMorning = (hour: number) => msBetween(hour, 6);
@@ -573,6 +577,12 @@ function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: numbe
 export function apply(world: World, save: Save, a: Action, now: number): Result {
   if (!a || typeof a !== "object" || !KNOWN.has(a.t)) return fail("Unknown action.");
   if (save.missions) checkDeadline(world, save, now);
+  settleHelpers(world, save, now);
+  if (a.t === "hire" || a.t === "cancelHire" || a.t === "orderHelper") {
+    const r = hands(world, save, a, now);
+    if (r.ok) save.updatedAt = now;
+    return r;
+  }
   if (a.t === "tieBulls") {
     if (!save.bulls) return fail("You don't have bulls yet.");
     save.bulls = { ...bullsNow(save.bulls, now), tied: !!a.tie, sheltered: !!a.tie && !!save.inv.gotha };
@@ -676,7 +686,6 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
     if (inv[item] <= 0) delete inv[item];
   };
   const give = (item: string, n: number) => (inv[item] = (inv[item] ?? 0) + n);
-  const season = clock(now).season;
   let r: Result;
 
   switch (a.t) {
@@ -762,11 +771,7 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       if (!has(`seed:${a.crop}`)) return fail(`No ${CROPS[a.crop].name.toLowerCase()} seeds left.`);
       if (!ownedPlot(world, save, x, z)) return fail("You can only farm your own land.");
       take(`seed:${a.crop}`);
-      // resting land recovers: +0.05 quality per game day since the last harvest
-      cell.q = Math.min(cell.baseQ, cell.q + ((now - cell.restedAt) / DAY_MS) * 0.05);
-      const speed = CROPS[a.crop].season[season] * (0.7 + 0.3 * cell.q);
-      cell.plant = { crop: a.crop, plantedAt: now, progress: 0, wetMs: 0, dryMs: 0, updatedAt: now, speed };
-      save.stats.planted++;
+      sow(save, cell, a.crop, now);
       r = { ok: true, msg: `Sowed ${CROPS[a.crop].name.toLowerCase()}` };
       break;
     }
@@ -776,8 +781,7 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       const cell = save.farm[k];
       if (!cell) return fail("Water tilled soil.");
       if (!has("water")) return fail("The can is empty — fill it at the river or the well.");
-      if (cell.plant) cell.plant = advance(cell.plant, cell.wetUntil, now);
-      cell.wetUntil = Math.max(cell.wetUntil, now + WET_MS[season]);
+      wet(cell, now);
       bump(save, "water");
       take("water");
       r = { ok: true };
@@ -825,11 +829,7 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       bump(save, `harvestN:${p.crop}`, n);
       if (carried(save) + n > CARRY) return fail(`Your sacks are full (${CARRY}) — sell, load the cart, or store it in the godown.`);
       give(p.crop, n);
-      cell.q = Math.max(0.45, cell.q - 0.04);
-      cell.restedAt = now;
-      delete cell.plant;
-      save.stats.harvested++;
-      save.stats.produce += n;
+      reaped(save, cell, n, now);
       r = { ok: true, msg: `+${n} ${CROPS[p.crop].name.toLowerCase()}`, gained: { [p.crop]: n } };
       break;
     }
@@ -839,4 +839,154 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
   }
   save.updatedAt = now;
   return r;
+}
+
+// ---- the soil, one patch at a time: the same for your own hands and your labourers' ----
+/** Sow a crop in a tilled patch (the seed has already been taken). */
+function sow(save: Save, cell: FarmCell, crop: CropId, now: number) {
+  // resting land recovers: +0.05 quality per game day since the last harvest
+  cell.q = Math.min(cell.baseQ, cell.q + ((now - cell.restedAt) / DAY_MS) * 0.05);
+  const speed = CROPS[crop].season[clock(now).season] * (0.7 + 0.3 * cell.q);
+  cell.plant = { crop, plantedAt: now, progress: 0, wetMs: 0, dryMs: 0, updatedAt: now, speed };
+  save.stats.planted++;
+}
+function wet(cell: FarmCell, now: number) {
+  if (cell.plant) cell.plant = advance(cell.plant, cell.wetUntil, now);
+  cell.wetUntil = Math.max(cell.wetUntil, now + WET_MS[clock(now).season]);
+}
+/** After a harvest of n: the soil tires a little, and starts resting. */
+function reaped(save: Save, cell: FarmCell, n: number, now: number) {
+  cell.q = Math.max(0.45, cell.q - 0.04);
+  cell.restedAt = now;
+  delete cell.plant;
+  save.stats.harvested++;
+  save.stats.produce += n;
+}
+
+// ---- majoor: labourers hired by the day ----
+type Job = NonNullable<Hire["job"]>;
+/** The farm cells of one field, in row order (the order a labourer works them). */
+const cellsOf = (world: World, save: Save, plot: number) =>
+  Object.keys(save.farm).filter((k) => plotOfKey(world, k) === plot).sort((p, q) => Number(p) - Number(q));
+
+/** Does this patch need the labourer's job at time t? */
+function needs(world: World, save: Save, j: Job, k: string, t: number) {
+  const cell = save.farm[k];
+  if (!cell) return false;
+  if (j.kind === "water") return cell.wetUntil <= t;
+  if (j.kind === "harvest") return !j.full && !!cell.plant && advance(cell.plant, cell.wetUntil, t).progress >= 1;
+  if (!j.seeds || cell.plant) return false;
+  const i = Number(k), x = i % W, z = Math.floor(i / W) % D, y = Math.floor(i / (W * D));
+  return blockAt(world, save, x, y + 1, z, t) === B.AIR;
+}
+
+/**
+ * Bring every labourer's day up to `now`. From the moment they reach the field, each time slot goes
+ * to the next patch (in row order) that needs their job; a slot with nothing to do is spent resting.
+ * Harvests go straight to the godown. At dusk, unsown seeds come back to you. Returns the farm
+ * cells that changed, so the client can redraw them.
+ */
+export function settleHelpers(world: World, save: Save, now: number): string[] {
+  if (!save.helpers?.length) return [];
+  const changed: string[] = [];
+  for (const h of save.helpers) {
+    const j = h.job;
+    if (!j || j.over) continue;
+    const end = duskOf(h.day), until = Math.min(now, end), ms = patchMs(h.who);
+    let cells: string[] | null = null;
+    while (j.startAt + (j.step + 1) * ms <= until) {
+      const t = j.startAt + ++j.step * ms;
+      const k = save.plots.includes(j.plot) ? (cells ??= cellsOf(world, save, j.plot)).find((c) => needs(world, save, j, c, t)) : undefined;
+      if (!k) {
+        j.idle = true;
+        continue;
+      }
+      const cell = save.farm[k];
+      if (j.kind === "plant") {
+        sow(save, cell, j.crop as CropId, t);
+        j.seeds--;
+      } else if (j.kind === "water") wet(cell, t);
+      else {
+        const p = advance(cell.plant!, cell.wetUntil, t);
+        const n = yieldOf(p, cell.q);
+        if (stored(save) + n > GODOWN_CAPACITY) {
+          j.full = j.idle = true;
+          continue;
+        }
+        // one lot per crop: its date is the weighted average, so rent stays fair
+        const lot = save.godown[p.crop] ?? { n: 0, since: t };
+        save.godown[p.crop] = { n: lot.n + n, since: Math.round((lot.since * lot.n + t * n) / (lot.n + n)) };
+        reaped(save, cell, n, t);
+      }
+      j.done++;
+      j.at = k;
+      j.idle = false;
+      changed.push(k);
+    }
+    if (now >= end) {
+      j.over = true;
+      if (j.seeds && j.crop) save.inv[`seed:${j.crop}`] = (save.inv[`seed:${j.crop}`] ?? 0) + j.seeds;
+      j.seeds = 0;
+    }
+  }
+  // yesterday's labourers have been paid and gone home
+  const today = clock(now).day;
+  save.helpers = save.helpers.filter((h) => h.day >= today);
+  if (!save.helpers.length) delete save.helpers;
+  return changed;
+}
+
+/** Hiring a labourer at the mukadam's, and telling one what to do in the morning. */
+function hands(world: World, save: Save, a: Extract<Action, { t: "hire" | "cancelHire" | "orderHelper" }>, now: number): Result {
+  if (!isHelper(a.who)) return fail("Who?");
+  const who = HELPERS[a.who];
+  const c = clock(now);
+  const hires = save.helpers ?? [];
+  if (a.t === "hire") {
+    if (save.plots.length < HELPER_MIN_PLOTS) return fail(`${MUKADAM.name}: "One field you can work yourself. Come back when you own ${HELPER_MIN_PLOTS}."`);
+    const day = hireDay(now);
+    if (hires.some((h) => h.who === a.who && h.day === day)) return fail(`${who.name} is already coming to you tomorrow.`);
+    if (hires.filter((h) => h.day === day).length >= HIRE_MAX) return fail(`The mukadam sends at most ${HIRE_MAX} labourers to one farmer.`);
+    if (save.money < who.wage) return fail(`${who.name} asks ₹${who.wage} for the day — you have ₹${save.money.toLocaleString("en-IN")}.`);
+    save.money -= who.wage;
+    save.stats.spent += who.wage;
+    record(save, { day: c.day, kind: "buy", item: `hire:${a.who}`, n: 1, amount: who.wage, where: MUKADAM.name });
+    save.helpers = [...hires, { who: a.who, day }];
+    return { ok: true, msg: `Paid ₹${who.wage} · ${who.name} will be waiting by Rathod Bhuvan at 6 am` };
+  }
+  if (a.t === "cancelHire") {
+    // until they set out at 6 am, the mukadam can send them elsewhere
+    const h = hires.find((x) => x.who === a.who && now < dawnOf(x.day));
+    if (!h) return fail(hires.some((x) => x.who === a.who) ? `${who.name} has already started the day — it's too late to cancel.` : `${who.name} isn't coming to you.`);
+    const back = Math.round(who.wage * CANCEL_REFUND);
+    save.money += back;
+    save.stats.spent -= back;
+    record(save, { day: c.day, kind: "sell", item: `unhire:${a.who}`, n: 1, amount: back, where: MUKADAM.name });
+    save.helpers = hires.filter((x) => x !== h);
+    if (!save.helpers.length) delete save.helpers;
+    return { ok: true, msg: `${who.name} won't come tomorrow · ₹${back} back from ${MUKADAM.name}` };
+  }
+  const h = hires.find((x) => x.who === a.who && x.day === c.day);
+  if (!h || now < dawnOf(h.day)) return fail(`${who.name} isn't working for you ${h ? "yet — they come at 6 am" : "today"}.`);
+  if (h.job) return fail(`${who.name} already has the day's work.`);
+  if (c.hour >= ORDER_BY) return fail("It's too late in the day to start in the fields.");
+  const p = Number.isInteger(a.plot) ? world.plots[a.plot] : undefined;
+  if (!p || !save.plots.includes(p.id)) return fail("Send them to one of your own fields.");
+  if (a.job !== "plant" && a.job !== "water" && a.job !== "harvest") return fail("What should they do?");
+  const cells = cellsOf(world, save, p.id);
+  let seeds = 0;
+  if (a.job === "plant") {
+    if (!a.crop || !isCrop(a.crop)) return fail("Which seeds?");
+    if (!qty(a.seeds)) return fail("Hand over some seeds.");
+    if ((save.inv[`seed:${a.crop}`] ?? 0) < a.seeds) return fail(`You don't have ${a.seeds} ${CROPS[a.crop].name.toLowerCase()} seeds.`);
+    if (!cells.some((k) => !save.farm[k].plant)) return fail(`There's no tilled soil free in ${p.name} — hoe it or plough it first.`);
+    take(save, `seed:${a.crop}`, a.seeds);
+    seeds = a.seeds;
+  } else if (a.job === "water") {
+    if (save.drip.includes(p.id)) return fail(`The drip lines already water ${p.name}.`);
+    if (!cells.length) return fail(`Nothing is tilled in ${p.name} to water.`);
+  } else if (!cells.some((k) => save.farm[k].plant)) return fail(`Nothing is growing in ${p.name}.`);
+  h.job = { kind: a.job, plot: p.id, ...(a.job === "plant" ? { crop: a.crop } : {}), seeds, startAt: now + WALK_MS, step: 0, done: 0 };
+  const what = a.job === "plant" ? `sow ${seeds} ${CROPS[a.crop!].name.toLowerCase()}` : a.job === "water" ? "water" : "harvest";
+  return { ok: true, msg: `${who.name} sets off to ${what} in ${p.name}` };
 }

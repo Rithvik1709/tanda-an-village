@@ -280,7 +280,7 @@ export class Jobs {
 }
 
 /** A gold disc with a "!" on it. */
-function bangTexture() {
+export function bangTexture() {
   const c = document.createElement("canvas");
   c.width = c.height = 64;
   const g = c.getContext("2d")!;
