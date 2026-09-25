@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BANDH_PLOT, complete, current, MISSIONS } from "../src/shared/missions";
+import { BANDH_PLOT, complete, current, MISSIONS, since } from "../src/shared/missions";
 import { apply, type Action } from "../src/shared/rules";
 import { newSave, type Save } from "../src/shared/save";
 import { atHour, DAY_MS, HOUR_MS, msBetween } from "../src/shared/time";
@@ -14,6 +14,7 @@ const ok = (s: Save, a: Action) => {
   if (!r.ok) throw new Error(`${a.t}: ${r.error}`);
   return r;
 };
+const progress_ = (s: Save) => [since(s, "deliver:mandir:jowar"), since(s, "deliver:mandir:onion")];
 const no = (s: Save, a: Action) => expect(apply(world, s, a, now).ok).toBe(false);
 const cells = (n: number, row = 4) => Array.from({ length: n }, (_, i) => ({ x: starter.x0 + 2 + i, y: starter.y, z: starter.z0 + row }));
 const grow = (s: Save, crop: "onion" | "jowar", n: number, row: number) => {
@@ -164,6 +165,22 @@ describe("the ten missions", () => {
     expect(s.rep).toBe(10);
     s.inv.jowar = 5;
     no(s, { t: "deliver", to: "sitabai", item: "jowar", n: 5 });
+  });
+
+  it("offerings stop at the count: never more than is asked, and nothing once it's given", () => {
+    const s = newSave("t", world, now);
+    s.missions.i = MISSIONS.findIndex((m) => m.id === "teej");
+    s.inv.jowar = 30;
+    ok(s, { t: "deliver", to: "mandir", item: "jowar", n: 25 }); // only 10 are asked
+    expect(s.inv.jowar).toBe(20);
+    no(s, { t: "deliver", to: "mandir", item: "jowar", n: 10 });
+    expect(s.inv.jowar).toBe(20);
+    s.inv.onion = 6;
+    ok(s, { t: "deliver", to: "mandir", item: "onion", n: 6 }); // a part now…
+    s.inv.onion = 10;
+    ok(s, { t: "deliver", to: "mandir", item: "onion", n: 10 }); // …and only the rest later
+    expect(s.inv.onion).toBe(6);
+    expect(progress_(s)).toEqual([10, 10]);
   });
 
   it("drip irrigation keeps a whole field watered", () => {

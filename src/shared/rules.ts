@@ -114,6 +114,8 @@ export function cleanName(raw: unknown): string | null {
   return n;
 }
 const FOREVER = 8.64e15; // drip-irrigated soil never dries
+/** What each mission asks to be delivered, by mission:to:item (the objectives' `need`). */
+const DELIVER_NEED: Record<string, number> = { "order:sitabai:jowar": 20, "teej:mandir:jowar": 10, "teej:mandir:onion": 10 };
 
 /** Story actions: talking, visiting, deliveries, choices, rewards — and the drip set. */
 function story(world: World, save: Save, a: Extract<Action, { t: "talk" | "visit" | "deliver" | "choose" | "claimMission" | "decorate" | "installDrip" }>, now: number): Result {
@@ -148,13 +150,18 @@ function story(world: World, save: Save, a: Extract<Action, { t: "talk" | "visit
       return { ok: true };
     }
     case "deliver": {
-      const wants = (m?.id === "order" && a.to === "sitabai" && a.item === "jowar") || (m?.id === "teej" && a.to === "mandir" && (a.item === "jowar" || a.item === "onion"));
-      if (!wants) return fail("Nobody's asking for that right now.");
-      if (!qty(a.n) || (save.inv[a.item] ?? 0) < a.n) return fail(`You don't have ${a.n} ${a.item}.`);
-      save.inv[a.item] -= a.n;
+      const need = m ? DELIVER_NEED[`${m.id}:${a.to}:${a.item}`] : undefined;
+      if (!need) return fail("Nobody's asking for that right now.");
+      // never more than is asked: what's already given counts, and the rest stays in your sack
+      const left = need - since(save, `deliver:${a.to}:${a.item}`);
+      if (left <= 0) return fail(a.to === "mandir" ? `You've already offered ${need} ${a.item}.` : `Sitabai already has her ${need} ${a.item}.`);
+      if (!qty(a.n)) return fail("How many?");
+      const n = Math.min(a.n, left);
+      if ((save.inv[a.item] ?? 0) < n) return fail(`You don't have ${n} ${a.item}.`);
+      save.inv[a.item] -= n;
       if (!save.inv[a.item]) delete save.inv[a.item];
-      bump(save, `deliver:${a.to}:${a.item}`, a.n);
-      return { ok: true, msg: a.to === "mandir" ? `Offered ${a.n} ${a.item} at the mandir` : `Gave Sitabai ${a.n} ${a.item}` };
+      bump(save, `deliver:${a.to}:${a.item}`, n);
+      return { ok: true, msg: a.to === "mandir" ? `Offered ${n} ${a.item} at the mandir` : `Gave Sitabai ${n} ${a.item}` };
     }
     case "choose": {
       if (!m?.choices || ms.choice) return fail("Nothing to decide.");

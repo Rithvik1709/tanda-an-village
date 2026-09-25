@@ -8,7 +8,7 @@ import { askingPrice, forSale, offersFor, valuePlot } from "../../shared/land";
 import { BULL_NAMES, bullsMoodWord, bullsNow, CART_CAPACITY, MIN_MOOD, TRIP_COST } from "../../shared/bulls";
 import { carried, CARRY, creditLimit, GODOWN_CAPACITY, GODOWN_RENT, isOverdue, LENDERS, type Lender, netWorth, owed, rentFor, stored, titleFor } from "../../shared/bank";
 import { DAY_MS } from "../../shared/time";
-import { current } from "../../shared/missions";
+import { current, since } from "../../shared/missions";
 import { clock } from "../../shared/time";
 import type { World } from "../../shared/world";
 import { FISH, FISH_IDS, type FishId, fishPrice } from "../../shared/fish";
@@ -372,13 +372,16 @@ export class Panels {
     if (m?.id !== "teej") return `<p class="empty">Ram Ram. You bow to Sevalal Maharaj. (During Teej, the tanda brings offerings here.)</p>`;
     const now = this.ctx.now();
     const h = clock(now).hour;
+    const given = (k: string) => since(s, k);
     const row = (c: CropId) => {
-      const have = s.inv[c] ?? 0;
-      return `<tr><td><i class="dot" style="background:${CROP_COLOR[c]}"></i>${CROPS[c].name}</td><td class="num">${have}</td><td class="acts"><button data-do="deliver:mandir:${c}" data-n="10" ${have ? "" : "disabled"}>Offer ${Math.min(10, have) || 10}</button></td></tr>`;
+      const have = s.inv[c] ?? 0, left = Math.max(0, 10 - given(`deliver:mandir:${c}`));
+      const btn = !left ? `<button disabled>Offered ✓</button>` : `<button data-do="deliver:mandir:${c}" data-n="${left}" ${have ? "" : "disabled"}>Offer ${Math.min(left, have) || left}</button>`;
+      return `<tr><td><i class="dot" style="background:${CROP_COLOR[c]}"></i>${CROPS[c].name}</td><td class="num">${have}</td><td class="num">${left ? `${10 - left} of 10` : "10 of 10 ✓"}</td><td class="acts">${btn}</td></tr>`;
     };
     const night = h >= 19 || h < 4;
-    return `<table><thead><tr><th>Offering</th><th class="num">You have</th><th></th></tr></thead><tbody>${row("jowar")}${row("onion")}</tbody></table>
-      <div class="big-acts"><button data-do="teej" ${night ? "" : "disabled"}>${night ? "Join the Teej gathering" : "The gathering begins after 7 pm"}</button></div>`;
+    const joined = given("visit:teej") > 0;
+    return `<table><thead><tr><th>Offering</th><th class="num">You have</th><th class="num">Offered</th><th></th></tr></thead><tbody>${row("jowar")}${row("onion")}</tbody></table>
+      <div class="big-acts"><button data-do="teej" ${night && !joined ? "" : "disabled"}>${joined ? "You joined the gathering ✓" : night ? "Join the Teej gathering" : "The gathering begins after 7 pm"}</button></div>`;
   }
 
   private loans(s: Save, day: number, lender: Lender) {
@@ -515,8 +518,10 @@ export class Panels {
 
   private buy(s: Save) {
     const m = current(s);
-    const order = m?.id === "order" ? `<div class="order-card"><b>Sitabai's order for Teej</b> — 20 jowar for the feast. You have ${s.inv.jowar ?? 0}.
-      <button data-do="deliver:sitabai:jowar" data-n="20" ${(s.inv.jowar ?? 0) >= 20 ? "" : "disabled"}>Deliver 20 jowar</button></div>` : "";
+    const gave = since(s, "deliver:sitabai:jowar");
+    const want = Math.max(0, 20 - gave);
+    const order = m?.id === "order" ? `<div class="order-card"><b>Sitabai's order for Teej</b> — 20 jowar for the feast. ${want ? `You have ${s.inv.jowar ?? 0}${gave ? `; ${gave} given, ${want} to go` : ""}.` : "All 20 given ✓"}
+      ${want ? `<button data-do="deliver:sitabai:jowar" data-n="${want}" ${(s.inv.jowar ?? 0) > 0 ? "" : "disabled"}>Deliver ${Math.min(want, s.inv.jowar ?? 0) || want} jowar</button>` : `<button disabled>Delivered ✓</button>`}</div>` : "";
     return order + this.buyTable(s);
   }
 
