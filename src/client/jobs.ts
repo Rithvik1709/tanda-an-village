@@ -61,8 +61,8 @@ export class Jobs {
       const side = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] }[h.door];
       return { x: h.x0 + h.w / 2 + side[0] * (h.w / 2 + 1), z: h.z0 + h.d / 2 + side[1] * (h.d / 2 + 1) };
     };
-    // (never a shop's door: the bank, the Naik's kacheri and the stalls are houses too)
-    const shops = [L.bank, L.landOffice, L.trader, L.seedShop];
+    // (never a shop's door: the bank, the Naik's kacheri, the stalls and the mukadam's are houses too)
+    const shops = [L.bank, L.landOffice, L.trader, L.seedShop, L.mukadam];
     const homes = houses.filter((h) => !shops.some((s) => Math.hypot(doorOf(h).x - s.x, doorOf(h).z - s.z) < 4.5));
     const near = (p: P) => homes.map(doorOf).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0];
     const spots: Record<GiverId, P> = {
