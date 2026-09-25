@@ -181,7 +181,7 @@ export class Figure {
       part(new THREE.SphereGeometry(0.1, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), look.hat, h, 0, 0.25, 0);
       const tail = part(new THREE.BoxGeometry(0.06, 0.28, 0.02), look.tail ?? look.hat, h, 0.04, 0.05, -0.13);
       tail.rotation.x = 0.15;
-    } else {
+    } else if (look.hatStyle !== "none") {
       // Gandhi topi: a folded white boat cap
       const cap = part(new THREE.CylinderGeometry(0.1, 0.12, 0.09, 4, 1), look.hat, h, 0, 0.24, 0);
       cap.scale.set(1, 1, 1.35);
@@ -336,11 +336,12 @@ export class Figure {
 
   /** speed in m/s drives the gait; call every frame. */
   /** What a villager is doing: the arms and body pose on top of the walk. */
-  action: "none" | "hoe" | "bend" | "carry" | "sit" | "draw" | "pour" = "none";
+  action: "none" | "hoe" | "bend" | "carry" | "sit" | "draw" | "pour" | "fish" | "reel" | "crouch" | "cheer" = "none";
   private props = new Map<string, THREE.Object3D>();
+  private restZ?: number[];
 
   /** Give the figure something to hold: a hoe (kudal) in the hands, or a clay pot (matka) on the head. */
-  hold(kind: "hoe" | "pot" | "can" | "bag" | "none") {
+  hold(kind: "hoe" | "pot" | "can" | "bag" | "rod" | "none") {
     for (const [k, o] of this.props) o.visible = k === kind;
     if (kind === "none" || this.props.has(kind)) return;
     const g = new THREE.Group();
@@ -358,6 +359,19 @@ export class Figure {
       spout.rotation.x = 1.0;
       part(new THREE.TorusGeometry(0.06, 0.012, 5, 10, Math.PI), "#b08a30", g, 0, 0.04, 0.02, 0.35);
       g.position.set(0, -0.3, 0);
+      this.elbows[1].add(g);
+    } else if (kind === "rod") {
+      // a bamboo gal: a long thin cane with a few knots, the line running from its tip
+      const cane = new THREE.Group();
+      part(new THREE.CylinderGeometry(0.008, 0.017, 2.3, 6), "#c8a868", cane, 0, 1.1, 0, 0.6);
+      for (let i = 1; i < 5; i++) part(new THREE.CylinderGeometry(0.019 - i * 0.002, 0.019 - i * 0.002, 0.03, 6), "#8a6a3c", cane, 0, i * 0.45, 0, 0.6);
+      const tip = new THREE.Object3D();
+      tip.name = "rodTip";
+      tip.position.y = 2.25;
+      cane.add(tip);
+      cane.rotation.x = 2.05; // out over the water, about 30° above level when the arm is raised
+      g.add(cane);
+      g.position.set(0, -0.3, 0.02);
       this.elbows[1].add(g);
     } else if (kind === "bag") {
       // a cloth seed bag in the hand
@@ -392,6 +406,9 @@ export class Figure {
     this.body.position.y = Math.abs(Math.cos(ph)) * 0.035 * walking + Math.sin(this.t * 1.6) * 0.004;
     this.head.rotation.y = Math.sin(this.t * 0.35) * 0.15 * (1 - walking);
     this.body.rotation.x = 0;
+    // poses may spread the arms; every frame starts from the shoulders' resting angle
+    this.restZ ??= this.shoulders.map((sh) => sh.rotation.z);
+    this.shoulders.forEach((sh, i) => (sh.rotation.z = this.restZ![i]));
     for (const [k, o] of this.props) if (k === "can" && this.action !== "pour") o.rotation.x = 0;
     if (this.action === "hoe") {
       // raise the hoe overhead and bring it down into the soil, about once a second
@@ -430,12 +447,50 @@ export class Figure {
       this.elbows[0].rotation.x = -0.6 - Math.max(0, c) * 0.5;
       this.elbows[1].rotation.x = -0.6 - Math.max(0, -c) * 0.5;
       this.body.rotation.x = 0.12 + Math.abs(c) * 0.05;
+    } else if (this.action === "fish" || this.action === "reel") {
+      // both hands on the rod, held out over the water; reeling works the arms
+      const w = this.action === "reel" ? Math.sin(this.t * 14) * 0.12 : Math.sin(this.t * 1.3) * 0.03;
+      this.shoulders[1].rotation.x = -0.75 + w;
+      this.elbows[1].rotation.x = -0.35;
+      this.shoulders[0].rotation.x = -0.6 - w;
+      this.elbows[0].rotation.x = -0.9;
+      this.body.rotation.x = this.action === "reel" ? -0.08 : 0.04;
+    } else if (this.action === "crouch") {
+      // a kabaddi defender's stance: knees bent, arms out, ready to pounce
+      this.hips[0].rotation.x = this.hips[1].rotation.x = -0.6;
+      this.knees[0].rotation.x = this.knees[1].rotation.x = 0.8;
+      this.body.rotation.x = 0.35;
+      this.body.position.y -= 0.12;
+      this.shoulders[0].rotation.x = this.shoulders[1].rotation.x = -1.1 + Math.sin(this.t * 3) * 0.1;
+      this.shoulders[0].rotation.z = -0.35;
+      this.shoulders[1].rotation.z = 0.35;
+    } else if (this.action === "cheer") {
+      const c = Math.abs(Math.sin(this.t * 5));
+      this.shoulders[0].rotation.x = this.shoulders[1].rotation.x = -2.8 + c * 0.3;
+      this.body.position.y += c * 0.06;
     } else if (this.action === "sit") {
       this.hips[0].rotation.x = this.hips[1].rotation.x = -1.5;
       this.knees[0].rotation.x = this.knees[1].rotation.x = 1.5;
       this.body.position.y = -0.45;
       this.shoulders[0].rotation.x = this.shoulders[1].rotation.x = -0.4;
+      if (this.props.get("rod")?.visible) {
+        // sitting on the bank with a rod held out over the water
+        this.shoulders[1].rotation.x = -0.85 + Math.sin(this.t * 1.1) * 0.03;
+        this.elbows[1].rotation.x = -0.3;
+        this.shoulders[0].rotation.x = -0.7;
+        this.elbows[0].rotation.x = -0.8;
+      }
     }
+  }
+
+  /** Where the rod's tip is in the world (for the fishing line), or null without a rod in hand. */
+  rodTip(out: THREE.Vector3): THREE.Vector3 | null {
+    const rod = this.props.get("rod");
+    if (!rod?.visible) return null;
+    const tip = rod.getObjectByName("rodTip");
+    if (!tip) return null;
+    this.root.updateMatrixWorld(true);
+    return tip.getWorldPosition(out);
   }
 
   set visible(v: boolean) {

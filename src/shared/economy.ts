@@ -74,6 +74,7 @@ export const SHOP: ShopItem[] = [
   { id: "cart", name: "Bullock cart (bailgaadi)", price: 1500, note: "carry up to 200 to the town mandi for a better price", max: 1 },
   { id: "fodder", name: "Fodder (kadba)", price: 5, note: "one bundle: +30 stamina, a happier pair" },
   { id: "gotha", name: "Gotha — a cattle shed behind your house", price: 800, note: "tie your bulls under a roof with a trough: they get hungry half as fast", max: 1 },
+  { id: "rod", name: "Bamboo fishing rod (gal)", price: 150, note: "fish in the talav behind the Z.P. school", max: 1 },
   { id: "gerua", name: "Gerua horn paint", price: 100, note: "for decorating your bulls at Pola" },
   { id: "drip", name: "Drip irrigation set with electric motor", price: 3000, note: "installs on one field: its soil stays watered, day and night" },
   blockItem(B.PLANKS, 3),

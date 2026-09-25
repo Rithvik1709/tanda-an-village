@@ -124,6 +124,65 @@ export const SOUNDS: Record<string, Fx> = {
     const base = 2200 + Math.random() * 1400;
     for (let i = 0; i < 2 + Math.floor(Math.random() * 3); i++) tone(c, o, t + i * 0.11, { f: base * (i % 2 ? 1.25 : 1), f2: base * (i % 2 ? 1.1 : 1.4), peak: 0.035, a: 0.01, d: 0.07 });
   },
+  splash: (c, o, t) => {
+    burst(c, o, t, { type: "lowpass", f: 2200, f2: 400, peak: 0.35, a: 0.005, d: 0.3 });
+    for (let i = 0; i < 4; i++) tone(c, o, t + 0.04 + i * 0.05, { f: 500 + Math.random() * 500, f2: 1200, peak: 0.05, a: 0.004, d: 0.06 });
+  },
+  bite: (c, o, t) => {
+    // the float bobs under: a plop and a ring
+    tone(c, o, t, { f: 420, f2: 180, peak: 0.25, a: 0.004, d: 0.12 });
+    burst(c, o, t, { type: "bandpass", f: 1500, q: 2, peak: 0.12, a: 0.003, d: 0.08 });
+  },
+  reel: (c, o, t) => {
+    for (let i = 0; i < 4; i++) burst(c, o, t + i * 0.035, { type: "highpass", f: 4200, peak: 0.06, a: 0.001, d: 0.015 });
+  },
+  snap: (c, o, t) => {
+    burst(c, o, t, { type: "highpass", f: 3000, peak: 0.3, a: 0.001, d: 0.05 });
+    tone(c, o, t, { type: "triangle", f: 900, f2: 200, peak: 0.12, a: 0.002, d: 0.15 });
+  },
+  whistle: (c, o, t) => {
+    // the referee's pea whistle: a trilled high note
+    const osc = c.createOscillator();
+    osc.frequency.value = 2900;
+    const lfo = c.createOscillator();
+    lfo.frequency.value = 38;
+    const depth = c.createGain();
+    depth.gain.value = 160;
+    lfo.connect(depth).connect(osc.frequency);
+    const g = env(c, t, 0.08, 0.01, 0.45);
+    osc.connect(g).connect(o);
+    osc.start(t);
+    lfo.start(t);
+    osc.stop(t + 0.5);
+    lfo.stop(t + 0.5);
+  },
+  cheer: (c, o, t) => {
+    // a small crowd: a swell of filtered noise with a few whoops on top
+    burst(c, o, t, { type: "bandpass", f: 900, f2: 1300, q: 0.7, peak: 0.22, a: 0.25, d: 1.1 });
+    for (let i = 0; i < 4; i++) tone(c, o, t + 0.1 + i * 0.18 + Math.random() * 0.1, { type: "triangle", f: 500 + Math.random() * 300, f2: 900 + Math.random() * 400, peak: 0.035, a: 0.03, d: 0.2 });
+  },
+  bleat: (c, o, t) => {
+    // a goat: a nasal, wobbling "meh-eh"
+    const osc = c.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(420, t);
+    osc.frequency.linearRampToValueAtTime(380, t + 0.5);
+    const lfo = c.createOscillator();
+    lfo.frequency.value = 11;
+    const depth = c.createGain();
+    depth.gain.value = 30;
+    lfo.connect(depth).connect(osc.frequency);
+    const f = c.createBiquadFilter();
+    f.type = "bandpass";
+    f.frequency.value = 1100;
+    f.Q.value = 1.5;
+    const g = env(c, t, 0.1, 0.04, 0.5);
+    osc.connect(f).connect(g).connect(o);
+    osc.start(t);
+    lfo.start(t);
+    osc.stop(t + 0.6);
+    lfo.stop(t + 0.6);
+  },
   cricket: (c, o, t) => {
     for (let i = 0; i < 3; i++) tone(c, o, t + i * 0.05, { type: "sine", f: 4400 + Math.random() * 200, peak: 0.018, a: 0.004, d: 0.03 });
   },

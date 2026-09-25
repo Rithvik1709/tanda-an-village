@@ -51,7 +51,20 @@ export type Structure =
   | { kind: "plate"; x: number; z: number; y: number; facing: number; lines: string[]; color?: string }
   /** Rathod Bhuvan: a long two-storey wooden wada, three homes under one roof, its back to the lane and
    *  its carved verandah facing the village (east). The player's home. */
-  | { kind: "wada"; x0: number; z0: number; w: number; d: number; y: number; name: string };
+  | { kind: "wada"; x0: number; z0: number; w: number; d: number; y: number; name: string }
+  /** The kabaddi maidan behind the school: a level earth ground (y is the ground you stand on). */
+  | { kind: "kabaddi"; x0: number; z0: number; x1: number; z1: number; y: number }
+  /** The talav: a small pond (an ellipse), its water surface at `level`. */
+  | { kind: "talav"; x: number; z: number; rx: number; rz: number; level: number; y: number };
+
+/** The kabaddi maidan: columns x0..x1, z0..z1, its top block at y (you stand at y + 1). */
+export const MAIDAN = { x0: 135, z0: 84, x1: 144, z1: 98, y: 16 } as const;
+/** The court drawn on it: 8 × 12, the midline across z = COURT.mid. Raiders start on the south half. */
+export const COURT = { x0: 135.5, x1: 143.5, z0: 85, z1: 97, mid: 91 } as const;
+/** The talav behind the maidan: an ellipse of water in a hollow at the foot of the tekdi. */
+export const TALAV = { x: 151.5, z: 91.5, rx: 3.3, rz: 4.6, level: 20.6, floor: 18 } as const;
+/** How far a point is outside the talav's edge (negative: in the water), roughly in blocks. */
+export const talavOut = (x: number, z: number) => (Math.sqrt(((x - TALAV.x) / TALAV.rx) ** 2 + ((z - TALAV.z) / TALAV.rz) ** 2) - 1) * Math.min(TALAV.rx, TALAV.rz);
 /** A tree: where it stands, how tall, how wide, and the trunk/root columns it occupies in the voxels. */
 export type Tree = { kind: "neem" | "banyan"; x: number; y: number; z: number; h: number; r: number; trunks: [number, number, number, number][] };
 
@@ -64,7 +77,7 @@ export type World = {
   chowk: { x0: number; z0: number; x1: number; z1: number; y: number };
   trees: Tree[];
   structures: Structure[];
-  landmarks: Record<"spawn" | "temple" | "hanuman" | "school" | "pir" | "tank" | "home" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat", Landmark>;
+  landmarks: Record<"spawn" | "temple" | "hanuman" | "school" | "pir" | "tank" | "home" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat" | "kabaddi" | "talav", Landmark>;
 };
 
 export const idx = (x: number, y: number, z: number) => x + W * (z + D * y);
@@ -660,6 +673,81 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
     }
 
+  /* ---------- 7b. behind the school: the kabaddi maidan, and the talav beyond it ----------
+   * The maidan is cut level into the foot of the tekdi. The talav sits a little higher, in a hollow
+   * where the tekdi's rain runs off, held on the maidan side by an earthen bund. This runs after the
+   * trees so the rest of the village keeps exactly the trees it had; any tree standing here goes. */
+  const playground = (() => {
+    const M = MAIDAN, P = TALAV;
+    const RIM = P.floor + 2; // the dry bank round the water (top block y; you stand just above the water)
+    // ground that belongs to something else stays as it is: fields, and the pads of the school, the tank and the Hanuman mandir
+    const pads: [number, number, number, number][] = [];
+    for (const s of structures) {
+      if (s.kind === "school") pads.push([s.x0 - 4, s.z0 - 2, s.x0 + s.w + 1, s.z0 + s.d + 3]);
+      if (s.kind === "tank") pads.push([s.x - 3, s.z - 3, s.x + 3, s.z + 3]);
+      if (s.kind === "hanuman") pads.push([s.x0 - 1, s.z0 - 1, s.x0 + 5, s.z0 + 5]);
+    }
+    const keep = (x: number, z: number) => plotMap[col(x, z)] >= 0 || roadCells[col(x, z)] > 0 || pads.some(([a, b, c, d]) => x >= a && x <= c && z >= b && z <= d);
+    const outM = (x: number, z: number) => Math.hypot(Math.max(M.x0 - x, 0, x - M.x1), Math.max(M.z0 - z, 0, z - M.z1));
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+    const changed: number[] = [];
+    for (let z = M.z0 - 6; z <= Math.ceil(P.z + P.rz) + 8; z++)
+      for (let x = M.x0 - 6; x <= Math.ceil(P.x + P.rx) + 9; x++) {
+        if (x < 1 || z < 1 || x >= W - 1 || z >= D - 1 || keep(x, z)) continue;
+        const c = col(x, z);
+        let h = height[c], t = top[c];
+        const dm = outM(x, z);
+        if (dm === 0) {
+          h = M.y;
+          t = B.DIRT;
+        } else if (dm < 5) h = Math.round(clamp(h, M.y - dm * 1.2, M.y + dm * 1.4)); // banks down to the maidan
+        const dp = talavOut(x + 0.5, z + 0.5);
+        if (dp < 0) {
+          // the water: shallow at the edge, a little deeper in the middle
+          h = dp < -1.4 ? P.floor : P.floor + 1;
+          t = dp < -1.4 ? B.DIRT : B.SAND;
+        } else if (dp < 1.2) {
+          h = RIM;
+          if (t !== B.GRASS && t !== B.RED_SOIL) t = B.GRASS;
+        } else if (dp < 8 && dm > 0) h = Math.round(clamp(h, RIM - (dp - 1.2) * 1.4, RIM + (dp - 1.2) * 2)); // the bund, and the hill behind
+        if (h === height[c] && t === top[c] && dp >= 0) continue;
+        height[c] = h;
+        top[c] = t;
+        changed.push(c);
+      }
+    // trees that stood on ground that moved go, canopy and all
+    const moved = new Uint8Array(W * D);
+    for (const c of changed) moved[c] = 1;
+    for (let i = trees.length - 1; i >= 0; i--) {
+      const tr = trees[i];
+      if (!tr.trunks.some(([x, z]) => moved[col(x, z)])) continue;
+      trees.splice(i, 1);
+      const r = Math.ceil(tr.r) + 1, x0 = Math.floor(tr.x), z0 = Math.floor(tr.z);
+      for (let y = tr.y; y < Math.min(H, tr.y + tr.h + 4); y++)
+        for (let dz = -r; dz <= r; dz++)
+          for (let dx = -r; dx <= r; dx++) {
+            const b = get(x0 + dx, y, z0 + dz);
+            if (b === B.LEAVES || b === B.BANYAN_LEAVES || b === B.LOG) set(x0 + dx, y, z0 + dz, B.AIR);
+          }
+    }
+    // rewrite the columns: rock, earth, the surface, water in the talav, open air above
+    for (const c of changed) {
+      const x = c % W, z = Math.floor(c / W), h = height[c];
+      const wet = talavOut(x + 0.5, z + 0.5) < 0;
+      for (let y = 1; y < H; y++) set(x, y, z, y < h - 3 ? B.STONE : y < h ? B.DIRT : y === h ? top[c] : wet && y < P.level ? B.WATER : B.AIR);
+      reserved[c] = 1;
+    }
+    const y = M.y + 1;
+    structures.push({ kind: "kabaddi", x0: M.x0, z0: M.z0, x1: M.x1, z1: M.z1, y });
+    structures.push({ kind: "talav", x: P.x, z: P.z, rx: P.rx, rz: P.rz, level: P.level, y: P.floor + 1 });
+    plate(M.x0 - 0.4, COURT.mid + 4.5, y, -Math.PI / 2, ["कबड्डी मैदान", "Kabaddi Maidan"], "#b45309");
+    plate(P.x - P.rx - 0.9, P.z - P.rz + 0.2, RIM + 1, -Math.PI * 0.62, ["उखळी तलाव", "Ukhali Talav"], "#1d6a8a"); // at the bund's north end
+    return {
+      kabaddi: { x: M.x0 + 0.5, y, z: COURT.mid - 3 }, // the west touchline, on the raiders' half
+      talav: { x: P.x - P.rx - 1.1, y: RIM + 1, z: P.z }, // on the bund, facing the water
+    };
+  })();
+
   /* ---------- 8. grass tufts and marigolds ---------- */
   for (let z = 1; z < D - 1; z++)
     for (let x = 1; x < W - 1; x++) {
@@ -696,6 +784,8 @@ export function generateWorld(seed = WORLD_SEED): World {
       well: lm(well, "Well"),
       market: lm(market, "Town market"),
       ghat: { ...vihir, label: "Vihir (field well)" },
+      kabaddi: lm(playground.kabaddi, "Kabaddi maidan"),
+      talav: lm(playground.talav, "Talav (pond)"),
     },
   };
 }

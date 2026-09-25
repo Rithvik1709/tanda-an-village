@@ -12,7 +12,8 @@ export class Water {
   readonly mesh: THREE.Mesh;
   private uniforms: Record<string, THREE.IUniform>;
 
-  constructor(hf: Heightfield, level: number) {
+  /** `pond` limits the sheet to one pond, an ellipse (centre x, z and radii); without it the water covers the map. */
+  constructor(hf: Heightfield, level: number, pond?: { x: number; z: number; rx: number; rz: number }) {
     const data = new Uint8Array(W * D);
     for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) data[x + W * z] = Math.max(0, Math.min(255, ((hf.at(x + 0.5, z + 0.5) - level + 4) / 8) * 255));
     const tex = new THREE.DataTexture(data, W, D, THREE.RedFormat, THREE.UnsignedByteType);
@@ -26,6 +27,7 @@ export class Water {
       uSunColor: { value: new THREE.Color("#fff2d8") },
       uSky: { value: new THREE.Color("#8fb4d6") },
       uHorizon: { value: new THREE.Color("#e8d8c0") },
+      uPond: { value: pond ? new THREE.Vector4(pond.x, pond.z, pond.rx, pond.rz) : new THREE.Vector4(0, 0, 0, 0) },
       ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
     };
     const mat = new THREE.ShaderMaterial({
@@ -44,7 +46,7 @@ export class Water {
           #include <fog_vertex>
         }`,
       fragmentShader: /* glsl */ `
-        uniform float uTime; uniform sampler2D uGround; uniform vec3 uSunDir, uSunColor, uSky, uHorizon;
+        uniform float uTime; uniform sampler2D uGround; uniform vec3 uSunDir, uSunColor, uSky, uHorizon; uniform vec4 uPond;
         varying vec3 vWorld;
         #include <fog_pars_fragment>
         ${NOISE_GLSL}
@@ -53,6 +55,8 @@ export class Water {
           float ground = texture2D(uGround, uv).r * 8.0 - 4.0;   // ground height relative to the water
           float depth = clamp(-ground, 0.0, 4.0);
           if (depth < 0.02) discard;
+          // a pond's sheet stops at its own banks, even where lower ground lies beyond them
+          if (uPond.z > 0.0 && length((vWorld.xz - uPond.xy) / uPond.zw) > 1.06) discard;
           // ripples: two drifting noise fields make a gently moving normal
           vec2 p = vWorld.xz;
           float e = 0.15;
@@ -75,9 +79,10 @@ export class Water {
           #include <fog_fragment>
         }`,
     });
-    const geo = new THREE.PlaneGeometry(W, D, 1, 1);
+    const [x0, z0, x1, z1] = pond ? [pond.x - pond.rx - 1, pond.z - pond.rz - 1, pond.x + pond.rx + 1, pond.z + pond.rz + 1] : [0, 0, W, D];
+    const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0, 1, 1);
     geo.rotateX(-Math.PI / 2);
-    geo.translate(W / 2, level, D / 2);
+    geo.translate((x0 + x1) / 2, level, (z0 + z1) / 2);
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.renderOrder = 3;
     this.mesh.name = "water";

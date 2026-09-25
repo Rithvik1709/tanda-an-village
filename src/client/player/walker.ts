@@ -16,7 +16,8 @@ export class Walker {
   onGround = false;
   wading = 0; // water depth at the feet
 
-  constructor(private ground: Ground, private solid: Solid, private waterLevel: number, private bounds: number) {}
+  /** `water` gives the water surface at a point (the talav sits higher than the old river level). */
+  constructor(private ground: Ground, private solid: Solid, private water: (x: number, z: number) => number, private bounds: number) {}
 
   /** The floor under a point: the terrain, or the top of a low solid block you're standing over. */
   floorAt(x: number, z: number, feet: number) {
@@ -44,7 +45,8 @@ export class Walker {
       wx = (fx * input.forward + rx * input.right) / len;
       wz = (fz * input.forward + rz * input.right) / len;
     }
-    this.wading = Math.max(0, this.waterLevel - this.ground(this.pos.x, this.pos.z));
+    const waterLevel = this.water(this.pos.x, this.pos.z);
+    this.wading = Math.max(0, waterLevel - this.ground(this.pos.x, this.pos.z));
     let speed = input.sprint ? WALK.run : WALK.walk;
     if (this.wading > 0.2) speed *= this.wading > 1.1 ? 0.45 : 0.65;
     const k = 1 - Math.exp(-(this.onGround || this.wading > 1.1 ? 12 : 3) * dt);
@@ -80,7 +82,7 @@ export class Walker {
 
     // vertical: follow the floor, jump, fall, float
     const floor = this.floorAt(this.pos.x, this.pos.z, this.pos.y);
-    const swimY = this.waterLevel - 1.25;
+    const swimY = waterLevel - 1.25;
     if (this.wading > 1.4) {
       // deep water: bob at the surface
       this.vel.y += (swimY - this.pos.y) * 8 * dt - this.vel.y * 4 * dt;

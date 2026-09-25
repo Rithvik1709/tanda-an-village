@@ -23,7 +23,7 @@ export class MapView {
     this.el.className = "mapview";
     this.el.hidden = true;
     this.el.innerHTML = `<div class="map-card"><button class="x" title="Close (M)">✕</button><h2>Ukhali Tanda <small>उखळी तांडा · the tanda map</small></h2><canvas></canvas>
-      <div class="map-legend"><span><i style="background:#3fbf5a"></i>your land</span><span><i style="background:#f0a030"></i>for sale</span><span><i style="background:#5a8fe0"></i>you listed</span><span><i style="background:#ffffff"></i>other farms</span><span>▲ you</span></div><div class="map-credit">Roads: © OpenStreetMap contributors</div></div>`;
+      <div class="map-legend"><span><i style="background:#3fbf5a"></i>your land</span><span><i style="background:#f0a030"></i>for sale</span><span><i style="background:#5a8fe0"></i>you listed</span><span><i style="background:#ffffff"></i>other farms</span><span><i style="background:#f2b12e;border-radius:50%"></i>kaam (a job)</span><span>▲ you</span></div><div class="map-credit">Roads: © OpenStreetMap contributors</div></div>`;
     parent.appendChild(this.el);
     this.canvas = this.el.querySelector("canvas")!;
     this.el.querySelector(".x")!.addEventListener("click", () => this.close());
@@ -55,7 +55,8 @@ export class MapView {
     return c;
   }
 
-  show(save: Save, day: number, player: { x: number; z: number; yaw: number }) {
+  /** `jobs`: neighbours who have kaam for you today (drawn as gold "!" pins). */
+  show(save: Save, day: number, player: { x: number; z: number; yaw: number }, jobs: { x: number; z: number; label: string }[] = []) {
     this.open = true;
     this.el.hidden = false;
     const S = 3;
@@ -98,6 +99,8 @@ export class MapView {
       [L.tank, "Water tank", 6, 4, "left"],
       [L.market, "Town mandi (to Jalna)", 6, -10, "left"],
       [L.ghat, "Vihir", 8, 4, "left"],
+      [L.kabaddi, "Kabaddi maidan", -6, -6, "right"],
+      [L.talav, "Talav (fishing)", 8, 10, "left"],
     ];
     for (const [lm, text, dx, dz, align] of pins) {
       const px = (lm.x + 0.5) * S, pz = (lm.z + 0.5) * S;
@@ -111,6 +114,21 @@ export class MapView {
       g.textAlign = align;
       label(g, text, px + dx, pz + dz, "#ffffff", true);
       g.textAlign = "center";
+    }
+    for (const j of jobs) {
+      const px = j.x * S, pz = j.z * S;
+      g.fillStyle = "#f2b12e";
+      g.strokeStyle = "#3a2406";
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(px, pz, 7, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      g.fillStyle = "#3a2406";
+      g.font = "900 11px system-ui";
+      g.textAlign = "center";
+      g.fillText("!", px, pz + 4);
+      label(g, j.label, px, pz - 11, "#ffd98a", true);
     }
     // you
     g.save();

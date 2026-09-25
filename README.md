@@ -44,6 +44,12 @@ Created by **[Gajanan Rathod](https://github.com/gajanansr)**.
 - **A living tanda.** Neighbours hoe their own fields, women carry matkas from the well, children
   play in the chowk, and people steer round each other and the houses. At night tungsten bulbs come
   on, and you carry a torch (T).
+- **Things to do while the crops grow.** Every day three neighbours ask for a hand (kaam): onions
+  for Kashibai's guests, a can of water for Tulsa aaji, a tiffin run to the school, Chinki the goat
+  gone missing. Behind the Z.P. school the boys play **kabaddi** on a limed maidan: raid in one
+  breath, tag and get back, tackle their raider, with ₹101 for the day's first win. Past the maidan, in
+  a hollow at the foot of the tekdi, the **talav** has rohu, katla and the rare maral for anyone with
+  a bamboo gal. Cast, strike when the float dips, and play the fish in without snapping the line.
 - **Banjara culture.** Mirror-work ghaghras, bangles and coin-edged odhnis, torans over the doors,
   Teej sprout baskets, and the Naik who heads the tanda.
 - **Saves and a leaderboard.** You start instantly as a guest. A recovery code moves your farm to
@@ -61,10 +67,11 @@ Created by **[Gajanan Rathod](https://github.com/gajanansr)**.
 | **Shift** | run |
 | **Space** | jump |
 | **Mouse** | look |
-| **Left click** | harvest |
+| **Left click** | harvest · tag or tackle in kabaddi · strike when a fish bites |
 | **Right click** | use the tool in your hand (plough, sow, water, fill the can) |
 | **1–6** | pick a tool |
-| **E** | talk / trade |
+| **E** | talk / trade / help a neighbour / fish / play kabaddi |
+| **Space** or hold the mouse | reel in a fish |
 | **M** | map |
 | **L** | leaderboard |
 | **V** | first / third person |

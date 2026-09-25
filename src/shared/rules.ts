@@ -9,7 +9,9 @@ import { BULL_NAMES, bullsNow, CART_CAPACITY, FEED, MIN_MOOD, newBulls, PLOUGH_C
 import { hash2 } from "./rng.js";
 import type { LedgerEntry, Save } from "./save.js";
 import { clock, DAY_MS, msBetween } from "./time.js";
-import { D, H, idx, W, type World } from "./world.js";
+import { D, H, idx, talavOut, W, type World } from "./world.js";
+import { BASKET, biteFor, CASTS_PER_DAY, FISH, FISH_IDS, type FishId, fishCount, fishPrice, isFish } from "./fish.js";
+import { GIVERS, jobsFor } from "./jobs.js";
 
 /*
  * The rules of the game: the ONLY way a save changes. The client runs these for instant feedback;
@@ -50,7 +52,11 @@ export type Action =
   | { t: "sleep" }
   | { t: "tieBulls"; tie: boolean }
   | { t: "ploughField"; plot: number }
-  | { t: "friends" };
+  | { t: "friends" }
+  | { t: "job"; slot: number; step?: "take" }
+  | { t: "fish"; got: boolean }
+  | { t: "sellFish"; item: FishId; n: number }
+  | { t: "kabaddi"; won: boolean };
 
 export type Result = { ok: true; msg?: string; gained?: Record<string, number> } | { ok: false; error: string };
 
@@ -95,7 +101,7 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
-const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends", "tieBulls", "ploughField"]);
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends", "tieBulls", "ploughField", "job", "fish", "sellFish", "kabaddi"]);
 export const isNight = (hour: number) => hour >= 19.5 || hour < 4;
 /** How long until 6 am, from a night hour (ms). */
 export const untilMorning = (hour: number) => msBetween(hour, 6);
@@ -234,6 +240,98 @@ function story(world: World, save: Save, a: Extract<Action, { t: "talk" | "visit
         cell.wetUntil = FOREVER;
       }
       return { ok: true, msg: `The motor hums: drip lines now water ${p.name}` };
+    }
+  }
+}
+
+/** Pastimes and neighbourly help: the day's kaam, fishing in the talav, and kabaddi on the maidan. */
+function pastimes(save: Save, a: Extract<Action, { t: "job" | "fish" | "sellFish" | "kabaddi" }>, now: number): Result {
+  const day = clock(now).day;
+  switch (a.t) {
+    case "job": {
+      const job = jobsFor(day).find((j) => j.slot === a.slot);
+      if (!job) return fail("Nobody's asking for that today.");
+      const js = save.jobs?.day === day ? save.jobs : (save.jobs = { day, done: [] });
+      const who = GIVERS[job.who].name;
+      if (js.done.includes(job.slot)) return fail(`You've already helped ${who} today.`);
+      if (job.kind === "parcel") {
+        if (a.step === "take") {
+          if (js.carrying === job.slot) return fail("You're already carrying the tiffin.");
+          js.carrying = job.slot;
+          return { ok: true, msg: `${who} hands you a tiffin for ${GIVERS[job.to].name}` };
+        }
+        if (js.carrying !== job.slot) return fail(`Collect the tiffin from ${who} first.`);
+        delete js.carrying;
+      } else if (a.step) return fail("There's nothing to carry for that one.");
+      else if (job.kind === "produce") {
+        if ((save.inv[job.item] ?? 0) < job.n) return fail(`${who} needs ${job.n} ${CROPS[job.item].name.toLowerCase()} — you have ${save.inv[job.item] ?? 0}.`);
+        take(save, job.item, job.n);
+      } else if (job.kind === "fish") {
+        if (fishCount(save.inv) < job.n) return fail(`${who} needs ${job.n} fish — try the talav behind the school.`);
+        // the smallest fish go first; you keep the prized ones
+        let left = job.n;
+        for (const id of [...FISH_IDS].sort((p, q) => FISH[p].price - FISH[q].price)) {
+          const k = Math.min(left, save.inv[`fish:${id}`] ?? 0);
+          if (k) take(save, `fish:${id}`, k);
+          left -= k;
+        }
+      } else if (job.kind === "water") {
+        if (!save.inv.can) return fail("You need a watering can.");
+        if ((save.inv.water ?? 0) < job.n) return fail(`Fill your can first — Aaji needs ${job.n} pours and you have ${save.inv.water ?? 0}.`);
+        take(save, "water", job.n);
+      }
+      js.done.push(job.slot);
+      save.money += job.pay;
+      save.stats.earned += job.pay;
+      save.rep += job.rep;
+      bump(save, "job");
+      record(save, { day, kind: "sell", item: `job:${job.kind}`, n: 1, amount: job.pay, where: job.kind === "parcel" ? GIVERS[job.to].name : who });
+      return { ok: true, msg: `+₹${job.pay} · ★ +${job.rep} from ${job.kind === "parcel" ? GIVERS[job.to].name : who}`, gained: { money: job.pay } };
+    }
+    case "fish": {
+      if (!save.inv.rod) return fail("You need a fishing rod — Sitabai sells a bamboo gal.");
+      const f = save.fishing ?? { day, casts: 0, n: 0 };
+      if (f.day !== day) Object.assign(f, { day, casts: 0 });
+      if (f.casts >= CASTS_PER_DAY) return fail("The talav has gone quiet — the fish won't bite again today. Come back tomorrow.");
+      if (a.got && fishCount(save.inv) >= BASKET) return fail(`Your basket is full (${BASKET} fish) — sell some to Ganpat.`);
+      const bite = biteFor(save.id, f.n);
+      f.n++;
+      f.casts++;
+      save.fishing = f;
+      if (!a.got) return { ok: true, msg: "It got away!" };
+      const k = `fish:${bite.fish}`;
+      save.inv[k] = (save.inv[k] ?? 0) + 1;
+      bump(save, "fish");
+      return { ok: true, msg: `Caught a ${bite.kg} kg ${FISH[bite.fish].name.toLowerCase()}!`, gained: { [k]: 1 } };
+    }
+    case "sellFish": {
+      if (!isFish(a.item) || !qty(a.n)) return fail("Sell whole fish.");
+      const k = `fish:${a.item}`;
+      if ((save.inv[k] ?? 0) < a.n) return fail(`You don't have ${a.n} ${FISH[a.item].name.toLowerCase()}.`);
+      const amount = Math.round(fishPrice(a.item, day) * a.n * repBonus(save));
+      take(save, k, a.n);
+      save.money += amount;
+      save.stats.earned += amount;
+      record(save, { day, kind: "sell", item: k, n: a.n, amount, where: "village" });
+      return { ok: true, msg: `Sold ${a.n} ${FISH[a.item].name.toLowerCase()} for ₹${amount}`, gained: { money: amount } };
+    }
+    case "kabaddi": {
+      const k = save.kabaddi ?? { day: -1, played: 0, wins: 0 };
+      k.played++;
+      if (a.won) k.wins++;
+      const first = k.day !== day;
+      k.day = day;
+      save.kabaddi = k;
+      if (!first) return { ok: true, msg: a.won ? "You won again! (The prize is once a day — the boys cheer anyway.)" : "A good game. The prize is once a day." };
+      if (a.won) {
+        save.money += 101;
+        save.stats.earned += 101;
+        save.rep += 3;
+        record(save, { day, kind: "sell", item: "kabaddi", n: 1, amount: 101, where: "the kabaddi boys" });
+        return { ok: true, msg: "Victory! ₹101 and a coconut from the sarpanch · ★ +3", gained: { money: 101 } };
+      }
+      save.rep += 1;
+      return { ok: true, msg: "You lost, but the boys want you back tomorrow · ★ +1" };
     }
   }
 }
@@ -547,6 +645,11 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
     if (r.ok) save.updatedAt = now;
     return r;
   }
+  if (a.t === "job" || a.t === "fish" || a.t === "sellFish" || a.t === "kabaddi") {
+    const r = pastimes(save, a, now);
+    if (r.ok) save.updatedAt = now;
+    return r;
+  }
   if (a.t === "borrow" || a.t === "repay" || a.t === "store" || a.t === "withdraw") {
     const r = finance(world, save, a, now);
     if (r.ok) save.updatedAt = now;
@@ -585,6 +688,12 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
         for (let dz = -2; dz <= 2 && !near; dz++)
           for (let dx = -2; dx <= 2 && !near; dx++) near = !!block(blockAt(world, save, x + dx, y + dy, z + dz, now)).liquid;
       if (!near) return fail("Fill the can at the well or the vihir.");
+      // the talav behind the school is always there for a can
+      if (talavOut(x + 0.5, z + 0.5) < 3) {
+        inv.water = canCapacity(save);
+        r = { ok: true, msg: "Can filled at the talav" };
+        break;
+      }
       // which well? (the village well is the first, the field vihir the second)
       const wells = world.structures.filter((q) => q.kind === "well") as { x: number; z: number }[];
       const nearest = wells.map((q, i) => ({ i, d: Math.hypot(q.x - x, q.z - z) })).sort((p, q) => p.d - q.d)[0];

@@ -11,6 +11,8 @@ import { DAY_MS } from "../../shared/time";
 import { current } from "../../shared/missions";
 import { clock } from "../../shared/time";
 import type { World } from "../../shared/world";
+import { FISH, FISH_IDS, type FishId, fishPrice } from "../../shared/fish";
+import { GIVERS } from "../../shared/jobs";
 
 /*
  * The trader's and shopkeeper's panels. They only ever call `act` — the same actions the server
@@ -103,7 +105,12 @@ export class Panels {
     }
     const s = this.ctx.save();
     let r: Result | null = null;
-    if (what === "sell") {
+    if (what === "sellFish") {
+      const have = s.inv[`fish:${a}`] ?? 0;
+      const n = b === "all" ? have : Math.min(Number(b), have);
+      if (n < 1) return this.ctx.toast("No fish to sell.", "bad");
+      r = this.ctx.act({ t: "sellFish", item: a as FishId, n });
+    } else if (what === "sell") {
       const have = s.inv[a] ?? 0;
       const n = b === "all" ? have : Math.min(Number(b), have);
       if (n < 1) return this.ctx.toast(`No ${CROPS[a as CropId].name.toLowerCase()} to sell yet.`, "bad");
@@ -220,8 +227,14 @@ export class Panels {
         <td class="num">${have}</td><td class="num">${rs(p)} ${trend}</td><td class="num"><b>${rs(Math.round(p * have))}</b></td>
         <td class="acts"><button data-do="sell:${c}:1" ${have ? "" : "disabled"}>Sell 1</button><button data-do="sell:${c}:10" ${have >= 10 ? "" : "disabled"}>10</button><button data-do="sell:${c}:all" ${have ? "" : "disabled"}>All</button></td></tr>`;
     }).join("");
+    // fish from the talav: Ganpat buys those too, by the piece
+    const fishRows = FISH_IDS.filter((f) => s.inv[`fish:${f}`]).map((f) => {
+      const have = s.inv[`fish:${f}`] ?? 0, p = fishPrice(f, day);
+      return `<tr><td>🐟 ${FISH[f].name} <small>${FISH[f].local}</small></td><td class="num">${have}</td><td class="num">${rs(p)}</td><td class="num"><b>${rs(p * have)}</b></td>
+        <td class="acts"><button data-do="sellFish:${f}:1">Sell 1</button><button data-do="sellFish:${f}:all">All</button></td></tr>`;
+    }).join("");
     return `${heads.map((h) => `<div class="news ${h.kind}">${h.kind === "glut" ? "📉" : "📈"} ${h.headline}</div>`).join("")}
-      <table><thead><tr><th>Produce</th><th class="num">You have</th><th class="num">Price today</th><th class="num">Worth</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+      <table><thead><tr><th>Produce</th><th class="num">You have</th><th class="num">Price today</th><th class="num">Worth</th><th></th></tr></thead><tbody>${rows}${fishRows}</tbody></table>`;
   }
 
   /** 14-day price chart (what Ganpat pays), drawn as SVG. */
@@ -258,6 +271,17 @@ export class Panels {
       }
       if (e.item === "godown-rent") {
         d.lines.push(`Godown rent for ${e.n} · <b class="down">−${rs(e.amount)}</b>`);
+        byDay.set(e.day, d);
+        continue;
+      }
+      if (e.item.startsWith("job:") || e.item === "kabaddi") {
+        const giver = Object.values(GIVERS).find((g) => g.name === e.where);
+        d.lines.push(`${e.item === "kabaddi" ? "Kabaddi prize" : `A job for ${giver?.name ?? e.where}`} · <b class="up">+${rs(e.amount)}</b>`);
+        byDay.set(e.day, d);
+        continue;
+      }
+      if (e.item.startsWith("fish:")) {
+        d.lines.push(`Sold ${e.n} ${FISH[e.item.slice(5) as FishId]?.name.toLowerCase() ?? "fish"} · <b class="up">+${rs(e.amount)}</b>`);
         byDay.set(e.day, d);
         continue;
       }

@@ -5,7 +5,7 @@ import { advance, CROPS, msToRipe } from "../shared/crops";
 import { canCapacity, isNight, type Result, untilMorning } from "../shared/rules";
 import { newSave } from "../shared/save";
 import { clock, fmtHour, SEASON_DAYS, SEASON_NAMES } from "../shared/time";
-import { D, generateWorld, H, idx, W, WATER_LEVEL, WORLD_SEED } from "../shared/world";
+import { D, generateWorld, H, idx, MAIDAN, TALAV, talavOut, W, WATER_LEVEL, WORLD_SEED } from "../shared/world";
 import { buildAtlasTexture } from "./engine/atlas";
 import { Sky } from "./engine/sky";
 import { WorldRenderer } from "./engine/world-renderer";
@@ -49,6 +49,11 @@ import { loadSettings, SettingsPanel, TitleScreen, Tutorial } from "./ui/screens
 import { isTouch, TouchControls } from "./player/touch";
 import { FrameWatch, Q } from "./quality";
 import { closedText, hoursText, isOpen } from "../shared/hours";
+import { Playground } from "./scene/playground";
+import { Kabaddi, RAIDS } from "./kabaddi";
+import { atTalavEdge, Fishing } from "./fishing";
+import { DAYTIME, Jobs } from "./jobs";
+import { GIVERS } from "../shared/jobs";
 
 type Hooks = {
   ready: boolean;
@@ -132,7 +137,11 @@ const WATER_Y = WATER_LEVEL + 0.86;
 scene.add(buildTerrain(hf, WATER_Y));
 const water = new Water(hf, WATER_Y);
 scene.add(water.mesh);
-const walker = new Walker((x, z) => hf.at(x, z), (x, y, z) => { const id = get(x, y, z); return !TERRAIN.has(id) && block(id).solid; }, WATER_Y, W);
+const talavWater = new Water(hf, TALAV.level, TALAV);
+scene.add(talavWater.mesh);
+// the talav behind the school has its own water, higher than the old river's
+const waterSurface = (x: number, z: number) => (talavOut(x, z) < 1.5 ? TALAV.level : WATER_Y);
+const walker = new Walker((x, z) => hf.at(x, z), (x, y, z) => { const id = get(x, y, z); return !TERRAIN.has(id) && block(id).solid; }, waterSurface, W);
 walker.pos = { x: spawn.x, y: hf.at(spawn.x, spawn.z), z: spawn.z };
 const body = Object.defineProperty(walker, "inWater", { get: () => walker.wading > 0.3 }) as Walker & { readonly inWater: boolean };
 // the living landscape: modelled trees, and grass wherever the ground is grassy and open
@@ -140,6 +149,9 @@ const trees = new Trees(world.trees, (x, z) => hf.at(x, z));
 scene.add(trees.group);
 const village = new Village(world.structures, world.plots, (x, z) => hf.at(x, z));
 scene.add(village.group);
+// behind the school: the kabaddi court, and the talav's reeds, lotus and Dagdu mama with his rod
+const playground = new Playground((x, z) => hf.at(x, z));
+scene.add(playground.group);
 // pumps: at the vihir, and borewells by three fields (their sheds and tanks are solid)
 const VH = world.landmarks.ghat; // the vihir (its landmark is the path beside it)
 const PUMPS: { x: number; z: number; tankDir: [number, number] }[] = [
@@ -540,6 +552,89 @@ scene.add(nights.group);
 const fixedBodies = [...STALLS.map((s) => s.npc), ...NEIGHBOURS].map((n) => ({ pos: { x: n.group.position.x, z: n.group.position.z }, r: 0.34, fixed: true }));
 const playerBody = { pos: { x: 0, z: 0 }, r: 0.32 };
 scene.add(villagers.group);
+// ---- pastimes: the day's kaam from the neighbours, kabaddi on the maidan, fishing in the talav ----
+const jobs = new Jobs({
+  ui: uiRoot,
+  world,
+  nav,
+  ground: (x, z) => hf.at(x, z),
+  save: () => game.save,
+  now: () => game.now(),
+  act: (a) => game.act(a),
+  toast: (m, k) => hud.toast(m, k),
+  sound: (n) => audio.play(n),
+  dialogue: (who, title, text, buttons) => guide.dialogue(who, title, text, buttons),
+  closeDialogue: () => guide.onDialogue(false),
+});
+scene.add(jobs.group);
+fixedBodies.push(...jobs.bodies(), { pos: playground.dagduAt, r: 0.4, fixed: true });
+const kabaddi = new Kabaddi({
+  ui: uiRoot,
+  ground: (x, z) => hf.at(x, z),
+  place: (x, z, yaw) => {
+    Object.assign(body.pos, { x, y: hf.at(x, z), z });
+    Object.assign(body.vel, { x: 0, y: 0, z: 0 });
+    controls.yaw = yaw;
+    controls.pitch = -0.28;
+  },
+  toast: (m, k) => hud.toast(m, k),
+  sound: (n) => audio.play(n),
+  finish: (won) => {
+    const r = game.act({ t: "kabaddi", won });
+    hud.toast(r.ok ? (r.msg ?? "") : r.error, r.ok ? "ok" : "bad");
+    if (won) celebrate();
+  },
+});
+scene.add(kabaddi.group);
+const fishing = new Fishing({ scene, ui: uiRoot, farmer, save: () => game.save, now: () => game.now(), act: (a) => game.act(a), toast: (m, k) => hud.toast(m, k), sound: (n) => audio.play(n) });
+const onMaidan = () => body.pos.x > MAIDAN.x0 - 0.5 && body.pos.x < MAIDAN.x1 + 1.5 && body.pos.z > MAIDAN.z0 - 0.5 && body.pos.z < MAIDAN.z1 + 1.5;
+const nearDagdu = () => Math.hypot(body.pos.x - playground.dagduAt.x, body.pos.z - playground.dagduAt.z) < 2.3;
+/** What E would do here among the pastimes (the hint line), or "". */
+function pastimeHint(): string {
+  if (kabaddi.active || fishing.active) return "";
+  const h = nowHour();
+  const job = jobs.hint(body.pos, h);
+  if (job) return job;
+  if (nearDagdu() && DAYTIME(h)) return "<kbd>E</kbd> Talk to Dagdu mama, the old fisherman";
+  if (atTalavEdge(body.pos.x, body.pos.z) && !body.inWater) {
+    if (!game.save.inv.rod) return "🎣 Fish here with a gal (rod) — Sitabai sells one";
+    return fishing.castsLeft() > 0 ? `<kbd>E</kbd> Cast your line into the talav <small class="hours">· ${fishing.castsLeft()} casts left today</small>` : "🎣 The fish have stopped biting today — come back tomorrow";
+  }
+  if (onMaidan()) return Kabaddi.canPlay(h) ? `<kbd>E</kbd> Play kabaddi with the boys <small class="hours">· ${RAIDS} raids each · ₹101 for the day's first win</small>` : "The boys play kabaddi here by day, 8 am to 7 pm";
+  return "";
+}
+/** E among the pastimes: true if it did something. */
+function pastimeInteract(): boolean {
+  if (fishing.active) {
+    fishing.press();
+    return true;
+  }
+  if (kabaddi.active) return true;
+  const h = nowHour();
+  if (jobs.interact(body.pos, h)) return true;
+  if (nearDagdu() && DAYTIME(h)) {
+    guide.dialogue("Dagdu mama · दगडू मामा", "The old fisherman", "Sit, sit. The talav fills from the tekdi every monsoon, and the fish come with it. Cast out past the lotus. When the float dips — strike! Then reel slowly: when the fish pulls hard, let it run, or your line will snap. They bite best at dawn and in the evening. And the maral… the maral you must earn.", [{ label: "Thank you, mama", onClick: () => guide.onDialogue(false) }]);
+    return true;
+  }
+  if (atTalavEdge(body.pos.x, body.pos.z) && !body.inWater) {
+    fishing.start(body.pos, controls.yaw);
+    // look along the line from a little to the side, so the rod, the line and the float all show
+    if (fishing.active) {
+      controls.yaw = fishing.heading + Math.PI + 0.6;
+      controls.pitch = -0.32;
+    }
+    return true;
+  }
+  if (onMaidan() && Kabaddi.canPlay(h)) {
+    const tag = TOUCH ? "tap Harvest" : "click";
+    guide.dialogue("Kabaddi · कबड्डी", "Ukhali vs the Hanuman Club", `The boys from the Hanuman Vyayamshala are here for a match! Five raids each. On your raid, cross the midline, tag defenders (${tag}) and get back over the line in one breath — don't let them catch you. On theirs, tackle their raider (${tag}) before he touches anyone and gets away. The day's first win pays ₹101 and a coconut.`, [
+      { label: "Let's play!", onClick: () => { guide.onDialogue(false); kabaddi.start(); } },
+      { label: "Not now", onClick: () => guide.onDialogue(false) },
+    ]);
+    return true;
+  }
+  return false;
+}
 const panels = new Panels(document.getElementById("ui")!, {
   save: () => game.save,
   now: () => game.now(),
@@ -563,7 +658,8 @@ const map = new MapView(document.getElementById("ui")!, world);
 map.onClose = () => (panels.open ? hud.setPlaying(true) : resumePlay());
 function showMap() {
   closeWindows();
-  map.show(game.save, clock(game.now()).day, { x: body.pos.x, z: body.pos.z, yaw: controls.yaw });
+  const kaam = jobs.open().map((id) => ({ ...jobs.spots().find((g) => g.id === id)!, label: GIVERS[id].name }));
+  map.show(game.save, clock(game.now()).day, { x: body.pos.x, z: body.pos.z, yaw: controls.yaw }, kaam);
   hud.setPlaying(true);
   releaseMouse();
 }
@@ -641,6 +737,8 @@ function cartHint(): string {
     const sabha = (ms.c["visit:gramsabha"] ?? 0) > (ms.base["visit:gramsabha"] ?? 0);
     return !sabha ? "<kbd>E</kbd> Join the gram sabha" : !ms.choice ? "Decide whom you back…" : "<kbd>E</kbd> Vote at the polling booth";
   }
+  const pastime = pastimeHint();
+  if (pastime) return pastime;
   if (game.save.bulls && !game.save.bulls.tied && nearYard()) return `<kbd>G</kbd> Tie Sarja & Raja ${game.save.inv.gotha ? "in their gotha" : "at the khunta"}`;
   if (game.save.bulls?.tied && nearYard()) return `<kbd>G</kbd> Untie Sarja & Raja`;
   if (game.save.bulls && game.save.inv.plough && game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)])) return "<kbd>P</kbd> Let Sarja & Raja plough this field";
@@ -867,8 +965,14 @@ game.onChange(refreshStatus);
 game.onChange(() => syncFields());
 const sfxQueue = { push: (name: string) => audio.play(name) };
 
-controls.onDig = () => void (!windowOpen() && useLeft());
-controls.onPlace = () => void (!windowOpen() && useRight());
+controls.onDig = () => {
+  if (windowOpen()) return;
+  // in a match a click tags (or tackles); at the talav it strikes or reels in
+  if (kabaddi.active) return kabaddi.tag(body.pos);
+  if (fishing.active) return fishing.press();
+  void useLeft();
+};
+controls.onPlace = () => void (!windowOpen() && !kabaddi.active && !fishing.active && useRight());
 controls.onSelect = (i) => {
   hotbar.select(i);
   hud.refresh();
@@ -983,6 +1087,9 @@ controls.onSleep = () => {
 controls.onInteract = () => {
   if (guide.dialogueOpen) return;
   if (windowOpen() && !panels.open) return;
+  // a line in the talav or a match on: E belongs to them
+  if (fishing.active) return fishing.press();
+  if (kabaddi.active) return;
   const h = nowHour();
   if (isNight(h) && nearHome() && !nearStall()) return void goHomeToSleep();
   if (Nights.evening(h) && nearFire() && !nearStall()) {
@@ -1005,6 +1112,8 @@ controls.onInteract = () => {
     if (r.ok) celebrate();
     return;
   }
+  // then the neighbours' kaam, the talav and the maidan (the story's own moments come first)
+  if (!panels.open && !map.open && !nearStall() && pastimeInteract()) return;
   if (map.open) return map.close();
   if (panels.open) return panels.close();
   const s = nearStall();
@@ -1157,8 +1266,14 @@ renderer.setAnimationLoop(() => {
   } else if (mode === "play") {
     // fixed sub-steps keep collision stable when a frame hitches
     const n = Math.ceil(dt / (1 / 120));
-    const input = windowOpen() ? STILL : controls.input(); // a window is open: the farmer waits
+    const wants = controls.input();
+    // a window is open, or you're at the talav with your line out: the farmer stands still
+    const input = windowOpen() || fishing.active ? STILL : wants;
     for (let i = 0; i < n; i++) walker.step(input, controls.yaw, dt / n);
+    if (fishing.active) {
+      fishing.update(dt, controls.held.has("Space"), !windowOpen() && (wants.forward !== 0 || wants.right !== 0), nowHour(), body.pos);
+      body.heading = fishing.heading;
+    }
     rig.update(dt, body.pos, controls.yaw, controls.pitch);
     // aim along the crosshair; you can only reach what's near your farmer
     const ray = rig.ray();
@@ -1220,8 +1335,8 @@ renderer.setAnimationLoop(() => {
   }
   // what's in your hand shows in your hand, and using it shows too
   const cur = hotbar.current;
-  farmer.hold(cur.kind === "tool" ? (cur.tool === "hoe" ? "hoe" : "can") : cur.kind === "seed" ? "bag" : "none");
-  if (now > actionUntil) farmer.action = "none";
+  farmer.hold(fishing.active ? "rod" : cur.kind === "tool" ? (cur.tool === "hoe" ? "hoe" : "can") : cur.kind === "seed" ? "bag" : "none");
+  if (now > actionUntil && !fishing.active) farmer.action = "none";
   updateDrops(dt);
   worldRenderer.cull(camera.position, mode === "title" ? 200 : settings.renderDistance);
   const electionOn = current(game.save)?.id === "election";
@@ -1240,7 +1355,7 @@ renderer.setAnimationLoop(() => {
     playerBody.pos.z = body.pos.z;
     const people = villagers.bodies();
     villagers.others = [...people, ...fixedBodies, playerBody];
-    separate([...people, ...fixedBodies, playerBody], nav);
+    separate([...people, ...kabaddi.bodies(), ...fixedBodies, playerBody], nav);
     for (const v of people) v.place((x, z) => hf.at(x, z));
     if (!walker.blockedAt(playerBody.pos.x, playerBody.pos.z)) {
       body.pos.x = playerBody.pos.x;
@@ -1262,9 +1377,19 @@ renderer.setAnimationLoop(() => {
   sky.update(hour, dt, mode === "play" ? new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z) : camera.position);
   const sc = skyColors(hour);
   water.update(now / 1000, sunDirection(hour), sc.sun, sc.top, sc.horizon);
+  talavWater.update(now / 1000, sunDirection(hour), sc.sun, sc.top, sc.horizon);
   trees.update(now / 1000);
   village.update(dt);
   nights.update(dt, hourOverride ?? clock(game.now()).hour);
+  {
+    const h = hourOverride ?? clock(game.now()).hour;
+    playground.update(dt, DAYTIME(h), camera.position);
+    kabaddi.update(dt, h, body.pos, body.vel, camera.position);
+    jobs.update(dt, now / 1000, h, camera.position, body.pos);
+    jobs.hidden = mode !== "play" || titleScreen.open || !!farmyard.ride;
+    if (fishing.active && (farmyard.ride || mode !== "play" || !!ploughJob)) fishing.stop();
+    if (kabaddi.active && (farmyard.ride || !!ploughJob)) kabaddi.quit("You left the match.");
+  }
   for (let i = confetti.length - 1; i >= 0; i--) {
     const c = confetti[i];
     c.v.y -= 6 * dt;
@@ -1567,6 +1692,8 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     hideLayer: (name: string, on: boolean) => {
       const m: Record<string, THREE.Object3D> = { villagers: villagers.group, grass: grass.group, trees: trees.group, village: village.group, fields: fields.group };
       if (name === "vfields") villagers.fields.group.visible = !on;
+      else if (name === "pastimes") for (const o of [playground.group, kabaddi.group, jobs.group, talavWater.mesh]) o.visible = !on;
+      else if (name === "kabaddi" || name === "jobs" || name === "playground") ({ kabaddi: kabaddi.group, jobs: jobs.group, playground: playground.group })[name].visible = !on;
       else m[name].visible = !on;
     },
     title: () => ({ open: titleScreen.open, mode }),
@@ -1610,6 +1737,14 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
       };
     },
     plots: world.plots.length,
+    kabaddi: () => kabaddi.debug(),
+    kabaddiStart: () => kabaddi.start(),
+    kabaddiTag: () => kabaddi.tag(body.pos),
+    fishing: () => ({ casts: fishing.castsLeft(), ...fishing.debug() }),
+    fishPress: () => fishing.press(),
+    jobs: () => ({ ...jobs.debug(), today: jobs.today() }),
+    interact: () => controls.onInteract(),
+    hint: () => document.querySelector(".interact")?.textContent ?? "",
   });
 });
 // the voxels remain for collision and the rules; everything you see is modelled, so the mesher draws nothing

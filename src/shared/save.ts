@@ -48,6 +48,9 @@ export type Save = {
   sleptDay?: number; // the game day you last woke on (one sleep per night)
   friendsDay?: number; // the last night you sat with friends at the chowk
   name?: string; // shown on the leaderboard (optional — guests are "Farmer ABCD")
+  jobs?: { day: number; done: number[]; carrying?: number }; // today's kaam: slots done, and a tiffin in hand
+  fishing?: { day: number; casts: number; n: number }; // casts today, and every cast ever (it picks the next bite)
+  kabaddi?: { day: number; played: number; wins: number }; // the day the last prize was given
 };
 
 export type Trip = { startedAt: number; load: Record<string, number> };

@@ -19,6 +19,11 @@ export class Npc {
     this.group.rotation.y = facing;
   }
 
+  /** Far-off people needn't cast shadows. */
+  setShadow(on: boolean) {
+    this.fig.setShadow(on);
+  }
+
   /** Turn toward the player when close; otherwise idle. */
   update(dt: number, player: THREE.Vector3) {
     this.t += dt;
