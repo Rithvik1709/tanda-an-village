@@ -140,6 +140,21 @@ export class Nights {
     });
   }
 
+  /** Your place in the circle: the gap between two friends nearest where you stand, facing the fire. */
+  seatBy(px: number, pz: number) {
+    let best = { x: 0, z: 0, face: 0 }, bd = Infinity;
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + 0.4 + Math.PI / 4;
+      const x = this.fire.x + Math.cos(a) * 1.3, z = this.fire.z + Math.sin(a) * 1.3;
+      const d = Math.hypot(px - x, pz - z);
+      if (d < bd) {
+        bd = d;
+        best = { x, z, face: Math.atan2(this.fire.x - x, this.fire.z - z) };
+      }
+    }
+    return { ...best, y: this.fire.y };
+  }
+
   /** Evening: friends out and the fire lit (7 to 11:30 pm). */
   static evening = (hour: number) => hour >= 19 && hour < 23.5;
 

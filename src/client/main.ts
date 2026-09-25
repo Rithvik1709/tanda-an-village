@@ -19,7 +19,7 @@ import { buildTerrain } from "./scene/terrain";
 import { Water } from "./scene/water";
 import { Grass } from "./scene/grass";
 import { Trees } from "./scene/trees";
-import { Village } from "./scene/village";
+import { TANK_LADDER_R, Village } from "./scene/village";
 import { Fields } from "./scene/crops";
 import { Post } from "./scene/post";
 import { FARMER, Figure } from "./scene/figure";
@@ -832,7 +832,9 @@ function cartHint(): string {
   }
   if (polaHere()) return `<kbd>E</kbd> ${tr("Lead Sarja & Raja in the Pola procession")}`;
   if (isNight(nowHour()) && nearHome()) return `<kbd>E</kbd> ${tr("Go home and sleep till morning")}`;
-  if (Nights.evening(nowHour()) && nearFire()) return `<kbd>E</kbd> ${tr("Sit with your friends by the fire")}`;
+  if (seat) return seat.climb ? "" : seat.kind === "tank" ? tr("Move to climb down") : tr("Move to stand up") + (game.save.friendsDay === clock(game.now()).day ? ` <small class="hours">${tr("· tonight's chai ✓")}</small>` : "");
+  if (Nights.evening(nowHour()) && nearFire()) return game.save.friendsDay === clock(game.now()).day ? `<kbd>E</kbd> ${tr("Sit by the fire again")} <small class="hours">${tr("· tonight's chai ✓")}</small>` : `<kbd>E</kbd> ${tr("Sit with your friends by the fire")}`;
+  if (nearLadder()) return `<kbd>E</kbd> ${tr("Climb the tanki")}`;
   if (schoolHere()) {
     const ms = game.save.missions;
     const sabha = (ms.c["visit:gramsabha"] ?? 0) > (ms.base["visit:gramsabha"] ?? 0);
@@ -883,6 +885,74 @@ function checkPlotEntry() {
 }
 
 /** The stall the player is standing at, if any (within a few steps of its counter). */
+/*
+ * Sitting down: in the circle round the evening fire, or up on the tanki's roof. While seated the
+ * farmer doesn't walk; moving (or E) stands you up — from the tanki you climb back down.
+ */
+type Seat = { kind: "fire" | "tank"; at: { x: number; y: number; z: number }; face: number; climb?: { from: THREE.Vector3; to: THREE.Vector3; t: number; dur: number; then: "sit" | "stand" } };
+let seat: Seat | null = null;
+const TANK = (() => {
+  const s = world.structures.find((x) => x.kind === "tank") as { x: number; z: number; y: number } | undefined;
+  if (!s) return null;
+  const cx = s.x + 0.5, cz = s.z + 0.5, base = s.y - 1, roof = base + 11 + 1.6 + 2.8;
+  const fx = cx - TANK_LADDER_R - 0.45;
+  return { foot: new THREE.Vector3(fx, 0, cz), rung: cx - TANK_LADDER_R - 0.3, cx, cz, roof };
+})();
+const nearLadder = () => !!TANK && !seat && Math.hypot(body.pos.x - TANK.foot.x, body.pos.z - TANK.foot.z) < 1.6;
+function climbTank() {
+  if (!TANK) return;
+  const ground = hf.at(TANK.foot.x, TANK.foot.z);
+  const from = new THREE.Vector3(TANK.rung, Math.max(body.pos.y, ground), TANK.foot.z);
+  const up = new THREE.Vector3(TANK.rung, TANK.roof, TANK.foot.z);
+  seat = { kind: "tank", at: { x: TANK.cx - 2.9, y: TANK.roof, z: TANK.cz }, face: -Math.PI / 2, climb: { from, to: up, t: 0, dur: (TANK.roof - from.y) / 2.4, then: "sit" } };
+  hud.toast(tr("Up the tanki ladder… hold on tight!"));
+}
+function sitByFire() {
+  const p = nights.seatBy(body.pos.x, body.pos.z);
+  seat = { kind: "fire", at: { x: p.x, y: p.y, z: p.z }, face: p.face };
+}
+/** Stand up (from the tanki: climb down first). */
+function standUp() {
+  if (!seat || seat.climb) return;
+  if (seat.kind === "tank" && TANK) {
+    const ground = hf.at(TANK.foot.x, TANK.foot.z);
+    seat.climb = { from: new THREE.Vector3(TANK.rung, TANK.roof, TANK.foot.z), to: new THREE.Vector3(TANK.rung, ground, TANK.foot.z), t: 0, dur: (TANK.roof - ground) / 3, then: "stand" };
+    return;
+  }
+  seat = null;
+}
+/** Each frame while seated or climbing: hold the farmer in place (or move them up the ladder). */
+function updateSeat(dt: number, wants: { forward: number; right: number; jump: boolean }) {
+  if (!seat) return false;
+  if (mode !== "play" || farmyard.ride) {
+    seat = null;
+    return false;
+  }
+  const c = seat.climb;
+  if (c) {
+    c.t = Math.min(1, c.t + dt / Math.max(0.5, c.dur));
+    const p = c.from.clone().lerp(c.to, c.t);
+    Object.assign(body.pos, { x: p.x, y: p.y, z: p.z });
+    body.heading = Math.PI / 2; // facing the ladder
+    if (c.t >= 1) {
+      if (c.then === "sit") {
+        seat.climb = undefined;
+        hud.toast(tr("The whole tanda below you. Move to climb down."), "ok");
+      } else {
+        Object.assign(body.pos, { x: TANK!.foot.x, y: c.to.y, z: TANK!.foot.z });
+        seat = null;
+      }
+    }
+  } else {
+    Object.assign(body.pos, seat.at);
+    body.heading = seat.face;
+    farmer.action = "sit";
+    if ((wants.forward || wants.right || wants.jump) && !windowOpen()) standUp();
+  }
+  Object.assign(body.vel, { x: 0, y: 0, z: 0 });
+  return true;
+}
+
 function nearStall() {
   // the nearest one wins (the Naik's door and Ganpat's stall are neighbours on the chowk), and a
   // neighbour standing closer than the counter gets E instead
@@ -1349,7 +1419,12 @@ controls.onInteract = () => {
   if (kabaddi.active) return;
   const h = nowHour();
   if (isNight(h) && nearHome() && !nearStall()) return void goHomeToSleep();
+  if (seat) return standUp();
+  if (nearLadder() && !nearStall()) return climbTank();
   if (Nights.evening(h) && nearFire() && !nearStall()) {
+    const again = game.save.friendsDay === clock(game.now()).day;
+    sitByFire();
+    if (again) return hud.toast(tr("More chai, more stories."));
     const r = game.act({ t: "friends" });
     const line = FIRESIDE[clock(game.now()).day % FIRESIDE.length];
     guide.dialogue("Friends at the chowk", "Evening round the fire", line.replace(/^[^:]+: /, "").replace(/^"|"$/g, ""), [{ label: r.ok ? (r.msg ?? "Good night!") : r.error, onClick: () => guide.onDialogue(false) }]);
@@ -1527,7 +1602,7 @@ renderer.setAnimationLoop(() => {
     const wants = controls.input();
     // a window is open, or you're at the talav with your line out: the farmer stands still
     const input = windowOpen() || fishing.active ? STILL : wants;
-    for (let i = 0; i < n; i++) walker.step(input, controls.yaw, dt / n);
+    if (!updateSeat(dt, wants)) for (let i = 0; i < n; i++) walker.step(input, controls.yaw, dt / n);
     if (fishing.active) {
       fishing.update(dt, controls.held.has("Space"), !windowOpen() && (wants.forward !== 0 || wants.right !== 0), nowHour(), body.pos);
       body.heading = fishing.heading;
@@ -1625,7 +1700,7 @@ renderer.setAnimationLoop(() => {
   const cur = hotbar.current;
   if (now > actionUntil) smartHold = null;
   farmer.hold(fishing.active ? "rod" : smartHold && cur.kind === "hand" ? smartHold : cur.kind === "tool" ? (cur.tool === "hoe" ? "hoe" : "can") : cur.kind === "seed" ? "bag" : "none");
-  if (now > actionUntil && !fishing.active) farmer.action = "none";
+  if (now > actionUntil && !fishing.active) farmer.action = seat && !seat.climb ? "sit" : "none";
   updateDrops(dt);
   hud.tickMoney(dt);
   worldRenderer.cull(camera.position, mode === "title" ? 200 : settings.renderDistance);
@@ -1640,7 +1715,7 @@ renderer.setAnimationLoop(() => {
   villagers.update(dt, now / 1000, hourOverride ?? clock(game.now()).hour, game.save, clock(game.now()).day, game.now(), camera.position);
   prof.villagers = prof.villagers * 0.95 + (performance.now() - tv0) * 0.05;
   // nobody walks through anybody: villagers, the stall keepers, and you
-  if (mode === "play" && !farmyard.ride) {
+  if (mode === "play" && !farmyard.ride && !seat) {
     playerBody.pos.x = body.pos.x;
     playerBody.pos.z = body.pos.z;
     const people = villagers.bodies();
@@ -1898,6 +1973,7 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
       mode = "play";
     },
     teleport: (x: number, y: number, z: number, yaw = controls.yaw, pitch = controls.pitch) => {
+      seat = null;
       enterGame(false);
       mode = "play";
       hud.setPlaying(true); // scripted play counts as playing: hide the click prompt
@@ -2047,6 +2123,8 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     kabaddiTag: () => kabaddi.tag(body.pos),
     fishing: () => ({ casts: fishing.castsLeft(), ...fishing.debug() }),
     ripeMarks: () => fields.ripeCount,
+    seat: () => (seat ? { kind: seat.kind, climbing: !!seat.climb, pose: farmer.action, y: +body.pos.y.toFixed(2) } : null),
+    places: () => ({ fire: { x: nights.fire.x, y: nights.fire.y, z: nights.fire.z }, ladder: TANK && { x: TANK.foot.x, z: TANK.foot.z, roof: TANK.roof } }),
     metrics: () => (window as unknown as { __metrics: unknown[] }).__metrics,
     arrive: () => arrived({ touch: TOUCH, lang: LANG_CODE, mission: game.save.missions.i }),
     confetti: () => confetti.length,
