@@ -1,4 +1,5 @@
 import { B } from "../../shared/blocks";
+import { advance } from "../../shared/crops";
 import { askingPrice, forSale } from "../../shared/land";
 import type { Save } from "../../shared/save";
 import { D, H, W, type World } from "../../shared/world";
@@ -17,16 +18,41 @@ export class MapView {
   private canvas: HTMLCanvasElement;
   open = false;
   onClose: () => void = () => {};
+  /** A place was picked on the map: guide the player there. */
+  onPick: (p: { x: number; z: number; label: string }) => void = () => {};
+  private picks: { x: number; z: number; label: string; r: number }[] = [];
+  /** The waypoint you set, drawn as a blue pin. */
+  waypoint: { x: number; z: number } | null = null;
+  private S = 3;
 
   constructor(parent: HTMLElement, private world: World) {
     this.el = document.createElement("div");
     this.el.className = "mapview";
     this.el.hidden = true;
-    this.el.innerHTML = `<div class="map-card"><button class="x" title="Close (M)">✕</button><h2>Ukhali Tanda <small>उखळी तांडा · the tanda map</small></h2><canvas></canvas>
+    this.el.innerHTML = `<div class="map-card"><button class="x" title="Close (M)">✕</button><h2>Ukhali Tanda <small>उखळी तांडा · the tanda map</small></h2><p class="map-tip">${typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches ? "Tap" : "Click"} a place to be guided there</p><canvas></canvas>
       <div class="map-legend"><span><i style="background:#3fbf5a"></i>your land</span><span><i style="background:#f0a030"></i>for sale</span><span><i style="background:#5a8fe0"></i>you listed</span><span><i style="background:#ffffff"></i>other farms</span><span><i style="background:#f2b12e;border-radius:50%"></i>kaam (a job)</span><span>▲ you</span></div><div class="map-credit">Roads: © OpenStreetMap contributors</div></div>`;
     parent.appendChild(this.el);
     this.canvas = this.el.querySelector("canvas")!;
     this.el.querySelector(".x")!.addEventListener("click", () => this.close());
+    // pick the nearest named place under the pointer (a landmark, a neighbour, a field), else the spot itself
+    this.canvas.addEventListener("click", (e) => {
+      const b = this.canvas.getBoundingClientRect();
+      // (on a phone held upright the whole game is turned; read the pointer in the canvas's own axes)
+      const turned = document.documentElement.classList.contains("rotated");
+      const fx = turned ? (e.clientY - b.top) / b.height : (e.clientX - b.left) / b.width;
+      const fz = turned ? 1 - (e.clientX - b.left) / b.width : (e.clientY - b.top) / b.height;
+      const x = fx * W, z = fz * D;
+      let best: (typeof this.picks)[number] | null = null, bd = Infinity;
+      for (const p of this.picks) {
+        const d = Math.hypot(p.x - x, p.z - z) - p.r;
+        if (d < bd) {
+          bd = d;
+          best = p;
+        }
+      }
+      this.onPick(best && bd < 4 ? best : { x, z, label: "your marker" });
+      this.close();
+    });
     this.base = this.paintTerrain();
   }
 
@@ -56,10 +82,18 @@ export class MapView {
   }
 
   /** `jobs`: neighbours who have kaam for you today (drawn as gold "!" pins). */
-  show(save: Save, day: number, player: { x: number; z: number; yaw: number }, jobs: { x: number; z: number; label: string }[] = []) {
+  show(save: Save, day: number, player: { x: number; z: number; yaw: number }, jobs: { x: number; z: number; label: string }[] = [], now = Date.now()) {
     this.open = true;
     this.el.hidden = false;
-    const S = 3;
+    const S = this.S;
+    this.picks = [];
+    // labels that would overlap one already drawn are dropped (the dot stays)
+    const placed: [number, number, number, number][] = [];
+    const room = (x: number, y: number, w: number, h: number) => {
+      if (placed.some(([a, b, c, d]) => x < c && x + w > a && y < d && y + h > b)) return false;
+      placed.push([x, y, x + w, y + h]);
+      return true;
+    };
     const cv = this.canvas;
     cv.width = W * S;
     cv.height = D * S;
@@ -82,8 +116,20 @@ export class MapView {
       }
       const cx = ((p.x0 + p.x1 + 1) / 2) * S, cz = ((p.z0 + p.z1 + 1) / 2) * S;
       label(g, p.name, cx, cz - 2);
+      placed.push([cx - 40, cz - 14, cx + 40, cz + 16]);
+      this.picks.push({ x: (p.x0 + p.x1 + 1) / 2, z: (p.z0 + p.z1 + 1) / 2, label: p.name, r: Math.min(p.x1 - p.x0, p.z1 - p.z0) / 2 });
       if (sale) label(g, `₹${askingPrice(p, day).toLocaleString("en-IN")}`, cx, cz + 12, "#ffd98a");
-      if (mine) label(g, listed ? "listed" : "yours", cx, cz + 12, listed ? "#bcd4ff" : "#c8f5c0");
+      if (mine) {
+        // how many are ripe here
+        let ripe = 0;
+        for (const [k, cell] of Object.entries(save.farm)) {
+          if (!cell.plant) continue;
+          const i = Number(k), x = i % W, z = Math.floor(i / W) % D;
+          if (x < p.x0 || x > p.x1 || z < p.z0 || z > p.z1) continue;
+          if (advance(cell.plant, cell.wetUntil, now).progress >= 1) ripe++;
+        }
+        label(g, ripe ? `🌾 ${ripe} ripe` : listed ? "listed" : "yours", cx, cz + 12, ripe ? "#ffe27a" : listed ? "#bcd4ff" : "#c8f5c0");
+      }
     }
     // the few places worth finding, nudged so the village square doesn't turn into a pile of text
     const L = this.world.landmarks;
@@ -102,8 +148,10 @@ export class MapView {
       [L.kabaddi, "Kabaddi maidan", -6, -6, "right"],
       [L.talav, "Talav (fishing)", 8, 10, "left"],
     ];
-    for (const [lm, text, dx, dz, align] of pins) {
+    // dots and job circles first (they claim their space), then the labels that still fit
+    for (const [lm, text] of pins) {
       const px = (lm.x + 0.5) * S, pz = (lm.z + 0.5) * S;
+      this.picks.push({ x: lm.x + 0.5, z: lm.z + 0.5, label: text, r: 1 });
       g.fillStyle = "#fff";
       g.strokeStyle = "rgba(20,14,10,0.8)";
       g.lineWidth = 2;
@@ -111,12 +159,11 @@ export class MapView {
       g.arc(px, pz, 3.5, 0, Math.PI * 2);
       g.fill();
       g.stroke();
-      g.textAlign = align;
-      label(g, text, px + dx, pz + dz, "#ffffff", true);
-      g.textAlign = "center";
+      placed.push([px - 4, pz - 4, px + 4, pz + 4]);
     }
     for (const j of jobs) {
       const px = j.x * S, pz = j.z * S;
+      this.picks.push({ x: j.x, z: j.z, label: j.label, r: 1.5 });
       g.fillStyle = "#f2b12e";
       g.strokeStyle = "#3a2406";
       g.lineWidth = 2;
@@ -128,7 +175,36 @@ export class MapView {
       g.font = "900 11px system-ui";
       g.textAlign = "center";
       g.fillText("!", px, pz + 4);
-      label(g, j.label, px, pz - 11, "#ffd98a", true);
+      placed.push([px - 8, pz - 8, px + 8, pz + 8]);
+    }
+    /** Try the label's own spot, then above, below, left and right of its point; skip it if none is free. */
+    const place = (text: string, px: number, pz: number, dx: number, dz: number, align: CanvasTextAlign, color: string) => {
+      g.font = "700 10px system-ui";
+      const w = g.measureText(text).width;
+      const tries: [number, number, CanvasTextAlign][] = [[dx, dz, align], [0, -9, "center"], [0, 16, "center"], [7, 4, "left"], [-7, 4, "right"]];
+      for (const [ox, oz, al] of tries) {
+        const lx = al === "left" ? px + ox : al === "right" ? px + ox - w : px + ox - w / 2;
+        if (!room(lx - 2, pz + oz - 10, w + 4, 13)) continue;
+        g.textAlign = al;
+        label(g, text, px + ox, pz + oz, color, true);
+        g.textAlign = "center";
+        return;
+      }
+    };
+    for (const j of jobs) place(j.label, j.x * S, j.z * S, 0, -11, "center", "#ffd98a");
+    for (const [lm, text, dx, dz, align] of pins) place(text, (lm.x + 0.5) * S, (lm.z + 0.5) * S, dx, dz, align, "#ffffff");
+    // your waypoint, if you set one
+    if (this.waypoint) {
+      const wx = this.waypoint.x * S, wz = this.waypoint.z * S;
+      g.fillStyle = "#4fb3ff";
+      g.strokeStyle = "#0b2a44";
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(wx, wz);
+      g.arc(wx, wz - 12, 7, Math.PI * 0.8, Math.PI * 0.2);
+      g.closePath();
+      g.fill();
+      g.stroke();
     }
     // you
     g.save();

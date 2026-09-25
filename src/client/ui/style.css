@@ -165,10 +165,6 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .settings-card label b { position: absolute; right: 22px; font-weight: 700; color: #8a5a10; }
 .settings-card label { position: relative; }
 .settings-card input[type="range"] { width: 100%; accent-color: #b8553a; }
-.tutorial { position: absolute; left: 12px; top: 56px; max-width: 300px; padding: 10px 12px; border-radius: 10px; background: rgba(246, 238, 219, 0.94); color: #2a2530; font-size: 14px; line-height: 1.45; pointer-events: auto; box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
-.tutorial .tut-head { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.6; margin-bottom: 4px; }
-.tutorial button { border: 0; background: none; font: 600 11px system-ui; cursor: pointer; opacity: 0.8; text-decoration: underline; }
-.tutorial kbd { margin: 0 1px; }
 .mobile-note { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; pointer-events: auto; background: rgba(20,14,10,0.55); z-index: 20; }
 .mobile-note .panel-card { max-width: 420px; }
 .play-prompt .pause-buttons { display: flex; gap: 8px; justify-content: center; }
@@ -177,7 +173,6 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .title-restore input { font: 14px ui-monospace, Menlo, monospace; padding: 8px 10px; border-radius: 8px; border: 0; width: 200px; text-transform: uppercase; }
 .title-restore button { min-width: 0 !important; padding: 8px 14px !important; font-size: 14px !important; }
 .title-screen .restore-msg { color: #fff; font-size: 13px; min-height: 1em; }
-.tutorial kbd { background: #2a2530; color: #f4ecd8; }
 .panel-card, .map-card { box-sizing: border-box; }
 .mobile-note .panel-card { width: 100%; }
 .slot .icon svg { width: 40px; height: 40px; display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35)); }
@@ -197,7 +192,6 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .welcome .steps { font-size: 15px; line-height: 1.6; padding-left: 20px; }
 .action-tip { position: absolute; left: 50%; top: calc(50% + 24px); transform: translateX(-50%); padding: 5px 12px; border-radius: 8px; background: rgba(30,24,20,0.7); font-size: 14px; font-weight: 600; white-space: nowrap; }
 .action-tip .no { color: #ffb4a0; }
-.tutorial { display: none !important; }
 .welcome { z-index: 30; background: rgba(20,14,10,0.55); }
 .map-credit { font-size: 10px; opacity: 0.55; margin-top: 4px; }
 .order-card { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 12px; margin-bottom: 10px; border-radius: 10px; background: #fbe3b8; font-size: 14px; }
@@ -255,7 +249,7 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
   --serif: Georgia, "Times New Roman", serif;
 }
 .panel { background: rgba(10, 6, 3, 0.42); backdrop-filter: blur(2px); }
-.panel-card, .map-card, .about-card, .goal, .tutorial {
+.panel-card, .map-card, .about-card, .goal {
   background: var(--glass) !important;
   color: var(--ink) !important;
   border: 1px solid var(--line) !important;
@@ -305,7 +299,7 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .bar i { background: var(--gold) !important; }
 .chart .grid { stroke: rgba(255, 236, 200, 0.12) !important; }
 .chart .axis { fill: var(--ink-2) !important; }
-kbd, .goal kbd, .help kbd, .welcome kbd, .tutorial kbd { background: rgba(255, 236, 200, 0.14) !important; color: var(--gold-2) !important; border: 1px solid var(--line); }
+kbd, .goal kbd, .help kbd, .welcome kbd { background: rgba(255, 236, 200, 0.14) !important; color: var(--gold-2) !important; border: 1px solid var(--line); }
 /* the goal card */
 .goal { border-left: 3px solid var(--gold) !important; }
 .goal b { color: #fff4dc; font-family: var(--serif); }
@@ -434,9 +428,9 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 .touch .t-top { position: absolute; top: 8px; right: calc(env(safe-area-inset-right) + 8px); display: flex; gap: 6px; pointer-events: auto; }
 .touch .t-top button { position: static; height: 34px; min-width: 34px; padding: 0 12px; border-radius: 17px; font-size: 12px; }
 .touch .t-top .t-menu { padding: 0; width: 38px; font-size: 16px; background: rgba(194,90,54,0.8); }
-.is-touch .hotbar { pointer-events: auto; bottom: calc(env(safe-area-inset-bottom) + 4px); transform: translateX(-50%) scale(0.62); transform-origin: bottom center; }
+.is-touch .hotbar { pointer-events: auto; bottom: calc(env(safe-area-inset-bottom) + 4px); transform: translateX(-50%) scale(0.9); transform-origin: bottom center; } /* 47 px slots: big enough for a thumb */
 /* the one contextual action ("Tie Sarja & Raja", "Load the cart"…) is a button you tap */
-.is-touch .interact { pointer-events: auto; top: auto !important; bottom: calc(env(safe-area-inset-bottom) + 60px) !important; font-size: 12px !important; padding: 8px 14px !important; border-radius: 18px; border: 1px solid var(--gold); background: rgba(28,19,12,0.78); max-width: 40%; text-align: center; }
+.is-touch .interact { pointer-events: auto; top: auto !important; bottom: calc(env(safe-area-inset-bottom) + 76px) !important; font-size: 12px !important; padding: 8px 14px !important; border-radius: 18px; border: 1px solid var(--gold); background: rgba(28,19,12,0.78); max-width: 40%; text-align: center; }
 .is-touch .interact.down { background: var(--rust); }
 .is-touch .interact { z-index: 6; } /* above the look pad, or a tap on its middle turns the camera instead */
 .is-touch .interact::after { content: " ›"; color: var(--gold); }
@@ -493,7 +487,7 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 
 /* ---- pastimes: the day's kaam, fishing at the talav, kabaddi on the maidan ---- */
 .kaam { position: absolute; right: 12px; top: 96px; width: 262px; padding: 9px 12px; border-radius: 12px; background: var(--glass); color: var(--ink); border: 1px solid var(--line); border-left: 4px solid var(--gold); backdrop-filter: blur(6px); box-shadow: 0 6px 20px rgba(0,0,0,0.18); pointer-events: auto; cursor: pointer; font-size: 12.5px; z-index: 6; }
-.kaam-head { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); display: flex; justify-content: space-between; }
+.kaam-head { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .kaam-head span { text-transform: none; letter-spacing: 0; font-weight: 700; opacity: 0.8; }
 .kaam ul { list-style: none; margin: 6px 0 4px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .kaam li { display: flex; gap: 6px; align-items: baseline; line-height: 1.3; }
@@ -502,7 +496,10 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 .kaam li.done { opacity: 0.5; text-decoration: line-through; }
 .kaam small { font-size: 10.5px; opacity: 0.6; }
 .is-touch .kaam { top: 62px; right: calc(env(safe-area-inset-right) + 8px); width: 200px; padding: 5px 9px; font-size: 11px; }
-.is-touch .kaam:not(.open) ul, .is-touch .kaam:not(.open) small { display: none; }
+.kaam:not(.open) ul, .kaam:not(.open) small { display: none; }
+.kaam:not(.open) { width: auto; }
+.kaam-head .fold::after { content: "▾"; margin-left: 8px; color: var(--gold); font-weight: 400; }
+.kaam.open .kaam-head .fold::after { content: "▴"; }
 
 .fishing { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); pointer-events: auto; z-index: 6; /* above the phone's look pad */ }
 .fish-card { width: 300px; padding: 10px 14px 12px; border-radius: 14px; background: rgba(24, 34, 38, 0.78); backdrop-filter: blur(5px); color: #eef4f2; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
@@ -538,3 +535,110 @@ body:not(.is-touch) .fishing.reeling .fish-foot::after { content: " · hold the 
 .is-touch .kb-score em { font-size: 16px; }
 .is-touch .kb-status { font-size: 11px; max-width: 46vw; padding: 3px 8px; }
 .is-touch .kb-breath { width: 200px; font-size: 12px; }
+.goal ul.objectives li span { display: flex; flex-direction: column; gap: 2px; }
+.goal ul.objectives small.how { font-size: 12px; font-weight: 500; opacity: 0.8; line-height: 1.35; color: var(--gold-2); }
+.is-touch .goal small.how { display: block !important; font-size: 10.5px !important; opacity: 0.85; } /* the one line on how to do it matters most on a phone */
+.info .clock { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.info .dial { width: 22px; height: 13px; color: #fff; }
+.info .season { opacity: 0.75; }
+.goods[hidden] { display: none !important; }
+.touch .t-use.long { font-size: 11px; line-height: 1.1; padding: 0 4px; }
+.sell-all { margin: 4px 0 10px; }
+.sell-all button { width: 100%; font-size: 16px; padding: 12px 18px; }
+small.why { font: 700 10px system-ui; text-transform: uppercase; letter-spacing: .05em; padding: 2px 5px; border-radius: 4px; margin-left: 4px; }
+small.why.glut { background: rgba(255,158,132,.18); color: var(--bad); }
+small.why.shortage { background: rgba(158,214,122,.18); color: var(--good); }
+/* the payoff: floaters and a bump where they land */
+.floater { position: absolute; transform: translate(-50%, -50%); font: 800 17px system-ui; color: #fff6dc; text-shadow: 0 2px 6px rgba(0,0,0,.7); pointer-events: none; white-space: nowrap; transition: transform .42s cubic-bezier(.2,1.4,.4,1), opacity .3s; z-index: 7; }
+.floater.money { color: #ffd98a; font-size: 18px; }
+.floater.up { transform: translate(-50%, calc(-50% - 34px)) scale(1.15); }
+.floater.fly { transition: left .6s cubic-bezier(.5,0,.8,.4), top .6s cubic-bezier(.5,0,.8,.4), transform .6s, opacity .6s; transform: translate(-50%, -50%) scale(.6); opacity: .2; }
+.floater.fade { opacity: 0; transition: opacity .6s; }
+.bump { animation: bump .35s ease-out; }
+@keyframes bump { 40% { transform: scale(1.12); } }
+.info.bump, .info .money.bump { animation: bump .35s ease-out; }
+.info .money { display: inline-block; }
+@media (prefers-reduced-motion: reduce) { .floater { transition: opacity .6s !important; } .bump { animation: none; } }
+.summary { z-index: 26; background: rgba(20,14,10,0.5); }
+.summary .panel-card { max-width: 520px; }
+.sum-rows { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.sum-rows li { display: flex; flex-direction: column; gap: 2px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.sum-rows li:last-child { border-bottom: 0; }
+.sum-rows b { font-size: 15.5px; }
+.sum-rows b.due { color: var(--bad); }
+.sum-rows span { font-size: 13px; color: var(--ink-2); }
+.summary .dlg-who { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+/* the message log */
+.log-bell { position: absolute; left: 14px; bottom: 16px; pointer-events: auto; border: 1px solid var(--line); background: rgba(30,24,20,0.6); color: #fff; border-radius: 10px; padding: 6px 9px; font-size: 16px; cursor: pointer; }
+.log-bell b { font: 700 10px system-ui; background: var(--rust); color: #fff; border-radius: 999px; padding: 1px 5px; margin-left: 3px; vertical-align: top; }
+.is-touch .log-bell { display: none; }
+.msglog { z-index: 27; }
+.msglog .panel-card { max-width: 560px; }
+.log-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 60vh; overflow: auto; }
+.log-list li { display: grid; grid-template-columns: 48px 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.log-list li.bad span { color: var(--bad); }
+.log-list time { font: 500 12px ui-monospace, Menlo, monospace; opacity: .6; padding-top: 2px; }
+.log-list em { font-style: normal; opacity: .6; }
+.map-tip { margin: 0 0 6px; font-size: 12px; opacity: .7; }
+.map-card canvas { cursor: crosshair; }
+/* on a phone the map takes the whole screen */
+.is-touch .mapview { background: rgba(20,14,10,0.9); }
+.is-touch .map-card { width: 100%; height: 100%; max-height: none; border-radius: 0; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto 1fr; column-gap: 14px; padding: 8px 12px; }
+.is-touch .map-card h2 { grid-column: 2; font-size: 16px; }
+.is-touch .map-card .map-tip { grid-column: 2; }
+.is-touch .map-card canvas { grid-column: 1; grid-row: 1 / span 4; height: calc(var(--app-h, 100vh) - 16px) !important; width: auto !important; max-width: 62vw; margin: 0; }
+.is-touch .map-card .map-legend { grid-column: 2; flex-direction: column; gap: 6px; }
+.is-touch .map-card .map-credit { grid-column: 2; }
+/* the floating joystick: the left third of the screen, clear of the goal card and the hotbar */
+.touch .t-move { position: absolute; left: 0; top: 45%; bottom: 0; width: 30%; pointer-events: auto; touch-action: none; }
+.touch .t-stick.floating { opacity: 0.95; }
+/* text and buttons at the size you chose (Settings) */
+.goal { scale: var(--ui, 1); transform-origin: top left; }
+.kaam { scale: var(--ui, 1); transform-origin: top right; }
+.info, .toasts, .kabaddi { scale: var(--ui, 1); transform-origin: top center; }
+.toasts { transform-origin: bottom center; }
+.hotbar, .interact, .fishing { scale: var(--ui, 1); transform-origin: bottom center; }
+.tip { scale: var(--ui, 1); transform-origin: top center; }
+.log-bell, .touch .t-stick { scale: var(--ui, 1); transform-origin: bottom left; }
+.touch .t-use, .touch .t-jump, .touch .t-harvest, .touch .t-pad { scale: var(--ui, 1); transform-origin: bottom right; }
+.touch .t-top { scale: var(--ui, 1); transform-origin: top right; }
+.panel-card, .map-card { scale: var(--ui, 1); transform-origin: center; }
+.is-touch .panel-card, .is-touch .map-card { scale: none; zoom: var(--ui, 1); }
+.settings .seg { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: flex; gap: 8px; margin: 6px 0; }
+.settings .seg legend { font-size: 13px; padding: 0 4px; }
+.settings .seg label { flex: 1; display: flex; }
+.settings .seg input { position: absolute; opacity: 0; }
+.settings .seg span { flex: 1; text-align: center; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); cursor: pointer; }
+.settings .seg input:checked + span { background: var(--rust); color: #fff; border-color: var(--rust); }
+.settings .seg input:focus-visible + span { outline: 2px solid var(--gold); }
+/* Marathi and Hindi: a Devanagari face, set a little larger so the matras read */
+:root[lang="mr"] body, :root[lang="hi"] body { font-family: "Noto Sans Devanagari", "Kohinoor Devanagari", "Mangal", system-ui, sans-serif; }
+:root[lang="mr"] .tip, :root[lang="hi"] .tip, :root[lang="mr"] .interact, :root[lang="hi"] .interact { font-size: 15px; }
+:root[lang="mr"] .kaam, :root[lang="hi"] .kaam, :root[lang="mr"] .help-grid, :root[lang="hi"] .help-grid { font-size: 14px; line-height: 1.55; }
+:root[lang="mr"] .info, :root[lang="hi"] .info { font-size: 15px; }
+:root[lang="mr"] .kaam-head, :root[lang="hi"] .kaam-head { text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.title-langs { display: flex; gap: 6px; margin-top: 10px; }
+.title-langs button { font: 600 13px "Noto Sans Devanagari", system-ui, sans-serif; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(20,12,4,0.35); color: var(--ink); cursor: pointer; pointer-events: auto; }
+.title-langs button.on { background: var(--gold); color: #2a1a08; border-color: var(--gold); }
+.howto { z-index: 26; }
+.howto .panel-card { max-width: 520px; }
+.howto-art { width: 100%; height: auto; margin: 8px 0 4px; border-radius: 10px; background: rgba(0,0,0,.18); }
+.howto-steps { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; line-height: 1.45; }
+.settings label.check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; margin: 6px 0; }
+/* the picture of the controls */
+.help-pic { width: 100%; height: auto; margin: 6px 0 4px; }
+.help-pic .hp-key { fill: rgba(255,236,200,0.08); stroke: rgba(255,222,170,0.35); stroke-width: 1.2; }
+.help-pic .hp-key.hi { fill: rgba(240,195,106,0.22); stroke: var(--gold); }
+.help-pic .hp-k { font: 700 13px ui-monospace, Menlo, monospace; fill: #fff4dc; }
+.help-pic .hp-lab { font: 600 12px system-ui, "Noto Sans Devanagari", sans-serif; fill: var(--gold-2); }
+.help-pic .hp-mouse { fill: rgba(255,236,200,0.06); stroke: rgba(255,222,170,0.35); }
+.help-pic .hp-line { stroke: rgba(255,222,170,0.35); fill: none; }
+.help-pic .hp-screen { fill: rgba(0,0,0,.25); stroke: rgba(255,222,170,0.35); stroke-width: 2; }
+.help-pic .hp-pad { fill: rgba(255,236,200,0.06); stroke: rgba(255,222,170,0.3); stroke-dasharray: 4 3; }
+.help-pic .hp-card { fill: rgba(28,19,12,.7); stroke: var(--gold); }
+.help-more { margin-top: 6px; }
+.help-more summary { cursor: pointer; font-weight: 700; color: var(--gold); padding: 6px 0; }
+.is-touch .help-pic { max-height: 42vh; }
+/* Settings → Reduce motion (defaults to the system setting) */
+.reduce-motion .fishing.surge .fish-status, .reduce-motion .kb-breath span, .reduce-motion .bump, .reduce-motion .rotate-icon, .reduce-motion .sk { animation: none !important; }
+.reduce-motion .floater { transition: opacity .6s !important; }

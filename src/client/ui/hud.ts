@@ -1,4 +1,6 @@
 import { CROP_IDS, CROPS } from "../../shared/crops";
+import { FISH_IDS } from "../../shared/fish";
+import { cropName, t } from "../i18n";
 import { type Hotbar, type Slot, slotName } from "../player/hotbar";
 
 /** The in-game HTML overlay: crosshair, hotbar, info chips, toasts, tooltip, F3 panel, play prompt. */
@@ -33,7 +35,7 @@ export class Hud {
     this.debug = el("pre", "debug", this.root);
     this.debug.hidden = true;
     this.prompt = el("div", "play-prompt", this.root);
-    this.prompt.innerHTML = `<b>Click to play</b><span>Paused · <b>H</b> shows all the controls</span>`;
+    this.prompt.innerHTML = `<b>${t("Click to play")}</b><span>${t("Paused · <b>H</b> shows all the controls")}</span>`;
     this.account = el("div", "account", this.prompt);
     this.banner = el("div", "banner", this.root);
     this.hint = el("div", "interact", this.root);
@@ -46,6 +48,7 @@ export class Hud {
       this.counts.push(el("span", "count", cell));
     });
     this.refresh();
+    this.paintBell();
   }
 
   refresh() {
@@ -68,11 +71,72 @@ export class Hud {
       c.className = s.kind === "tool" && s.tool === "can" ? "water" : "count";
       c.parentElement!.classList.toggle("empty", (s.kind === "seed" && !(inv[`seed:${s.crop}`] > 0)) || (s.kind === "block" && !(inv[`block:${s.block}`] > 0)));
     });
-    this.goods.innerHTML = CROP_IDS.map((id) => `<span><b>${inv[id] ?? 0}</b> ${CROPS[id].name}</span>`).join("");
+    // what you carry, only when you carry something (and only the kinds you have)
+    const fish = FISH_IDS.reduce((a, f) => a + (inv[`fish:${f}`] ?? 0), 0);
+    const html = CROP_IDS.filter((id) => inv[id] > 0).map((id) => `<span><b>${inv[id]}</b> ${cropName(id) || CROPS[id].name}</span>`).join("") + (fish ? `<span><b>${fish}</b> ${t("fish")}</span>` : "");
+    if (this.goods.innerHTML !== html) this.goods.innerHTML = html;
+    this.goods.hidden = !html;
   }
 
   setInfo(html: string) {
     this.info.innerHTML = html;
+    if (this.moneyShown !== null) this.paintMoney();
+  }
+
+  /*
+   * The payoff you can see: harvests float up and fly to what you carry; money pops and counts up.
+   * Plain DOM and CSS transitions, so it costs nothing on a cheap phone.
+   */
+  private moneyShown: number | null = null;
+  private moneyTarget = 0;
+  /** The money figure eases towards `to` instead of jumping. */
+  setMoney(to: number) {
+    if (this.moneyShown === null) this.moneyShown = to;
+    this.moneyTarget = to;
+  }
+  tickMoney(dt: number) {
+    if (this.moneyShown === null || this.moneyShown === this.moneyTarget) return;
+    const d = this.moneyTarget - this.moneyShown;
+    const step = Math.sign(d) * Math.max(1, Math.abs(d) * Math.min(1, dt * 6));
+    this.moneyShown = Math.abs(step) >= Math.abs(d) ? this.moneyTarget : Math.round(this.moneyShown + step);
+    this.paintMoney();
+  }
+  private paintMoney() {
+    const el = this.info.querySelector(".money");
+    if (el) el.textContent = `₹${this.moneyShown!.toLocaleString("en-IN")}`;
+  }
+  /** Text that rises from a point on screen (in CSS px of the game area) and flies into `to`. */
+  floater(text: string, from: { x: number; y: number }, to: Element | null, kind: "crop" | "money" = "crop") {
+    const f = el("div", `floater ${kind}`, this.root);
+    f.textContent = text;
+    f.style.left = `${from.x}px`;
+    f.style.top = `${from.y}px`;
+    const rootBox = this.root.getBoundingClientRect();
+    const tb = to && !(to as HTMLElement).hidden ? to.getBoundingClientRect() : null;
+    requestAnimationFrame(() => {
+      f.classList.add("up");
+      setTimeout(() => {
+        if (tb && !document.documentElement.classList.contains("reduce-motion")) {
+          f.style.left = `${tb.left - rootBox.left + tb.width / 2}px`;
+          f.style.top = `${tb.top - rootBox.top + tb.height / 2}px`;
+          f.classList.add("fly");
+        } else f.classList.add("fade");
+      }, 420);
+    });
+    setTimeout(() => {
+      f.remove();
+      if (to && !(to as HTMLElement).hidden) {
+        to.classList.remove("bump");
+        void (to as HTMLElement).offsetWidth;
+        to.classList.add("bump");
+      }
+    }, 1150);
+  }
+  get moneyEl() {
+    return this.info.querySelector(".money");
+  }
+  get carryEl() {
+    return this.goods.hidden ? this.info.querySelector(".basket") : this.goods;
   }
 
   setTip(text: string) {
@@ -80,7 +144,59 @@ export class Hud {
     this.tip.hidden = !text;
   }
 
+  /*
+   * Every message is also kept in a short log (last 30) you can open again: a bell by the hotbar on a
+   * computer, "Recent messages" in the phone menu. Repeats fold into one line with a count.
+   */
+  readonly log: { msg: string; kind: "ok" | "bad"; at: string; n: number }[] = [];
+  /** The game's clock as text, for the log. */
+  clockText: () => string = () => "";
+  onLog: () => void = () => {};
+  private bell?: HTMLElement;
+  private unread = 0;
+  private logEl?: HTMLElement;
+  get logOpen() {
+    return !!this.logEl && !this.logEl.hidden;
+  }
+  showLog() {
+    this.logEl ??= (() => {
+      const e = el("div", "panel msglog", this.root.parentElement!);
+      e.addEventListener("click", (ev) => {
+        const t = ev.target as HTMLElement;
+        if (t === e || t.closest("[data-close]")) this.closeLog();
+      });
+      return e;
+    })();
+    this.logEl.innerHTML = `<div class="panel-card"><button class="x" data-close>✕</button><h2>${t("Recent messages")}</h2>
+      ${this.log.length ? `<ul class="log-list">${[...this.log].reverse().map((l) => `<li class="${l.kind}"><time>${l.at}</time><span>${escapeHtml(l.msg)}${l.n > 1 ? ` <em>×${l.n}</em>` : ""}</span></li>`).join("")}</ul>` : `<p class="empty">Nothing yet. Messages from the village show up here.</p>`}</div>`;
+    this.logEl.hidden = false;
+    this.unread = 0;
+    this.paintBell();
+  }
+  closeLog() {
+    if (!this.logOpen) return;
+    this.logEl!.hidden = true;
+    this.onLog();
+  }
+  private paintBell() {
+    if (!this.bell) {
+      this.bell = el("button", "log-bell", this.root);
+      this.bell.title = t("Recent messages");
+      this.bell.addEventListener("click", () => this.showLog());
+    }
+    this.bell.innerHTML = `🔔${this.unread ? `<b>${Math.min(99, this.unread)}</b>` : ""}`;
+  }
+  private record(msg: string, kind: "ok" | "bad") {
+    const last = this.log[this.log.length - 1];
+    if (last && last.msg === msg) last.n++;
+    else this.log.push({ msg, kind, at: this.clockText(), n: 1 });
+    if (this.log.length > 30) this.log.shift();
+    this.unread++;
+    this.paintBell();
+  }
+
   toast(msg: string, kind: "ok" | "bad" = "ok") {
+    this.record(msg, kind);
     // the same message again just bumps a counter on the newest toast
     const last = this.toasts.lastElementChild as HTMLElement | null;
     if (last && last.dataset.msg === msg && !last.classList.contains("gone")) {
@@ -219,7 +335,4 @@ function el(tag: string, cls: string, parent: HTMLElement) {
   return e;
 }
 
-
-
-
-
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);

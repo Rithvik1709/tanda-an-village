@@ -133,8 +133,12 @@ export class Fields {
   private plants = new Map<string, THREE.InstancedMesh>(); // crop:stage
   private furrows: THREE.InstancedMesh;
   private wetFurrows: THREE.InstancedMesh;
-  private uniforms = { uTime: { value: 0 } };
+  private uniforms = { uTime: { value: 0 }, uBob: { value: 1 } };
   readonly aim: THREE.Mesh;
+  /** A small gold spark over each ripe plant in your own fields, so ripeness isn't told by colour alone. */
+  private ripe: THREE.InstancedMesh;
+  private tops = new Map<CropId, number>();
+  ripeCount = 0;
 
   constructor() {
     const plantMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, side: THREE.DoubleSide });
@@ -161,6 +165,10 @@ export class Fields {
           return p;
         }))!;
         const m = new THREE.InstancedMesh(g, plantMat, MAX);
+        if (st === 3) {
+          g.computeBoundingBox();
+          this.tops.set(crop, g.boundingBox!.max.y);
+        }
         m.count = 0;
         m.castShadow = true;
         m.receiveShadow = true;
@@ -192,6 +200,27 @@ export class Fields {
       f.frustumCulled = false;
       this.group.add(f);
     }
+    // ripe sparks: one instanced draw; they bob and turn gently unless motion is reduced
+    const spark = new THREE.OctahedronGeometry(0.1, 0);
+    spark.scale(1, 1.7, 1);
+    const sparkMat = new THREE.MeshBasicMaterial({ color: "#ffd24a", toneMapped: false });
+    sparkMat.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = this.uniforms.uTime;
+      sh.uniforms.uBob = this.uniforms.uBob;
+      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nuniform float uTime;\nuniform float uBob;").replace(
+        "#include <begin_vertex>",
+        /* glsl */ `#include <begin_vertex>
+        float ph = instanceMatrix[3][0] * 1.7 + instanceMatrix[3][2] * 0.9;
+        float a = uTime * 1.6 * uBob + ph;
+        transformed.xz = mat2(cos(a), -sin(a), sin(a), cos(a)) * transformed.xz;
+        transformed.y += sin(uTime * 2.4 + ph) * 0.07 * uBob;`,
+      );
+    };
+    this.ripe = new THREE.InstancedMesh(spark, sparkMat, MAX);
+    this.ripe.count = 0;
+    this.ripe.frustumCulled = false;
+    this.ripe.renderOrder = 3;
+    this.group.add(this.ripe);
     // the aim marker: a soft glowing square outline
     const c = document.createElement("canvas");
     c.width = c.height = 64;
@@ -211,11 +240,12 @@ export class Fields {
   }
 
   /** Rebuild instances from the save (called when it changes, and twice a second as crops grow). */
-  sync(save: Save, now: number, groundY: (x: number, z: number) => number) {
+  sync(save: Save, now: number, groundY: (x: number, z: number) => number, mine: (x: number, z: number) => boolean = () => true) {
     const counts = new Map<string, number>();
     for (const m of this.plants.values()) m.count = 0;
     this.furrows.count = 0;
     this.wetFurrows.count = 0;
+    this.ripe.count = 0;
     let dry = 0, wet = 0;
     const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), v = new THREE.Vector3();
     for (const [k, cell] of Object.entries(save.farm)) {
@@ -242,6 +272,7 @@ export class Fields {
       mtx.compose(v.set(x + 0.5 + (rnd - 0.5) * 0.15, y + 0.05, z + 0.5 + (rnd * 7 % 1 - 0.5) * 0.15), q, s);
       m.setMatrixAt(n, mtx);
       counts.set(key, n + 1);
+      if (st === 3 && this.ripe.count < MAX && mine(x, z)) this.ripe.setMatrixAt(this.ripe.count++, mtx.makeTranslation(x + 0.5, y + 0.05 + (this.tops.get(pl.crop) ?? 1) * s.x + 0.3, z + 0.5));
     }
     for (const [key, m] of this.plants) {
       m.count = counts.get(key) ?? 0;
@@ -249,6 +280,8 @@ export class Fields {
     }
     this.furrows.instanceMatrix.needsUpdate = true;
     this.wetFurrows.instanceMatrix.needsUpdate = true;
+    this.ripe.instanceMatrix.needsUpdate = true;
+    this.ripeCount = this.ripe.count;
     void dry;
     void wet;
   }
@@ -258,7 +291,8 @@ export class Fields {
     if (cell) this.aim.position.set(cell.x + 0.5, y + 0.14, cell.z + 0.5);
   }
 
-  update(t: number) {
+  update(t: number, calm = false) {
     this.uniforms.uTime.value = t;
+    this.uniforms.uBob.value = calm ? 0 : 1;
   }
 }

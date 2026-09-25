@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { inject as injectAnalytics } from "@vercel/analytics";
 import { B, block, BLOCKS, isCropBlock } from "../shared/blocks";
 import { advance, CROPS, msToRipe } from "../shared/crops";
-import { canCapacity, isNight, type Result, untilMorning } from "../shared/rules";
+import { canCapacity, isNight, type Result, soilQuality, untilMorning } from "../shared/rules";
 import { newSave } from "../shared/save";
 import { clock, fmtHour, SEASON_DAYS, SEASON_NAMES } from "../shared/time";
 import { D, generateWorld, H, idx, MAIDAN, TALAV, talavOut, W, WATER_LEVEL, WORLD_SEED } from "../shared/world";
@@ -40,12 +40,12 @@ import { FIRESIDE, Nights } from "./nights";
 import { Infrastructure } from "./scene/infrastructure";
 import { Nav, separate } from "./player/nav";
 import { Audio, renderRms, SOUNDS } from "./audio";
-import { Guide } from "./ui/guide";
+import { forDevice, Guide } from "./ui/guide";
 import { Leaderboard } from "./ui/leaderboard";
 import { PhoneMenu } from "./ui/phonemenu";
 import { AccountCard } from "./ui/account";
 import { current } from "../shared/missions";
-import { loadSettings, SettingsPanel, TitleScreen, Tutorial } from "./ui/screens";
+import { applyMotion, applyUiScale, calm, loadSettings, SettingsPanel, TitleScreen } from "./ui/screens";
 import { isTouch, TouchControls } from "./player/touch";
 import { FrameWatch, Q } from "./quality";
 import { closedText, hoursText, isOpen } from "../shared/hours";
@@ -55,6 +55,12 @@ import { atTalavEdge, Fishing } from "./fishing";
 import { DAYTIME, Jobs } from "./jobs";
 import { Helpers } from "./helpers";
 import { GIVERS } from "../shared/jobs";
+import { awaySummary, daySummary } from "../shared/summary";
+import { SummaryCard } from "./ui/summary";
+import { HowToCard } from "./ui/howto";
+import { cropName, isEnglish, LANG as LANG_CODE, t as tr } from "./i18n";
+import { SHOP_HOURS } from "../shared/hours";
+import { arrived, firstTime, metric } from "./metrics";
 import { HELPER_MIN_PLOTS } from "../shared/helpers";
 
 type Hooks = {
@@ -196,7 +202,7 @@ const syncFields = () => {
     const t = performance.now();
     save = { ...save, farm: Object.fromEntries(Object.entries(save.farm).filter(([k]) => !(reveal.get(k)! > t))) };
   }
-  fields.sync(save, game.now(), (x, z) => hf.at(x, z));
+  fields.sync(save, game.now(), (x, z) => hf.at(x, z), (x, z) => game.save.plots.includes(world.plotMap[x + W * z]));
 };
 const farmer = new Figure(FARMER);
 scene.add(farmer.root);
@@ -251,11 +257,12 @@ const audio = new Audio();
 const uiRoot = document.getElementById("ui")!;
 uiRoot.classList.add("ui-title");
 const settings = loadSettings();
+applyUiScale(settings);
+applyMotion(settings);
 controls.sensitivity = settings.sensitivity;
 audio.setVolume(settings.volume);
 const titleScreen = new TitleScreen(uiRoot);
 const settingsPanel = new SettingsPanel(uiRoot, settings);
-const tutorial = new Tutorial(uiRoot);
 const guide = new Guide(uiRoot, scene, (x, z) => hf.at(x, z));
 guide.act = (a) => game.act(a);
 guide.onToast = (m, k) => hud.toast(m, k);
@@ -288,6 +295,7 @@ function enterGame(lock: boolean) {
   titleScreen.hide();
   uiRoot.classList.remove("ui-title");
   mode = "play";
+  arrived({ touch: TOUCH, lang: LANG_CODE, mission: game.save.missions.i });
   audio.unlock();
   hud.setPlaying(false);
   if (TOUCH) {
@@ -338,6 +346,12 @@ accountCard.onGoogle = () => net.google();
 accountCard.onEmail = (email) => net.emailLink(email);
 accountCard.onSignOut = () => net.signOut();
 accountCard.onClose = () => (titleScreen.open ? hud.setPlaying(true) : resumePlay());
+function showLogWindow() {
+  closeWindows();
+  hud.showLog();
+  hud.setPlaying(true);
+  releaseMouse();
+}
 function showAccount(prompted = false) {
   closeWindows();
   accountCard.show(game.save.missions.i, prompted);
@@ -345,6 +359,12 @@ function showAccount(prompted = false) {
   releaseMouse();
 }
 hud.onAccountCard = () => showAccount();
+const summary = new SummaryCard(uiRoot);
+const howto = new HowToCard(uiRoot);
+howto.onClose = () => resumePlay();
+summary.onClose = () => resumePlay();
+hud.clockText = () => fmtHour(nowHour());
+hud.onLog = () => resumePlay();
 const WINDOWS = () => [
   { open: () => !!panels.open, close: () => panels.close() },
   { open: () => map.open, close: () => map.close() },
@@ -353,6 +373,9 @@ const WINDOWS = () => [
   { open: () => guide.helpOpen, close: () => guide.toggleHelp(false) },
   { open: () => phoneMenu.open, close: () => phoneMenu.close() },
   { open: () => accountCard.open, close: () => accountCard.close() },
+  { open: () => summary.open, close: () => summary.close() },
+  { open: () => howto.open, close: () => howto.close() },
+  { open: () => hud.logOpen, close: () => hud.closeLog() },
 ];
 function closeWindows() {
   switching = true;
@@ -362,7 +385,7 @@ function closeWindows() {
 function windowOpen() {
   return !!ploughJob || WINDOWS().some((w) => w.open()) || guide.dialogueOpen || !!document.querySelector(".welcome, .fs-gate:not([hidden])");
 }
-phoneMenu.onPick = (what) => (what === "account" ? showAccount() : what === "map" ? showMap() : what === "board" ? showBoard() : what === "help" ? controls.onHelp() : what === "view" ? controls.onView() : what === "torch" ? controls.onTorch() : settingsPanel.show());
+phoneMenu.onPick = (what) => (what === "log" ? showLogWindow() : what === "account" ? showAccount() : what === "map" ? showMap() : what === "board" ? showBoard() : what === "help" ? controls.onHelp() : what === "view" ? controls.onView() : what === "torch" ? controls.onTorch() : settingsPanel.show());
 phoneMenu.onClose = () => resumePlay();
 phoneMenu.onRestore = async (code) => {
   const err = await net.restore(code);
@@ -602,7 +625,7 @@ const kabaddi = new Kabaddi({
   },
 });
 scene.add(kabaddi.group);
-const fishing = new Fishing({ scene, ui: uiRoot, farmer, save: () => game.save, now: () => game.now(), act: (a) => game.act(a), toast: (m, k) => hud.toast(m, k), sound: (n) => audio.play(n) });
+const fishing = new Fishing({ scene, ui: uiRoot, farmer, save: () => game.save, now: () => game.now(), act: (a) => game.act(a), toast: (m, k) => hud.toast(m, k), sound: (n) => audio.play(n), easy: () => settings.easyFishing });
 const onMaidan = () => body.pos.x > MAIDAN.x0 - 0.5 && body.pos.x < MAIDAN.x1 + 1.5 && body.pos.z > MAIDAN.z0 - 0.5 && body.pos.z < MAIDAN.z1 + 1.5;
 const nearDagdu = () => Math.hypot(body.pos.x - playground.dagduAt.x, body.pos.z - playground.dagduAt.z) < 2.3;
 /** What E would do here among the pastimes (the hint line), or "". */
@@ -611,12 +634,12 @@ function pastimeHint(): string {
   const h = nowHour();
   const job = jobs.hint(body.pos, h) || helpers.hint(body.pos, h);
   if (job) return job;
-  if (nearDagdu() && DAYTIME(h)) return "<kbd>E</kbd> Talk to Dagdu mama, the old fisherman";
+  if (nearDagdu() && DAYTIME(h)) return `<kbd>E</kbd> ${tr("Talk to Dagdu mama, the old fisherman")}`;
   if (atTalavEdge(body.pos.x, body.pos.z) && !body.inWater) {
-    if (!game.save.inv.rod) return "🎣 Fish here with a gal (rod) — Sitabai sells one";
-    return fishing.castsLeft() > 0 ? `<kbd>E</kbd> Cast your line into the talav <small class="hours">· ${fishing.castsLeft()} casts left today</small>` : "🎣 The fish have stopped biting today — come back tomorrow";
+    if (!game.save.inv.rod) return tr("🎣 Fish here with a gal (rod) — Sitabai sells one");
+    return fishing.castsLeft() > 0 ? `<kbd>E</kbd> ${tr("Cast your line into the talav")} <small class="hours">${tr(" · {n} casts left today", { n: fishing.castsLeft() })}</small>` : tr("🎣 The fish have stopped biting today — come back tomorrow");
   }
-  if (onMaidan()) return Kabaddi.canPlay(h) ? `<kbd>E</kbd> Play kabaddi with the boys <small class="hours">· ${RAIDS} raids each · ₹101 for the day's first win</small>` : "The boys play kabaddi here by day, 8 am to 7 pm";
+  if (onMaidan()) return Kabaddi.canPlay(h) ? `<kbd>E</kbd> ${tr("Play kabaddi with the boys")} <small class="hours">${tr(" · {r} raids each · ₹101 for the day's first win", { r: RAIDS })}</small>` : tr("The boys play kabaddi here by day, 8 am to 7 pm");
   return "";
 }
 /** E among the pastimes: true if it did something. */
@@ -633,16 +656,35 @@ function pastimeInteract(): boolean {
     return true;
   }
   if (atTalavEdge(body.pos.x, body.pos.z) && !body.inWater) {
-    fishing.start(body.pos, controls.yaw);
-    // look along the line from a little to the side, so the rod, the line and the float all show
-    if (fishing.active) {
-      controls.yaw = fishing.heading + Math.PI + 0.6;
-      controls.pitch = -0.32;
-    }
+    const cast = () => {
+      fishing.start(body.pos, controls.yaw);
+      // look along the line from a little to the side, so the rod, the line and the float all show
+      if (fishing.active) {
+        controls.yaw = fishing.heading + Math.PI + 0.6;
+        controls.pitch = -0.32;
+      }
+    };
+    // the first time: a picture card on how it's done
+    if (!HowToCard.seen("fishing") && game.save.inv.rod) {
+      closeWindows();
+      howto.show("fishing", () => {
+        resumePlay();
+        cast();
+      });
+      hud.setPlaying(true);
+      releaseMouse();
+    } else cast();
+    return true;
+  }
+  if (onMaidan() && Kabaddi.canPlay(h) && !HowToCard.seen("kabaddi")) {
+    closeWindows();
+    howto.show("kabaddi", () => kabaddi.start());
+    hud.setPlaying(true);
+    releaseMouse();
     return true;
   }
   if (onMaidan() && Kabaddi.canPlay(h)) {
-    const tag = TOUCH ? "tap Harvest" : "click";
+    const tag = TOUCH ? "tap Tag" : "click";
     guide.dialogue("Kabaddi · कबड्डी", "Ukhali vs the Hanuman Club", `The boys from the Hanuman Vyayamshala are here for a match! Five raids each. On your raid, cross the midline, tag defenders (${tag}) and get back over the line in one breath — don't let them catch you. On theirs, tackle their raider (${tag}) before he touches anyone and gets away. The day's first win pays ₹101 and a coconut.`, [
       { label: "Let's play!", onClick: () => { guide.onDialogue(false); kabaddi.start(); } },
       { label: "Not now", onClick: () => guide.onDialogue(false) },
@@ -672,11 +714,18 @@ panels.onClose = () => resumePlay();
 // ---- the map (M) and the for-sale boards at plot gates ----
 const map = new MapView(document.getElementById("ui")!, world);
 map.onClose = () => (panels.open ? hud.setPlaying(true) : resumePlay());
+map.onPick = (p) => {
+  guide.waypoint = { x: p.x, y: hf.at(p.x, p.z), z: p.z, label: `📍 ${p.label}` };
+  map.waypoint = { x: p.x, z: p.z };
+  hud.toast(`Marker set: ${p.label} — follow the arrow`);
+  audio.play("buy");
+};
 function showMap() {
   closeWindows();
   const kaam: { x: number; z: number; label: string }[] = jobs.open().map((id) => ({ ...jobs.spots().find((g) => g.id === id)!, label: GIVERS[id].name }));
   if (game.save.plots.length >= HELPER_MIN_PLOTS) kaam.push({ ...helpers.mukadamAt, label: "Mukadam · labourers" });
-  map.show(game.save, clock(game.now()).day, { x: body.pos.x, z: body.pos.z, yaw: controls.yaw }, kaam);
+  map.waypoint = guide.waypoint;
+  map.show(game.save, clock(game.now()).day, { x: body.pos.x, z: body.pos.z, yaw: controls.yaw }, kaam, game.now());
   hud.setPlaying(true);
   releaseMouse();
 }
@@ -741,26 +790,68 @@ function feedBulls() {
   const r = game.act({ t: "feed" });
   hud.toast(r.ok ? (r.msg ?? "Fed") : r.error, r.ok ? "ok" : "bad");
 }
+/** "Sitabai's shop is closed · opens at 8 am (open 8 am – 8 pm)", in the chosen language. */
+function closedMsg(kind: string) {
+  const h = SHOP_HOURS[kind];
+  if (!h || isEnglish) return closedText(kind);
+  const open = hoursText(kind).split(" – ")[0];
+  return tr("{name} is closed · opens at {open} (open {hours})", { name: tr(h.name), open, hours: hoursText(kind) });
+}
+/*
+ * Sound as information: the mandir bell at 6:30 pm (the stalls close soon), a rooster at dawn, a soft
+ * chime when a crop of yours ripens while you're near its field.
+ */
+let lastHourHeard = -1, ripeHeard = -1;
+function daySounds() {
+  if (mode !== "play" || !booted_) return;
+  const h = nowHour();
+  const crossed = (at: number) => lastHourHeard >= 0 && lastHourHeard < at && h >= at && h - lastHourHeard < 2;
+  if (crossed(18.5)) {
+    audio.play("templebell");
+    hud.toast(tr("The mandir bell: the stalls close soon (Ganpat at 8 pm, the bank at 6)"));
+  }
+  if (crossed(6) || (lastHourHeard > 20 && h >= 6 && h < 7)) audio.play("rooster");
+  lastHourHeard = h;
+  // ripe crops in the field you're standing near
+  const here = world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)];
+  const plot = game.save.plots.map((id) => world.plots[id]).find((p) => Math.max(p.x0 - body.pos.x, body.pos.x - p.x1, p.z0 - body.pos.z, body.pos.z - p.z1) < 25) ?? (here >= 0 && game.save.plots.includes(here) ? world.plots[here] : null);
+  if (!plot) return void (ripeHeard = -1);
+  let ripe = 0, crop = "";
+  for (const [k, cell] of Object.entries(game.save.farm)) {
+    if (!cell.plant) continue;
+    const i = Number(k), x = i % W, z = Math.floor(i / W) % D;
+    if (x < plot.x0 || x > plot.x1 || z < plot.z0 || z > plot.z1) continue;
+    if (advance(cell.plant, cell.wetUntil, game.now()).progress >= 1) {
+      ripe++;
+      crop = cell.plant.crop;
+    }
+  }
+  if (ripeHeard >= 0 && ripe > ripeHeard) {
+    audio.play("ripe");
+    hud.toast(tr("🌾 {crop} is ripe in {plot}", { crop: cropName(crop) || crop, plot: plot.name }));
+  }
+  ripeHeard = ripe;
+}
 function cartHint(): string {
   if (nearCart()) {
-    if (game.save.trip) return cartInTown() ? "<kbd>R</kbd> Sell the load at the mandi" : "<kbd>R</kbd> Continue to the town mandi";
-    return cartInTown() ? "<kbd>R</kbd> Ride home" : "<kbd>R</kbd> Load the cart for the town mandi";
+    if (game.save.trip) return `<kbd>R</kbd> ${tr(cartInTown() ? "Sell the load at the mandi" : "Continue to the town mandi")}`;
+    return `<kbd>R</kbd> ${tr(cartInTown() ? "Ride home" : "Load the cart for the town mandi")}`;
   }
-  if (polaHere()) return "<kbd>E</kbd> Lead Sarja & Raja in the Pola procession";
-  if (isNight(nowHour()) && nearHome()) return "<kbd>E</kbd> Go home and sleep till morning";
-  if (Nights.evening(nowHour()) && nearFire()) return "<kbd>E</kbd> Sit with your friends by the fire";
+  if (polaHere()) return `<kbd>E</kbd> ${tr("Lead Sarja & Raja in the Pola procession")}`;
+  if (isNight(nowHour()) && nearHome()) return `<kbd>E</kbd> ${tr("Go home and sleep till morning")}`;
+  if (Nights.evening(nowHour()) && nearFire()) return `<kbd>E</kbd> ${tr("Sit with your friends by the fire")}`;
   if (schoolHere()) {
     const ms = game.save.missions;
     const sabha = (ms.c["visit:gramsabha"] ?? 0) > (ms.base["visit:gramsabha"] ?? 0);
-    return !sabha ? "<kbd>E</kbd> Join the gram sabha" : !ms.choice ? "Decide whom you back…" : "<kbd>E</kbd> Vote at the polling booth";
+    return !sabha ? `<kbd>E</kbd> ${tr("Join the gram sabha")}` : !ms.choice ? tr("Decide whom you back…") : `<kbd>E</kbd> ${tr("Vote at the polling booth")}`;
   }
   const pastime = pastimeHint();
   if (pastime) return pastime;
-  if (game.save.bulls && !game.save.bulls.tied && nearYard()) return `<kbd>G</kbd> Tie Sarja & Raja ${game.save.inv.gotha ? "in their gotha" : "at the khunta"}`;
-  if (game.save.bulls?.tied && nearYard()) return `<kbd>G</kbd> Untie Sarja & Raja`;
-  if (game.save.bulls && game.save.inv.plough && game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)])) return "<kbd>P</kbd> Let Sarja & Raja plough this field";
-  if (nearBulls() && game.save.inv.gerua && current(game.save)?.id === "pola" && !game.save.missions.flags.decorated) return "<kbd>F</kbd> Paint Sarja & Raja's horns with gerua";
-  if (nearBulls()) return `<kbd>F</kbd> Feed Sarja & Raja (${game.save.inv.fodder ?? 0} kadba)`;
+  if (game.save.bulls && !game.save.bulls.tied && nearYard()) return `<kbd>G</kbd> ${tr(game.save.inv.gotha ? "Tie Sarja & Raja in their gotha" : "Tie Sarja & Raja at the khunta")}`;
+  if (game.save.bulls?.tied && nearYard()) return `<kbd>G</kbd> ${tr("Untie Sarja & Raja")}`;
+  if (game.save.bulls && game.save.inv.plough && game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)])) return `<kbd>P</kbd> ${tr("Let Sarja & Raja plough this field")}`;
+  if (nearBulls() && game.save.inv.gerua && current(game.save)?.id === "pola" && !game.save.missions.flags.decorated) return `<kbd>F</kbd> ${tr("Paint Sarja & Raja's horns with gerua")}`;
+  if (nearBulls()) return `<kbd>F</kbd> ${tr("Feed Sarja & Raja ({n} kadba)", { n: game.save.inv.fodder ?? 0 })}`;
   return "";
 }
 function bullsChip(): string {
@@ -872,14 +963,78 @@ function updateDrops(dt: number) {
   }
 }
 
+/** While the use button is held and you sweep along a row: failures stay quiet, bar one "the can is empty". */
+let repeating = false;
+let repeatWarned = false;
 function report(r: Outcome, sfx: string): Outcome {
   if (!r) return r;
+  if (!r.ok && repeating) {
+    if (!repeatWarned && /empty|No .* seeds|full/.test(r.error)) {
+      repeatWarned = true;
+      hud.toast(r.error, "bad");
+    }
+    return r;
+  }
   if (r.ok) {
     sfxQueue.push(sfx);
     perform(sfx);
     if (r.msg) hud.toast(r.msg);
+    // a harvest rises from the plant and flies into what you carry
+    const got = Object.entries(r.gained ?? {}).find(([k]) => k in CROPS);
+    if (got && target) {
+      const v = new THREE.Vector3(target.x + 0.5, hf.at(target.x + 0.5, target.z + 0.5) + 0.9, target.z + 0.5).project(camera);
+      const box = canvas.getBoundingClientRect(), turned = document.documentElement.classList.contains("rotated");
+      const w = turned ? box.height : box.width, h = turned ? box.width : box.height;
+      hud.floater(`+${got[1]} ${CROPS[got[0] as keyof typeof CROPS].name.toLowerCase()}`, { x: (v.x * 0.5 + 0.5) * w, y: (-v.y * 0.5 + 0.5) * h }, hud.carryEl, "crop");
+    }
   } else hud.toast(r.error, "bad");
   return r;
+}
+
+/*
+ * The smart hand: aim at something and the hand does what it needs — plough grass or soil in your field,
+ * sow ploughed soil (the seed you last used, else onion, jowar, sugarcane), water a dry crop, fill the can
+ * at water, harvest what's ripe. The explicit tools (2–6) still work as before.
+ */
+type Smart = { t: "till" | "plant" | "water" | "refill" | "harvest"; label: string; crop?: import("../shared/crops").CropId; hold: "hoe" | "can" | "bag" | "none" };
+let lastSeed: import("../shared/crops").CropId | null = null;
+const seedToSow = () => [lastSeed, "onion", "jowar", "sugarcane"].find((c) => c && (game.save.inv[`seed:${c}`] ?? 0) > 0) as import("../shared/crops").CropId | undefined;
+function smartFor(t: Hit | null): Smart | null {
+  if (!t) return null;
+  const id = get(t.x, t.y, t.z);
+  if (block(id).liquid) return game.save.inv.can ? { t: "refill", label: "Fill can", hold: "can" } : null;
+  const crop = isCropBlock(id);
+  const cell = game.save.farm[String(idx(t.x, crop ? t.y - 1 : t.y, t.z))];
+  if (cell?.plant) {
+    const p = advance(cell.plant, cell.wetUntil, game.now());
+    if (p.progress >= 1) return { t: "harvest", label: "Harvest", hold: "none" };
+    if (cell.wetUntil <= game.now() && (game.save.inv.water ?? 0) > 0) return { t: "water", label: "Water", hold: "can" };
+    return null;
+  }
+  if (cell) {
+    const seed = seedToSow();
+    return seed ? { t: "plant", label: `Sow ${CROPS[seed].name.toLowerCase()}`, crop: seed, hold: "bag" } : null;
+  }
+  const plotId = world.plotMap[t.x + W * t.z];
+  if (plotId >= 0 && game.save.plots.includes(plotId) && t.ny === 1 && block(id).farmable) return { t: "till", label: "Plough", hold: "hoe" };
+  if (nearWater(t) && game.save.inv.can) return { t: "refill", label: "Fill can", hold: "can" };
+  return null;
+}
+let smartHold: Smart["hold"] | null = null;
+/** What the smart action is called, in the chosen language. */
+const smartLabel = (s: Smart) => (s.t === "plant" ? (isEnglish ? s.label : tr("Sow {crop}", { crop: cropName(s.crop!) })) : tr(s.label));
+const soilQ = (t: Hit) => soilQuality(world, t.x, t.z, get(t.x, t.y, t.z));
+function useSmart(): Outcome {
+  const s = smartFor(target);
+  if (!s || !target) return null;
+  const id = get(target.x, target.y, target.z);
+  const at = { x: target.x, y: isCropBlock(id) ? target.y - 1 : target.y, z: target.z };
+  smartHold = s.hold;
+  if (s.t === "harvest") return report(game.act({ t: "harvest", ...at }), "harvest"); // (aimed at the plant or the soil under it)
+  if (s.t === "till") return report(game.act({ t: "till", ...at }), "till");
+  if (s.t === "plant") return report(game.act({ t: "plant", ...at, crop: s.crop! }), "plant");
+  if (s.t === "water") return report(game.act({ t: "water", ...at }), "water");
+  return report(game.act({ t: "refill", ...target }), "fill");
 }
 
 /** Left click: harvest a crop (an unripe one just says how far along it is), otherwise dig. */
@@ -888,6 +1043,7 @@ function useLeft(): Outcome {
   const { x, y, z } = target;
   if (block(get(x, y, z)).liquid) return null;
   if (isCropBlock(get(x, y, z))) return report(game.act({ t: "harvest", x, y: y - 1, z }), "harvest");
+  if (game.save.farm[String(idx(x, y, z))]?.plant) return report(game.act({ t: "harvest", x, y, z }), "harvest"); // aimed at the soil under it
   return null; // real farming: the land isn't dug up block by block
 }
 
@@ -899,6 +1055,9 @@ function useRight(): Outcome {
   // aiming at a plant means "the soil it grows in"
   const soilY = isCropBlock(id) ? target.y - 1 : target.y;
   const at = { x: target.x, y: soilY, z: target.z };
+  // a ripe crop is harvested whatever is in hand
+  if (smartFor(target)?.t === "harvest") return useSmart();
+  if (slot.kind === "hand") return useSmart();
   if (slot.kind === "tool" && slot.tool === "hoe") {
     // (on a phone, Use with the hoe ploughs a whole row whenever your bulls and plough are there)
     const shift = controls.held.has("ShiftLeft") || controls.held.has("ShiftRight") || ploughNext || TOUCH;
@@ -919,8 +1078,10 @@ function useRight(): Outcome {
   }
   if (slot.kind === "tool" && slot.tool === "can")
     return game.save.farm[String(idx(at.x, at.y, at.z))] ? report(game.act({ t: "water", ...at }), "water") : report(game.act({ t: "refill", ...target }), "fill");
-  if (slot.kind === "seed") return report(game.act({ t: "plant", ...at, crop: slot.crop }), "plant");
-  if (slot.kind === "hand") return isCropBlock(id) ? useLeft() : null;
+  if (slot.kind === "seed") {
+    lastSeed = slot.crop;
+    return report(game.act({ t: "plant", ...at, crop: slot.crop }), "plant");
+  }
   if (slot.kind !== "block") return null;
   // building: plants are replaced in place, like tall grass; otherwise build onto the face we look at
   const onPlant = block(id).shape === "cross" && !isCropBlock(id);
@@ -943,26 +1104,30 @@ function tipFor(t: Hit | null): string {
   const id = get(t.x, t.y, t.z);
   const soil = game.save.farm[String(idx(t.x, isCropBlock(id) ? t.y - 1 : t.y, t.z))];
   const cur = hotbar.current;
+  if (cur.kind === "hand") {
+    const s = smartFor(t);
+    if (s) return tr("Right-click: {a}", { a: isEnglish ? smartLabel(s).toLowerCase() : smartLabel(s) }) + (s.t === "till" || s.t === "plant" ? tr(" · soil {n}%", { n: Math.round((soil?.q ?? soilQ(t)) * 100) }) : "");
+  }
   if (!soil) {
-    if (cur.kind === "tool" && cur.tool === "can" && nearWater(t)) return "Right-click: fill the can";
+    if (cur.kind === "tool" && cur.tool === "can" && nearWater(t)) return tr("Right-click: {a}", { a: tr("fill the can") });
     const plotId = world.plotMap[t.x + W * t.z];
-    if (plotId < 0 || t.ny !== 1) return nearWater(t) && !(cur.kind === "tool" && cur.tool === "can") ? "Water here — press 3 for the can" : "";
-    if (!game.save.plots.includes(plotId)) return `✋ ${world.plots[plotId].name} is a neighbour's field`;
+    if (plotId < 0 || t.ny !== 1) return nearWater(t) && !(cur.kind === "tool" && cur.tool === "can") ? tr("Water here — press 3 for the can") : "";
+    if (!game.save.plots.includes(plotId)) return tr("✋ {plot} is a neighbour's field", { plot: world.plots[plotId].name });
     if (!block(id).farmable) return "";
-    return cur.kind === "tool" && cur.tool === "hoe" ? "Right-click: plough this soil" : "Press 2 for the hoe to plough here";
+    return cur.kind === "tool" && cur.tool === "hoe" ? tr("Right-click: {a}", { a: tr("plough this soil") }) : tr("Press 2 for the hoe to plough here");
   }
   const now = game.now();
   const wet = soil.wetUntil > now ? "watered" : "dry";
   if (!soil.plant) {
-    if (cur.kind === "seed") return `Right-click: sow ${CROPS[cur.crop].name.toLowerCase()} · soil ${Math.round(soil.q * 100)}%`;
-    return `Ploughed soil · press 4, 5 or 6 for seeds, then right-click`;
+    if (cur.kind === "seed") return tr("Right-click: {a}", { a: isEnglish ? `sow ${CROPS[cur.crop].name.toLowerCase()}` : tr("Sow {crop}", { crop: cropName(cur.crop) }) }) + tr(" · soil {n}%", { n: Math.round(soil.q * 100) });
+    return tr("Ploughed soil · no seeds left — Sitabai sells more");
   }
   const p = advance(soil.plant, soil.wetUntil, now);
-  const c = CROPS[p.crop];
-  if (p.progress >= 1) return `${c.name} is ripe · left-click to harvest`;
-  if (wet === "dry" && cur.kind === "tool" && cur.tool === "can") return `${c.name} · ${Math.floor(p.progress * 100)}% · right-click to water`;
+  const name = cropName(p.crop) || CROPS[p.crop].name, pc = Math.floor(p.progress * 100);
+  if (p.progress >= 1) return tr("{crop} is ripe · left-click to harvest", { crop: name });
+  if (wet === "dry" && ((cur.kind === "tool" && cur.tool === "can") || cur.kind === "hand")) return tr(game.save.inv.water ? "{crop} · {p}% · right-click to water" : "{crop} · {p}% · the can is empty — fill it at a well", { crop: name, p: pc });
   const mins = Math.ceil(msToRipe(p) / 60000);
-  return `${c.name} · ${Math.floor(p.progress * 100)}% grown · ${wet === "dry" ? "dry — water it (press 3)" : "watered"} · ripe in ~${mins} min`;
+  return tr("{crop} · {p}% grown · {state} · ripe in ~{m} min", { crop: name, p: pc, state: tr(wet === "dry" ? "dry — water it (press 3)" : "watered"), m: mins });
 }
 
 function refreshStatus() {
@@ -975,10 +1140,48 @@ function refreshStatus() {
   const overdue = s.loans.some((l) => isOverdue(l, game.now()));
   if (s.bestTitle > lastTitle && lastTitle >= 0) hud.toast(`You are now a ${TITLES[s.bestTitle].name}! · ${TITLES[s.bestTitle].local}`);
   if (booted_) lastTitle = s.bestTitle;
-  const saved = { saved: "✓ saved", saving: "saving…", offline: "offline — retrying" }[net.status];
-  hud.setInfo(`${s.perks.includes("sarpanch") ? `<span class="title">Sarpanch</span>` : ""}<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${title.name}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${s.rep ? `<span class="rep" title="Reputation with the tanda: better prices from Ganpat">★ ${s.rep}</span>` : ""}${overdue ? `<span class="debt">loan overdue!</span>` : ""}<span class="sync ${net.status}">${saved}</span><span>${fmtHour(hourOverride ?? c.hour)}</span><span>${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}</span>`);
+  // one compact cluster: who you are, money, reputation, the time on a little sun-dial, the season's day;
+  // "saved" only speaks up while saving or when the server can't be reached
+  const sync = net.status === "saved" ? "" : `<span class="sync ${net.status}">${tr(net.status === "saving" ? "saving…" : "offline — retrying")}</span>`;
+  const h = hourOverride ?? c.hour;
+  hud.setInfo(`${s.perks.includes("sarpanch") ? `<span class="title">${tr("Sarpanch")}</span>` : ""}<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${tr(title.name)}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${s.rep ? `<span class="rep" title="Reputation with the tanda: better prices from Ganpat">★ ${s.rep}</span>` : ""}${overdue ? `<span class="debt">${tr("loan overdue!")}</span>` : ""}${sync}${TOUCH && carriedNow(s) ? `<span class="basket" title="What you're carrying">🧺 ${carriedNow(s)}</span>` : ""}<span class="clock" title="${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}">${sunDial(h)}${fmtHour(h)}</span><span class="season">${tr(SEASON_NAMES[c.season].split(" · ")[0])} · ${c.dayOfSeason + 1}/${SEASON_DAYS}</span>`);
+}
+/** Produce and fish in hand (phones show this in the info chip; the counts chip is too wide for them). */
+const carriedNow = (s: typeof game.save) => Object.entries(s.inv).reduce((a, [k, n]) => a + (CROPS[k as keyof typeof CROPS] || k.startsWith("fish:") ? n : 0), 0);
+/** A tiny dial: the sun travelling its arc by day, the moon by night. */
+function sunDial(h: number) {
+  const day = h >= 6 && h < 19.5;
+  const k = day ? (h - 6) / 13.5 : ((h < 6 ? h + 24 : h) - 19.5) / 10.5;
+  const a = Math.PI * (1 - k), x = 12 + Math.cos(a) * 8, y = 12 - Math.sin(a) * 8;
+  return `<svg class="dial" viewBox="0 0 24 14" aria-hidden="true"><path d="M3 12 A9 9 0 0 1 21 12" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-width="1.5"/><circle cx="${x.toFixed(1)}" cy="${Math.min(12, y).toFixed(1)}" r="2.6" fill="${day ? "#ffc94a" : "#dfe6ff"}"/></svg>`;
 }
 game.onChange(refreshStatus);
+// money you earn pops up by the purse; the first harvest and the first sale get a moment of their own
+let lastMoney: number | null = null, lastHarvested = -1, lastEarned = -1, lastMission = -1;
+game.onChange(() => {
+  const s = game.save;
+  if (!booted_) return;
+  hud.setMoney(s.money);
+  if (lastMoney !== null && s.money > lastMoney) {
+    const m = hud.moneyEl?.getBoundingClientRect(), root = uiRoot.getBoundingClientRect();
+    if (m) hud.floater(`+₹${(s.money - lastMoney).toLocaleString("en-IN")}`, { x: m.left - root.left + m.width / 2, y: m.bottom - root.top + 52 }, hud.moneyEl, "money"); // (rises into the purse from below)
+  }
+  if (lastHarvested === 0 && s.stats.harvested > 0) {
+    celebrate();
+    hud.toast("Your first harvest! Take it to Ganpat Seth on the chowk.");
+    firstTime("first_harvest", { mission: s.missions.i });
+  }
+  if (lastEarned === 0 && s.stats.earned > 0 && s.ledger.some((l) => l.kind === "sell")) {
+    celebrate();
+    hud.toast("Your first sale — the tanda's newest farmer is in business!");
+    firstTime("first_sale", { mission: s.missions.i });
+  }
+  if (lastMission >= 0 && s.missions.i > lastMission) for (let i = lastMission; i < s.missions.i; i++) metric("mission_done", { mission: i + 1 });
+  lastMission = s.missions.i;
+  lastMoney = s.money;
+  lastHarvested = s.stats.harvested;
+  lastEarned = s.stats.earned;
+});
 game.onChange(() => syncFields());
 const sfxQueue = { push: (name: string) => audio.play(name) };
 
@@ -989,7 +1192,12 @@ controls.onDig = () => {
   if (fishing.active) return fishing.press();
   void useLeft();
 };
-controls.onPlace = () => void (!windowOpen() && !kabaddi.active && !fishing.active && useRight());
+controls.onPlace = () => {
+  if (windowOpen()) return;
+  if (kabaddi.active) return kabaddi.tag(body.pos); // (on a phone the Use button reads "Tag")
+  if (fishing.active) return fishing.press();
+  void useRight();
+};
 controls.onSelect = (i) => {
   hotbar.select(i);
   hud.refresh();
@@ -1076,6 +1284,7 @@ let sleeping = false;
 /** Go home: the door swings open, you step in, the screen fades to night and back to dawn. */
 async function goHomeToSleep() {
   if (sleeping) return;
+  const dayBefore = clock(game.now()).day;
   const r = game.act({ t: "sleep" });
   if (!r.ok) return hud.toast(r.error, "bad");
   sleeping = true;
@@ -1091,9 +1300,14 @@ async function goHomeToSleep() {
   await net.flush();
   await new Promise((res) => setTimeout(res, 900));
   hud.fade(false, "");
-  hud.toast("Good morning, Ukhali! The bulls are rested and the crops grew overnight.");
   audio.play("chirp");
   sleeping = false;
+  // the morning card: how yesterday went, and what today holds
+  const c = clock(game.now());
+  closeWindows();
+  summary.morning(`Day ${c.dayOfSeason + 1} of ${SEASON_NAMES[c.season].split(" · ")[0]}`, daySummary(game.save, dayBefore), awaySummary(world, game.save, game.now()));
+  hud.setPlaying(true);
+  releaseMouse();
 }
 /** Can you still sleep tonight? (once a night, after 7:30 pm) */
 const canSleep = () => isNight(nowHour()) && game.save.sleptDay !== clock(game.now() + untilMorning(clock(game.now()).hour)).day;
@@ -1295,7 +1509,7 @@ renderer.setAnimationLoop(() => {
     // aim along the crosshair; you can only reach what's near your farmer
     const ray = rig.ray();
     const cur = hotbar.current;
-    const hit = raycast({ x: ray.o.x, y: ray.o.y, z: ray.o.z }, { x: ray.d.x, y: ray.d.y, z: ray.d.z }, MOVE.reach + (rig.view === "third" ? rig.distance + 1 : 0), cur.kind === "tool" && cur.tool === "can" ? pickWater : pickable, plantBox);
+    const hit = raycast({ x: ray.o.x, y: ray.o.y, z: ray.o.z }, { x: ray.d.x, y: ray.d.y, z: ray.d.z }, MOVE.reach + (rig.view === "third" ? rig.distance + 1 : 0), (cur.kind === "tool" && cur.tool === "can") || (cur.kind === "hand" && game.save.inv.can) ? pickWater : pickable, plantBox);
     target = hit && Math.hypot(hit.x + 0.5 - body.pos.x, hit.y + 0.5 - (body.pos.y + 1), hit.z + 0.5 - body.pos.z) <= MOVE.reach ? hit : null;
     outline.visible = false;
     // mark the field cell you'd act on (the soil under a crop, or the ground you look at)
@@ -1317,12 +1531,13 @@ renderer.setAnimationLoop(() => {
     game.tick();
     syncFields();
     refreshStatus();
-    hud.setTip(mode === "play" ? tipFor(target) : "");
+    hud.setTip(mode === "play" ? forDevice(tipFor(target)) : "");
     refreshSigns();
     if (mode === "play") checkPlotEntry();
     const st = mode === "play" && !panels.open && !farmyard.ride ? nearStall() : undefined;
-    hud.setHint(farmyard.ride || panels.open || ploughJob ? "" : st ? (isOpen(st.kind, nowHour()) ? `<kbd>E</kbd> ${st.label}${hoursText(st.kind) ? ` <small class="hours">· open till ${hoursText(st.kind).split(" – ")[1]}</small>` : ""}` : `🔒 ${closedText(st.kind)}`) : cartHint() || (mode === "play" && canSleep() ? "<kbd>Z</kbd> Sleep till morning (you walk home)" : nightK > 0.6 && !torchOn && mode === "play" ? "<kbd>T</kbd> Switch on your torch" : ""));
+    hud.setHint(farmyard.ride || windowOpen() || ploughJob ? "" : st ? (isOpen(st.kind, nowHour()) ? `<kbd>E</kbd> ${tr(st.label)}${hoursText(st.kind) ? ` <small class="hours">· ${tr("open till {h}", { h: hoursText(st.kind).split(" – ")[1] })}</small>` : ""}` : (canSleep() ? `<kbd>Z</kbd> ${tr("Sleep till morning (you walk home)")}` : `🔒 ${closedMsg(st.kind)}`)) : cartHint() || (mode === "play" && canSleep() ? `<kbd>Z</kbd> ${tr("Sleep till morning (you walk home)")}` : nightK > 0.6 && !torchOn && mode === "play" ? `<kbd>T</kbd> ${tr("Switch on your torch")}` : ""));
     hud.setBulls(bullsChip());
+    daySounds();
     // the watchdog: nothing may leave the player stuck — no pause panel on a phone, controls back when windows close
     if (TOUCH) {
       hud.setPlaying(true);
@@ -1339,22 +1554,53 @@ renderer.setAnimationLoop(() => {
     BULB_LIGHTS.forEach((l) => (l.intensity = nightK * 9));
     const elec = current(game.save)?.id === "election";
     guide.nearChoice = elec ? schoolHere() && (game.save.missions.c["visit:gramsabha"] ?? 0) > (game.save.missions.base["visit:gramsabha"] ?? 0) : Math.hypot(body.pos.x - 99.5, body.pos.z - 124) < 5;
+    // back after a while (20 real minutes, two game days): what's waiting — once, when play begins
+    if (!awayShown && booted_ && mode === "play" && !titleScreen.open && !windowOpen() && !farmyard.ride) {
+      awayShown = true;
+      const gone = game.now() - awaySince;
+      if (awaySince && gone > 20 * 60 * 1000 && (game.save.stats.planted > 0 || game.save.missions.i > 0)) {
+        const h = gone / 3600e3;
+        summary.away(h < 1 ? `${Math.round(h * 60)} minutes` : h < 48 ? `${Math.round(h)} hour${Math.round(h) === 1 ? "" : "s"}` : `${Math.round(h / 24)} days`, awaySummary(world, game.save, game.now()));
+        hud.setPlaying(true);
+        releaseMouse();
+      }
+    }
     // the first mission is done: offer to save the farm to an account (once a session, if it's due)
     if (!signInOffered && net.authEnabled && !net.account && mode === "play" && !titleScreen.open && !windowOpen() && !farmyard.ride && AccountCard.due(game.save.missions.i)) {
       signInOffered = true;
       showAccount(true);
     }
-    if (!titleScreen.open) tutorial.update(game.save, game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]), now);
   }
   if (ploughJob) {
     updatePloughJob(now);
     syncFields();
   }
+  // in kabaddi, holding the action tags the moment someone is in reach (and never stumbles)
+  if (kabaddi.active && controls.useHeld && !windowOpen()) kabaddi.hold(body.pos);
+  // hold to work a row: every new tile you aim at gets the same kind of use, about 8 a second
+  if (controls.useHeld && mode === "play" && !windowOpen() && !kabaddi.active && !fishing.active && !farmyard.ride && target) {
+    const k = `${target.x},${target.y},${target.z}`;
+    if (k !== lastWorked && now - lastWorkedAt > 120) {
+      if (lastWorked) {
+        repeating = true;
+        const cur = hotbar.current;
+        if (cur.kind !== "block") useRight(); // (never build by holding)
+        repeating = false;
+      }
+      lastWorked = k;
+      lastWorkedAt = now;
+    }
+  } else if (!controls.useHeld) {
+    lastWorked = "";
+    repeatWarned = false;
+  }
   // what's in your hand shows in your hand, and using it shows too
   const cur = hotbar.current;
-  farmer.hold(fishing.active ? "rod" : cur.kind === "tool" ? (cur.tool === "hoe" ? "hoe" : "can") : cur.kind === "seed" ? "bag" : "none");
+  if (now > actionUntil) smartHold = null;
+  farmer.hold(fishing.active ? "rod" : smartHold && cur.kind === "hand" ? smartHold : cur.kind === "tool" ? (cur.tool === "hoe" ? "hoe" : "can") : cur.kind === "seed" ? "bag" : "none");
   if (now > actionUntil && !fishing.active) farmer.action = "none";
   updateDrops(dt);
+  hud.tickMoney(dt);
   worldRenderer.cull(camera.position, mode === "title" ? 200 : settings.renderDistance);
   const electionOn = current(game.save)?.id === "election";
   campaign.visible = electionOn;
@@ -1379,7 +1625,12 @@ renderer.setAnimationLoop(() => {
       body.pos.z = playerBody.pos.z;
     }
   }
-  if (touch) touch.visible = mode === "play" && !titleScreen.open && !windowOpen() && !farmyard.ride;
+  if (touch) {
+    touch.visible = mode === "play" && !titleScreen.open && !windowOpen() && !farmyard.ride;
+    const sm = hotbar.current.kind === "hand" ? smartFor(target) : null;
+    touch.setUse(kabaddi.active ? tr("Tag") : sm ? smartLabel(sm) : tr("Use"));
+    touch.setTag(null);
+  }
   farmer.root.position.set(body.pos.x, body.pos.y, body.pos.z);
   farmer.root.rotation.y = body.heading;
   farmer.visible = mode !== "title" && (rig.view === "third" || !!farmyard.ride);
@@ -1405,7 +1656,8 @@ renderer.setAnimationLoop(() => {
     jobs.update(dt, now / 1000, h, camera.position, body.pos);
     helpers.update(dt, h, camera.position);
     helpers.group.visible = !titleScreen.open;
-    jobs.hidden = mode !== "play" || titleScreen.open || !!farmyard.ride;
+    // the kaam list waits until you know your way round (after Mission 1), and never covers a window
+    jobs.hidden = mode !== "play" || titleScreen.open || !!farmyard.ride || windowOpen() || game.save.missions.i < 1;
     if (fishing.active && (farmyard.ride || mode !== "play" || !!ploughJob)) fishing.stop();
     if (kabaddi.active && (farmyard.ride || !!ploughJob)) kabaddi.quit("You left the match.");
   }
@@ -1437,7 +1689,7 @@ renderer.setAnimationLoop(() => {
     torchModel.rotation.y = Math.atan2(ray.d.x, ray.d.z) - farmer.root.rotation.y;
   }
   grass.lights({ on: torchOn, pos: torch.position, dir: torchAim.position.clone().sub(torch.position) }, BULB_LIGHTS.map((l) => l.position), nightK);
-  fields.update(now / 1000);
+  fields.update(now / 1000, calm());
   const grassAt = mode === "play" ? new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z) : camera.position;
   grass.update(now / 1000, grassAt, mode === "title" ? Q.grassFar : Math.min(Q.grassFar, settings.renderDistance * 0.55), sunDirection(hour), sc.sun, sc.top);
   if (mode !== "title") applyRenderDistance();
@@ -1451,7 +1703,7 @@ renderer.setAnimationLoop(() => {
   if (hud.debugOn) hud.setDebug(debugText(dt));
   if (booted_) {
     const c = clock(game.now());
-    guide.update(game.save, { world, now: game.now(), day: c.day, onOwnLand: game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]) }, camera, now / 1000, mode === "title" || WINDOWS().some((w) => w.open()) || !!farmyard.ride || !!document.querySelector(".welcome, .fs-gate:not([hidden])"));
+    guide.update(game.save, { world, now: game.now(), day: c.day, onOwnLand: game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]), me: body.pos }, camera, now / 1000, mode === "title" || WINDOWS().some((w) => w.open()) || !!farmyard.ride || !!document.querySelector(".welcome, .fs-gate:not([hidden])"));
   }
 });
 
@@ -1459,7 +1711,7 @@ renderer.setAnimationLoop(() => {
 const confetti: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
 function celebrate() {
   const cols = ["#e8327a", "#f2a01e", "#f6e04a", "#e8662a", "#ffffff"];
-  for (let i = 0; i < 160; i++) {
+  for (let i = 0; i < (calm() ? 0 : 160); i++) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.12), new THREE.MeshBasicMaterial({ color: cols[i % 5], side: THREE.DoubleSide }));
     m.position.set(body.pos.x + (Math.random() - 0.5) * 3, body.pos.y + 1.5, body.pos.z + (Math.random() - 0.5) * 3);
     scene.add(m);
@@ -1469,6 +1721,7 @@ function celebrate() {
   audio.play("bells");
 }
 let lastTick = 0;
+let lastWorked = "", lastWorkedAt = 0;
 const prof = { villagers: 0, frame: 0, render: 0 };
 let frameNo = 0;
 /*
@@ -1538,6 +1791,7 @@ function debugText(dt: number) {
 /** Sign in and load the farm, retrying until the village server answers. */
 /** A message to show once the game is up (e.g. "Signed in"). */
 let signInOffered = false;
+let awayShown = false, awaySince = 0; // when the save was last touched, as it came from the server
 let bootToast: { msg: string; kind: "ok" | "bad" } | null = null;
 async function bootNet() {
   for (let attempt = 0; ; attempt++) {
@@ -1589,6 +1843,7 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
   bootStep(0.74, "Building the houses…");
   hud.setBanner("");
   game.save = boot.save;
+  awaySince = boot.save.updatedAt;
   booted_ = true;
   game.skew = boot.serverNow - Date.now();
   net.attach(game);
@@ -1702,6 +1957,10 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
       return n;
     },
     home: () => ({ door: { ...nights.home.door }, fire: { ...nights.fire } }),
+    showAway: (ms: number) => {
+      awaySince = game.now() - ms;
+      awayShown = false;
+    },
     clockNow: () => ({ hour: clock(game.now()).hour, day: clock(game.now()).day }),
     noFog: () => {
       settings.renderDistance = 2000;
@@ -1760,10 +2019,25 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     kabaddiStart: () => kabaddi.start(),
     kabaddiTag: () => kabaddi.tag(body.pos),
     fishing: () => ({ casts: fishing.castsLeft(), ...fishing.debug() }),
+    ripeMarks: () => fields.ripeCount,
+    metrics: () => (window as unknown as { __metrics: unknown[] }).__metrics,
+    arrive: () => arrived({ touch: TOUCH, lang: LANG_CODE, mission: game.save.missions.i }),
+    confetti: () => confetti.length,
+    celebrate: () => celebrate(),
     fishPress: () => fishing.press(),
     jobs: () => ({ ...jobs.debug(), today: jobs.today() }),
     helpers: () => ({ crew: helpers.debug(), mukadam: helpers.mukadamAt, hires: game.save.helpers ?? [] }),
     interact: () => controls.onInteract(),
+    // for filming on a virtual clock: hold a key until told otherwise, and turn the view
+    setHeld: (code: string, on: boolean) => (on ? controls.held.add(code) : controls.held.delete(code)),
+    useHold: (on: boolean) => {
+      if (on) controls.onPlace();
+      controls.useHeld = on;
+    },
+    look: (yaw: number, pitch = controls.pitch) => {
+      controls.yaw = yaw;
+      controls.pitch = pitch;
+    },
     hint: () => document.querySelector(".interact")?.textContent ?? "",
   });
 });

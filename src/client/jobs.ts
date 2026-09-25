@@ -8,6 +8,7 @@ import { clock } from "../shared/time";
 import type { World } from "../shared/world";
 import { Npc, type NpcLook } from "./engine/npc";
 import { mergeParts } from "./engine/merge";
+import { giverName, jobLineT, jobWhat, t } from "./i18n";
 import { Q } from "./quality";
 import type { Nav } from "./player/nav";
 
@@ -43,7 +44,9 @@ export const DAYTIME = (h: number) => h >= 7 && h < 19.5;
 
 export class Jobs {
   readonly group = new THREE.Group();
-  private givers = new Map<GiverId, { npc: Npc; at: P; mark: THREE.Sprite }>();
+  private givers = new Map<GiverId, { npc: Npc; at: P; mark: THREE.Sprite; ready: boolean }>();
+  private bang = new THREE.SpriteMaterial({ map: markTexture("!"), depthWrite: false, toneMapped: false });
+  private tick = new THREE.SpriteMaterial({ map: markTexture("✓"), depthWrite: false, toneMapped: false });
   private goat: Goat;
   private goatHome: P = { x: 0, z: 0 };
   /** Chinki is following you. */
@@ -64,17 +67,17 @@ export class Jobs {
       bhimrao: { x: 104.5, z: 119.8 }, // by the banyan, clear of the stalls
       tulsa: near({ x: 110, z: 132 }),
       guruji: { x: 131.5, z: 92.2 }, // at the school's back corner, watching the boys on the maidan
-      lakshmi: { x: L.hanuman.x - 1.8, z: L.hanuman.z + 2.7 },
+      lakshmi: { x: L.hanuman.x + 7.5, z: L.hanuman.z }, // on the open ground behind the mandir, by the maidan
       savitri: { x: 94.5, z: 123.5 },
     };
     for (const id of Object.keys(GIVERS) as GiverId[]) {
       const at = d.nav.open(spots[id]);
       const npc = new Npc(LOOKS[id], at.x, d.ground(at.x, at.z), at.z, 0);
-      const mark = new THREE.Sprite(new THREE.SpriteMaterial({ map: bangTexture(), depthWrite: false, toneMapped: false }));
+      const mark = new THREE.Sprite(this.bang);
       mark.scale.set(0.55, 0.55, 1);
       mark.position.set(at.x, d.ground(at.x, at.z) + 2.35, at.z);
       this.group.add(npc.group, mark);
-      this.givers.set(id, { npc, at, mark });
+      this.givers.set(id, { npc, at, mark, ready: false });
     }
     const lk = this.givers.get("lakshmi")!.at;
     this.goatHome = { x: lk.x + 0.9, z: lk.z + 0.6 };
@@ -83,7 +86,16 @@ export class Jobs {
     this.el = document.createElement("div");
     this.el.className = "kaam";
     d.ui.appendChild(this.el);
-    this.el.addEventListener("click", () => this.el.classList.toggle("open"));
+    // folded to a chip until you open it; the choice is remembered
+    try {
+      if (localStorage.getItem("tanda.kaam.open") === "1") this.el.classList.add("open");
+    } catch { /* ignore */ }
+    this.el.addEventListener("click", () => {
+      const open = this.el.classList.toggle("open");
+      try {
+        localStorage.setItem("tanda.kaam.open", open ? "1" : "0");
+      } catch { /* ignore */ }
+    });
   }
 
   /** Where each neighbour stands (for the map and for keeping people apart). */
@@ -114,6 +126,18 @@ export class Jobs {
     return (Object.keys(GIVERS) as GiverId[]).filter((id) => this.wants(id).length > 0);
   }
 
+  /** You already have what this job needs: hand it over (a green ✓ instead of the "!"). */
+  ready(j: Job, id: GiverId): boolean {
+    const s = this.d.save();
+    switch (j.kind) {
+      case "produce": return (s.inv[j.item] ?? 0) >= j.n;
+      case "fish": return fishCount(s.inv) >= j.n;
+      case "water": return !!s.inv.can && (s.inv.water ?? 0) >= j.n;
+      case "parcel": return j.to === id; // (only listed for the recipient while you carry it)
+      case "goat": return this.goatFollowing;
+    }
+  }
+
   /** The neighbour you're standing by, if any. */
   nearGiver(p: P): GiverId | null {
     let best: GiverId | null = null, bd = 2.4;
@@ -133,16 +157,17 @@ export class Jobs {
   /** The E hint near a neighbour or the goat. */
   hint(p: P, hour: number): string {
     if (!DAYTIME(hour)) return "";
-    if (this.nearGoat(p)) return "<kbd>E</kbd> Call Chinki — she'll follow you";
+    if (this.nearGoat(p)) return `<kbd>E</kbd> ${t("Call Chinki — she'll follow you")}`;
     const id = this.nearGiver(p);
     if (!id) return "";
     const w = this.wants(id);
-    const who = GIVERS[id].name;
-    if (!w.length) return `<kbd>E</kbd> Talk to ${who}`;
-    const j = w[0];
-    if (j.kind === "parcel" && j.to === id) return `<kbd>E</kbd> Give ${who} his tiffin`;
-    if (j.kind === "goat" && this.goatFollowing) return `<kbd>E</kbd> Bring Chinki home to ${who}`;
-    return `<kbd>E</kbd> ${who} needs a hand <small class="hours">· ${jobLine(j).split(": ")[1]}</small>`;
+    const who = giverName(id);
+    if (!w.length) return `<kbd>E</kbd> ${t("Talk to {who}", { who })}`;
+    const j = w.find((x) => this.ready(x, id)) ?? w[0]; // what you can hand over comes first
+    if (j.kind === "parcel" && j.to === id) return `<kbd>E</kbd> ${t("Give {who} his tiffin ✓", { who })}`;
+    if (j.kind === "goat" && this.goatFollowing) return `<kbd>E</kbd> ${t("Bring Chinki home to {who} ✓", { who })}`;
+    if (this.ready(j, id)) return `<kbd>E</kbd> ${t("Give {who} {what} ✓", { who, what: jobWhat(j).replace(/ from the talav| \(12 pours\)/, "") })}`;
+    return `<kbd>E</kbd> ${t("{who} needs a hand", { who })} <small class="hours">· ${jobWhat(j)}</small>`;
   }
 
   /** E: talk to whoever is here. Returns false if nobody is. */
@@ -164,7 +189,7 @@ export class Jobs {
       this.d.toast(helped ? `${GIVERS[id].name}: "Thank you again, bala. Come by tomorrow."` : `${GIVERS[id].name}: "Ram Ram! Nothing today — but ask the others, someone always needs a hand."`);
       return true;
     }
-    this.offer(id, who, w[0]);
+    this.offer(id, who, w.find((x) => this.ready(x, id)) ?? w[0]);
     return true;
   }
 
@@ -230,9 +255,14 @@ export class Jobs {
         g.npc.setShadow(Q.shadows && far < Q.peopleShadow);
         g.npc.update(dt, player);
       }
-      const want = g.npc.group.visible && this.wants(id).length > 0;
-      g.mark.visible = want;
-      if (want) g.mark.position.y = this.d.ground(g.at.x, g.at.z) + 2.35 + Math.sin(t * 2.5) * 0.08;
+      const w = g.npc.group.visible ? this.wants(id) : [];
+      g.mark.visible = w.length > 0;
+      const ready = w.some((j) => this.ready(j, id));
+      if (ready !== g.ready) {
+        g.ready = ready;
+        g.mark.material = ready ? this.tick : this.bang;
+      }
+      if (g.mark.visible) g.mark.position.y = this.d.ground(g.at.x, g.at.z) + 2.35 + (document.documentElement.classList.contains("reduce-motion") ? 0 : Math.sin(t * 2.5) * 0.08);
     }
     // Chinki: lost somewhere (if that's today's job), following you, or home with Lakshmi
     const gj = jobs.find((j) => j.kind === "goat");
@@ -264,9 +294,9 @@ export class Jobs {
 
   private renderList(jobs: Job[], done: number[], day: boolean) {
     const left = jobs.filter((j) => !done.includes(j.slot)).length;
-    const html = `<div class="kaam-head">📋 Kaam today <span>${left ? `${left} of ${jobs.length} open` : "all done!"}</span></div>
-      <ul>${jobs.map((j) => `<li class="${done.includes(j.slot) ? "done" : ""}"><i>${done.includes(j.slot) ? "✓" : ""}</i><span>${jobLine(j)}</span><em>₹${j.pay}</em></li>`).join("")}</ul>
-      <small>${day ? "Look for the <b>!</b> over their heads · new jobs every day" : "Everyone's gone in for the night — new jobs in the morning"}</small>`;
+    const html = `<div class="kaam-head">${t("📋 Kaam today")} <span>${left ? t("{a} of {b} open", { a: left, b: jobs.length }) : t("all done!")}</span><b class="fold" aria-hidden="true"></b></div>
+      <ul>${jobs.map((j) => `<li class="${done.includes(j.slot) ? "done" : ""}"><i>${done.includes(j.slot) ? "✓" : ""}</i><span>${jobLineT(j)}</span><em>₹${j.pay}</em></li>`).join("")}</ul>
+      <small>${t(day ? "Look for the <b>!</b> over their heads · new jobs every day" : "Everyone's gone in for the night — new jobs in the morning")}</small>`;
     if (html !== this.listHtml) this.el.innerHTML = this.listHtml = html;
   }
 
@@ -275,27 +305,28 @@ export class Jobs {
   }
 
   debug() {
-    return { goat: { ...this.goat.pos, visible: this.goat.root.visible, following: this.goatFollowing }, givers: this.spots() };
+    return { goat: { ...this.goat.pos, visible: this.goat.root.visible, following: this.goatFollowing }, givers: this.spots(), marks: Object.fromEntries([...this.givers.entries()].filter(([, g]) => g.mark.visible).map(([id, g]) => [id, g.ready ? "✓" : "!"])) };
   }
 }
 
-/** A gold disc with a "!" on it. */
-export function bangTexture() {
+/** A disc with a mark on it: a gold "!" for a new job, a green "✓" when you can hand it over. */
+export function markTexture(sym: "!" | "✓") {
   const c = document.createElement("canvas");
   c.width = c.height = 64;
   const g = c.getContext("2d")!;
-  g.fillStyle = "#f2b12e";
+  const tick = sym === "✓";
+  g.fillStyle = tick ? "#3fbf5a" : "#f2b12e";
   g.beginPath();
   g.arc(32, 32, 28, 0, Math.PI * 2);
   g.fill();
   g.lineWidth = 4;
-  g.strokeStyle = "#5a3a08";
+  g.strokeStyle = tick ? "#0f4a1e" : "#5a3a08";
   g.stroke();
-  g.fillStyle = "#3a2406";
-  g.font = "900 42px system-ui";
+  g.fillStyle = tick ? "#ffffff" : "#3a2406";
+  g.font = `900 ${tick ? 38 : 42}px system-ui`;
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText("!", 32, 34);
+  g.fillText(sym, 32, 34);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;

@@ -59,7 +59,8 @@ export function marketPrice(crop: CropId, day: number): number {
 /** What each buyer pays, as a share of the mandi price. The town market (by cart) comes in M7. */
 export const BUYERS = { village: 0.85, town: 1.1 } as const;
 export type Buyer = keyof typeof BUYERS;
-export const buyerPrice = (crop: CropId, day: number, where: Buyer) => Math.round(marketPrice(crop, day) * BUYERS[where] * 10) / 10;
+/** What a buyer pays per unit, in whole rupees (nobody haggles over paise at a village stall). */
+export const buyerPrice = (crop: CropId, day: number, where: Buyer) => Math.max(1, Math.round(marketPrice(crop, day) * BUYERS[where]));
 
 export const news = (day: number) => CROP_IDS.map((c) => eventFor(c, day)).filter((e): e is MarketEvent => !!e);
 

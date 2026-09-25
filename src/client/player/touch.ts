@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { Controls } from "./controls";
 
 /*
@@ -32,13 +33,14 @@ export class TouchControls {
     this.el.className = "touch";
     this.el.innerHTML = `
       <div class="t-look"></div>
+      <div class="t-move"></div>
       <div class="t-stick"><div class="t-knob"></div></div>
-      <div class="t-pad"><div class="t-pad-knob"></div><span>look</span></div>
+      <div class="t-pad"><div class="t-pad-knob"></div><span>${t("look")}</span></div>
       <button data-a="use" class="t-act t-use">Use</button>
       <button data-a="harvest" class="t-act t-harvest">Harvest</button>
-      <button data-a="jump" class="t-act t-jump">Jump</button>
+      <button data-a="jump" class="t-act t-jump">${t("Jump")}</button>
       <div class="t-top">
-        <button data-a="map" class="t-map">Map</button>
+        <button data-a="map" class="t-map">${t("Map")}</button>
         <button data-a="menu" class="t-menu">☰</button>
       </div>`;
     parent.appendChild(this.el);
@@ -54,6 +56,22 @@ export class TouchControls {
       this.stickId = t.identifier;
       const r = this.stick.getBoundingClientRect();
       this.stickOrigin = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      this.onStick(t.clientX, t.clientY);
+      e.preventDefault();
+    }, { passive: false });
+    // or anywhere on the left third: the stick comes to your thumb, and goes home when you let go
+    const moveZone = this.el.querySelector(".t-move") as HTMLElement;
+    moveZone.addEventListener("touchstart", (e) => {
+      const t = e.changedTouches[0];
+      this.stickId = t.identifier;
+      const home = this.stick.getBoundingClientRect(), zone = this.el.getBoundingClientRect();
+      // (in the turned layout the screen is rotated, so place the stick in the game's own axes)
+      const p = turned() ? { x: t.clientY - zone.top, y: zone.right - t.clientX } : { x: t.clientX - zone.left, y: t.clientY - zone.top };
+      const hx = turned() ? home.top - zone.top + home.height / 2 : home.left - zone.left + home.width / 2;
+      const hy = turned() ? zone.right - home.right + home.width / 2 : home.top - zone.top + home.height / 2;
+      this.stick.style.translate = `${p.x - hx}px ${p.y - hy}px`;
+      this.stickOrigin = { x: t.clientX, y: t.clientY };
+      this.stick.classList.add("floating");
       this.onStick(t.clientX, t.clientY);
       e.preventDefault();
     }, { passive: false });
@@ -87,6 +105,8 @@ export class TouchControls {
           this.move = { forward: 0, right: 0 };
           this.run = false;
           this.knob.style.transform = "";
+          this.stick.style.translate = "";
+          this.stick.classList.remove("floating");
         }
         if (t.identifier === this.lookId) this.endLook();
       }
@@ -105,9 +125,14 @@ export class TouchControls {
       b.addEventListener("touchstart", (e) => {
         e.preventDefault();
         b.classList.add("down");
+        if (a === "use") c.useHeld = true;
         ({ use: c.onPlace, harvest: c.onDig, talk: c.onInteract, map: c.onMap, view: c.onView, torch: c.onTorch, cart: c.onRide, feed: c.onFeed, board: c.onBoard, help: c.onHelp, menu: this.onMenu, plough: c.onPloughField, tie: c.onTie } as Record<string, () => void>)[a]?.call(c);
       }, { passive: false });
-      b.addEventListener("touchend", () => b.classList.remove("down"));
+      b.addEventListener("touchend", () => {
+        b.classList.remove("down");
+        if (a === "use") c.useHeld = false;
+      });
+      b.addEventListener("touchcancel", () => a === "use" && (c.useHeld = false));
     });
   }
 
@@ -115,6 +140,25 @@ export class TouchControls {
     this.lookId = null;
     this.pad.classList.remove("on");
     this.padKnob.style.transform = "";
+  }
+
+  private useLabel = "";
+  private tagLabel: string | null = "";
+  /** The Use button says what it will do ("Plough", "Sow onion", "Water", "Harvest"). */
+  setUse(label: string) {
+    if (label === this.useLabel) return;
+    this.useLabel = label;
+    const b = this.el.querySelector(".t-use") as HTMLElement;
+    b.textContent = label;
+    b.classList.toggle("long", label.length > 6);
+  }
+  /** The second action button only when there's a second action (a kabaddi tag). */
+  setTag(label: string | null) {
+    if (label === this.tagLabel) return;
+    this.tagLabel = label;
+    const b = this.el.querySelector(".t-harvest") as HTMLElement;
+    b.hidden = !label;
+    if (label) b.textContent = label;
   }
 
   /** The action hint ("R Load the cart…") becomes a button: tapping it presses that key. */

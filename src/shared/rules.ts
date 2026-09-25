@@ -771,6 +771,7 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       if (!has(`seed:${a.crop}`)) return fail(`No ${CROPS[a.crop].name.toLowerCase()} seeds left.`);
       if (!ownedPlot(world, save, x, z)) return fail("You can only farm your own land.");
       take(`seed:${a.crop}`);
+      bump(save, `plant:${a.crop}`);
       sow(save, cell, a.crop, now);
       r = { ok: true, msg: `Sowed ${CROPS[a.crop].name.toLowerCase()}` };
       break;

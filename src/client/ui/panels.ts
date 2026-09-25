@@ -106,6 +106,26 @@ export class Panels {
     }
     const s = this.ctx.save();
     let r: Result | null = null;
+    if (what === "sellAll") {
+      // one sale per kind you carry; the server checks each exactly as if you'd pressed them one by one
+      let got = 0, sold = 0;
+      for (const c of CROP_IDS) if (s.inv[c]) {
+        const n = s.inv[c], res = this.ctx.act({ t: "sell", item: c, n, where: "village" });
+        if (res.ok) {
+          got += res.gained?.money ?? 0;
+          sold += n;
+        }
+      }
+      for (const f of FISH_IDS) if (s.inv[`fish:${f}`]) {
+        const n = s.inv[`fish:${f}`], res = this.ctx.act({ t: "sellFish", item: f, n });
+        if (res.ok) {
+          got += res.gained?.money ?? 0;
+          sold += n;
+        }
+      }
+      this.ctx.toast(sold ? `Sold ${sold} items to Ganpat for ${rs(got)}` : "Nothing to sell.", sold ? "ok" : "bad");
+      return this.render();
+    }
     if (what === "sellFish") {
       const have = s.inv[`fish:${a}`] ?? 0;
       const n = b === "all" ? have : Math.min(Number(b), have);
@@ -217,12 +237,30 @@ export class Panels {
     if (card) card.scrollTop = scroll;
   }
 
+  /** Everything you could sell here right now, and what it would fetch (what Ganpat will pay, rep bonus and all). */
+  private sellAllTotal(s: Save, day: number) {
+    const bonus = 1 + Math.min(0.1, (s.rep ?? 0) / 400);
+    let total = 0, n = 0;
+    for (const c of CROP_IDS) if (s.inv[c]) {
+      total += Math.round(buyerPrice(c, day, "village") * s.inv[c] * bonus);
+      n += s.inv[c];
+    }
+    for (const f of FISH_IDS) if (s.inv[`fish:${f}`]) {
+      total += Math.round(fishPrice(f, day) * s.inv[`fish:${f}`] * bonus);
+      n += s.inv[`fish:${f}`];
+    }
+    return { total, n };
+  }
+
   private sell(s: Save, day: number) {
     const heads = news(day);
+    const why = (c: CropId) => heads.find((h) => h.headline.toLowerCase().includes(CROPS[c].name.toLowerCase()));
     const rows = CROP_IDS.map((c) => {
       const p = buyerPrice(c, day, "village");
       const y = buyerPrice(c, day - 1, "village");
-      const trend = p > y ? `<span class="up">▲ ${rs(p - y)}</span>` : p < y ? `<span class="down">▼ ${rs(y - p)}</span>` : `<span class="flat">—</span>`;
+      const w = why(c);
+      const tag = w ? ` <small class="why ${w.kind}">${w.kind === "glut" ? "glut" : "scarce"}</small>` : "";
+      const trend = (p > y ? `<span class="up">▲ ${rs(p - y)}</span>` : p < y ? `<span class="down">▼ ${rs(y - p)}</span>` : `<span class="flat">—</span>`) + tag;
       const have = s.inv[c] ?? 0;
       return `<tr><td><i class="dot" style="background:${CROP_COLOR[c]}"></i>${CROPS[c].name} <small>${CROPS[c].local}</small></td>
         <td class="num">${have}</td><td class="num">${rs(p)} ${trend}</td><td class="num"><b>${rs(Math.round(p * have))}</b></td>
@@ -234,7 +272,9 @@ export class Panels {
       return `<tr><td>🐟 ${FISH[f].name} <small>${FISH[f].local}</small></td><td class="num">${have}</td><td class="num">${rs(p)}</td><td class="num"><b>${rs(p * have)}</b></td>
         <td class="acts"><button data-do="sellFish:${f}:1">Sell 1</button><button data-do="sellFish:${f}:all">All</button></td></tr>`;
     }).join("");
-    return `${heads.map((h) => `<div class="news ${h.kind}">${h.kind === "glut" ? "📉" : "📈"} ${h.headline}</div>`).join("")}
+    const all = this.sellAllTotal(s, day);
+    const sellAll = all.n ? `<div class="big-acts sell-all"><button data-do="sellAll">Sell everything · ${all.n} items for ${rs(all.total)}</button></div>` : `<p class="empty">Nothing to sell yet. Harvest a ripe crop (or catch a fish) and bring it here.</p>`;
+    return `${heads.map((h) => `<div class="news ${h.kind}">${h.kind === "glut" ? "📉" : "📈"} ${h.headline}</div>`).join("")}${sellAll}
       <table><thead><tr><th>Produce</th><th class="num">You have</th><th class="num">Price today</th><th class="num">Worth</th><th></th></tr></thead><tbody>${rows}${fishRows}</tbody></table>`;
   }
 

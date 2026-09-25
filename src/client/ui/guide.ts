@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { complete, current, deadlineAt, MISSIONS, progress } from "../../shared/missions";
 import type { Action, Result } from "../../shared/rules";
 import { DAY_MS } from "../../shared/time";
+import { helpCard } from "./help";
 
 /** On phones, key names in the text become the on-screen buttons. */
 const TOUCH_UI = typeof matchMedia !== "undefined" && (matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1);
@@ -19,7 +20,24 @@ export const forDevice = (t: string) =>
         .replace(/Shift \+ right-click with the hoe/g, "tap Use with the hoe, your bulls nearby")
         .replace(/press P in your field/g, "tap the Plough button in your field")
         .replace(/press E/gi, "tap the button that appears")
-        .replace(/Press <kbd>H<\/kbd> any time for the controls/g, "Tap ☰ any time for help");
+        .replace(/Press <kbd>H<\/kbd> any time for the controls/g, "Tap ☰ any time for help")
+        // the crosshair tips and the first-steps card
+        .replace(/Right-click: /g, "Tap Use: ")
+        .replace(/\bright-click (the|your|tilled) /gi, "tap Use on $1 ")
+        .replace(/\bleft-click (it )?to harvest/gi, "tap Harvest")
+        .replace(/\bright-click(ing)?\b/gi, "tap Use")
+        .replace(/\bleft-click(ing)?\b/gi, "tap Harvest")
+        .replace(/Press M for the map|Press <kbd>M<\/kbd> for the map/g, "Tap Map to see where")
+        .replace(/Press 2 for the hoe/g, "Pick the hoe below").replace(/press 2 for the hoe/g, "pick the hoe below")
+        .replace(/press 3 for the can|\(press 3\)/g, "(pick the can below)")
+        .replace(/press 4, 5 or 6 for seeds/g, "pick a seed bag below")
+        .replace(/Pick the hoe \(2\)/g, "Pick the hoe below").replace(/Pick the onion seeds \(5\)/g, "Pick the onion seeds below").replace(/Pick the can \(3\)/g, "Pick the can below")
+        .replace(/look at (the |ploughed )?soil and right-click/g, "look at $1soil and tap Use")
+        .replace(/Hold it and walk/g, "Hold Use and walk").replace(/or hold it and walk/g, "or hold Use and walk")
+        .replace(/, then press E\./g, ", then tap the button that appears.").replace(/Press E and open/g, "Tap the button and open")
+        .replace(/or press M for the map/g, "or tap Map")
+        .replace(/ ?<kbd>\d<\/kbd>(–<kbd>\d<\/kbd>)?/g, "")
+        .replace(/press <kbd>E<\/kbd>/gi, "tap the button that appears");
 
 const seen = (id: string) => { try { return localStorage.getItem(`tanda.mission.${id}`) === "1"; } catch { return false; } };
 const markSeen = (id: string) => { try { localStorage.setItem(`tanda.mission.${id}`, "1"); } catch { /* ignore */ } };
@@ -30,7 +48,7 @@ import type { World } from "../../shared/world";
  * Making the game easy to follow: a welcome card, a chain of goals (each checked from the save),
  * a golden marker in the world with an on-screen arrow and distance, and a help card (H).
  */
-type Ctx = { world: World; now: number; day: number; onOwnLand: boolean };
+type Ctx = { world: World; now: number; day: number; onOwnLand: boolean; me?: { x: number; z: number } };
 type Where = { x: number; y: number; z: number; label: string };
 
 /** Where each objective happens, for the golden marker. */
@@ -73,6 +91,8 @@ export class Guide {
   private shownFor = "";
   private choiceAsked = "";
   private claiming = "";
+  /** A place picked on the map: the marker and the arrow guide you there instead, until you arrive. */
+  waypoint: { x: number; y: number; z: number; label: string } | null = null;
   /** Set by the game when you're standing near the person who asks you to choose. */
   nearChoice = false;
   onToast: (m: string, k: "ok" | "bad") => void = () => {};
@@ -88,27 +108,7 @@ export class Guide {
     this.arrow.hidden = true;
     this.help = el("div", "panel help", parent);
     this.help.hidden = true;
-    this.help.innerHTML = `<div class="panel-card"><button class="x" data-close>✕</button><h2>How to play</h2>
-      <p class="lede">You farm a field in Ukhali Tanda. Grow crops, sell them, and use the money for bulls, a cart and more land.</p>
-      <div class="help-grid">${TOUCH_UI ? `
-        <div><b>Move</b><span>Left thumb on the circle to walk (push to the edge to run). Drag the right side of the screen to look.</span></div>
-        <div><b>Use</b><span>Look at the soil and tap <b>Use</b>: plough, sow, water, fill the can. Pick tools and seeds on the bar below.</span></div>
-        <div><b>Harvest</b><span>Look at a ripe crop and tap <b>Harvest</b>.</span></div>
-        <div><b>Talk &amp; trade</b><span>Tap <b>Talk</b> near a stall or person.</span></div>
-        <div><b>Bulls &amp; cart</b><span><b>Plough</b> in your field · <b>Tie</b> behind your house · <b>Feed</b> near your bulls · <b>Cart</b> by your cart to ride to the mandi.</span></div>
-        <div><b>Pastimes</b><span>📋 <b>Kaam</b>: a <b>!</b> over someone's head means they have a job for you · 🤼 <b>Kabaddi</b> on the maidan behind the school (tap <b>Harvest</b> to tag) · 🎣 <b>Fishing</b> in the talav beyond it (a gal from Sitabai; hold the button to reel)</span></div>
-        <div><b>Other</b><span><b>Map</b> · <b>View</b> (first/third person) · <b>Torch</b> at night · at night, tap <b>Sleep till morning</b> · 🏆 leaderboard</span></div>
-      </div><div hidden>` : ""}
-        <div><b>Move</b><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump · mouse look</span></div>
-        <div><b>Pick a tool</b><span><kbd>1</kbd> hand · <kbd>2</kbd> hoe · <kbd>3</kbd> watering can · <kbd>4</kbd><kbd>5</kbd><kbd>6</kbd> seeds (or mouse wheel)</span></div>
-        <div><b>Use it</b><span><b>Right-click</b> the soil: plough, sow, water · <b>Left-click</b> a ripe crop: harvest</span></div>
-        <div><b>Talk &amp; trade</b><span><kbd>E</kbd> near a stall or person</span></div>
-        <div><b>Bulls &amp; cart</b><span><kbd>P</kbd> bulls plough your field · <kbd>G</kbd> tie / untie at home · <kbd>F</kbd> feed · <kbd>R</kbd> at the cart: load and ride to the town mandi</span></div>
-        <div><b>Pastimes</b><span>📋 <b>Kaam</b>: a <b>!</b> over someone's head means a job for you (<kbd>E</kbd>) · 🤼 <b>Kabaddi</b> on the maidan behind the school (<kbd>E</kbd>; click to tag or tackle) · 🎣 <b>Fishing</b> in the talav beyond it (a gal from Sitabai; <kbd>E</kbd> cast, click to strike, hold the mouse or <kbd>Space</kbd> to reel)</span></div>
-        <div><b>Other</b><span><kbd>L</kbd> leaderboard · <kbd>M</kbd> map · <kbd>V</kbd> first/third person · <kbd>T</kbd> torch at night · <kbd>Z</kbd> sleep till morning (at night) · <kbd>H</kbd> this help · <kbd>Esc</kbd> pause</span></div>
-      </div>
-      <p class="hint">The golden marker and the goal card (top left) always show what to do next. Your farm is saved online automatically.</p>
-      <div class="big-acts"><button data-close>Got it</button></div></div>`;
+    this.help.innerHTML = helpCard();
     this.help.addEventListener("click", (e) => (e.target as HTMLElement).closest("[data-close]") && this.toggleHelp(false));
     // the world marker: a soft pillar of light with a turning diamond on top
     this.marker = new THREE.Group();
@@ -144,11 +144,7 @@ export class Guide {
     }
     this.welcome = el("div", "panel welcome", parent);
     this.welcome.innerHTML = `<div class="panel-card"><h2>Ram Ram! Welcome home to Ukhali Tanda</h2>
-      <p>You've come back to the tanda to farm <b>Aamrai</b>, your family's small field of black soil.</p>
-      <ol class="steps"><li><b>Grow</b>: plough the soil, sow seeds, water them from the well.</li>
-      <li><b>Sell</b>: take the harvest to Ganpat Seth in the square, or by bullock cart to the town mandi for more.</li>
-      <li><b>Grow bigger</b>: buy bulls, a cart and more land, and rise from small farmer to <b>Bada Kisan</b>.</li></ol>
-      <p class="hint">${forDevice("The <b>goal card</b> (top left) and the <b>golden marker</b> show you what to do next. Press <kbd>H</kbd> any time for the controls.")}</p>
+      <p>Dada's field, <b>Aamrai</b>, is waiting for you. The card at the top left and the golden marker will show you each step.</p>
       <div class="big-acts"><button data-go>Let's farm</button></div></div>`;
     this.welcome.querySelector("[data-go]")!.addEventListener("click", () => {
       try {
@@ -247,13 +243,19 @@ export class Guide {
       const deadline = left !== null ? `<div class="goal-deadline">⏳ ${left >= 1 ? `${Math.floor(left)} day${Math.floor(left) === 1 ? "" : "s"} ${Math.round((left % 1) * 24)} h` : `${Math.round(left * 24)} hours`} left</div>` : "";
       const missed = save.missions.flags.missed && m.deadlineDays ? `<div class="goal-missed">You missed the last deadline — here's another chance.</div>` : "";
       html = `<div class="goal-head">Mission ${save.missions.i + 1} of ${MISSIONS.length} · ${m.who}</div><b>${m.title} <small>${m.local}</small></b>${deadline}${missed}
-        <ul class="objectives">${ps.map((o) => `<li class="${o.got >= o.need ? "done" : o === next ? "now" : ""}"><i>${o.got >= o.need ? "✓" : ""}</i>${forDevice(o.text)}${o.need > 1 ? ` <em>${o.got}/${o.need}</em>` : ""}</li>`).join("")}</ul>
+        <ul class="objectives">${ps.map((o) => `<li class="${o.got >= o.need ? "done" : o === next ? "now" : ""}"><i>${o.got >= o.need ? "✓" : ""}</i><span>${forDevice(o.text)}${o === next && o.how ? `<small class="how">${forDevice(o.how)}</small>` : ""}</span>${o.need > 1 ? ` <em>${o.got}/${o.need}</em>` : ""}</li>`).join("")}</ul>
         <small>Reward: ${m.reward.text} · <kbd>H</kbd> controls</small>`;
       this.target = next ? whereFor(m.id, next.id, c, save) : null;
     }
     if (html !== this.cardHtml) this.card.innerHTML = this.cardHtml = html;
     // the marker and the edge-of-screen arrow
-    const tg = this.target;
+    // a waypoint you set on the map wins over the story's marker until you reach it
+    const me = c.me ?? camera.position;
+    if (this.waypoint && Math.hypot(this.waypoint.x - me.x, this.waypoint.z - me.z) < 3.5) {
+      this.onToast(`You're at ${this.waypoint.label.replace(/^📍 /, "")}`, "ok");
+      this.waypoint = null;
+    }
+    const tg = this.waypoint ?? this.target;
     this.marker.visible = !!tg && !hidden;
     (this.beam.material as THREE.ShaderMaterial).uniforms.uTime.value = t;
     if (!tg || hidden) {
@@ -263,7 +265,7 @@ export class Guide {
     this.marker.position.set(tg.x, this.groundAt(tg.x, tg.z), tg.z);
     const gem = this.marker.getObjectByName("gem")!;
     gem.rotation.y = t * 1.5;
-    gem.position.y = 3 + Math.sin(t * 2) * 0.25;
+    gem.position.y = 3 + (document.documentElement.classList.contains("reduce-motion") ? 0 : Math.sin(t * 2) * 0.25);
     const p = new THREE.Vector3(tg.x, tg.y + 2, tg.z);
     const dist = p.distanceTo(camera.position);
     const v = p.clone().project(camera);
@@ -281,8 +283,19 @@ export class Guide {
       y *= k;
     }
     const ang = Math.atan2(-y, x);
-    this.arrow.style.left = `${(x * 0.5 + 0.5) * 100}%`;
-    this.arrow.style.top = `${(-y * 0.5 + 0.5) * 100}%`;
+    // never on top of the goal card, or under a thumb on a phone
+    const box = this.arrow.parentElement!.getBoundingClientRect();
+    let ax = (x * 0.5 + 0.5) * box.width, ay = (-y * 0.5 + 0.5) * box.height;
+    // (the arrow is centred on its point, so test its whole box, from its size last frame)
+    const hw = (this.arrow.offsetWidth || 120) / 2 + 4, hh = (this.arrow.offsetHeight || 26) / 2 + 4;
+    for (const sel of [".goal", ".touch:not([hidden]) .t-stick", ".touch:not([hidden]) .t-use", ".touch:not([hidden]) .t-pad", ".touch:not([hidden]) .t-jump"]) {
+      const o = document.querySelector(sel)?.getBoundingClientRect();
+      if (!o || !o.width) continue;
+      const l = o.left - box.left, r = o.right - box.left, t = o.top - box.top, b = o.bottom - box.top;
+      if (ax + hw > l && ax - hw < r && ay + hh > t && ay - hh < b) ay = t > box.height / 2 ? t - hh : b + hh;
+    }
+    this.arrow.style.left = `${(ax / box.width) * 100}%`;
+    this.arrow.style.top = `${(ay / box.height) * 100}%`;
     this.arrow.classList.toggle("edge", !onScreen);
     const ah = `${onScreen ? "" : `<i style="transform:rotate(${ang}rad)">➤</i>`}<span>${tg.label} · ${Math.round(dist)} m</span>`;
     if (ah !== this.arrow.innerHTML) this.arrow.innerHTML = ah;

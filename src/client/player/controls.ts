@@ -9,6 +9,8 @@ export class Controls {
   pitch = 0;
   sensitivity = 0.0022;
   readonly held = new Set<string>();
+  /** The use button (right mouse, or Use on a phone) is being held down: work every tile you aim at. */
+  useHeld = false;
   locked = false;
   onDig: () => void = () => {};
   onPlace: () => void = () => {};
@@ -35,7 +37,10 @@ export class Controls {
     });
     document.addEventListener("pointerlockchange", () => {
       this.locked = document.pointerLockElement === el;
-      if (!this.locked) this.held.clear();
+      if (!this.locked) {
+        this.held.clear();
+        this.useHeld = false;
+      }
       this.onLockChange(this.locked);
     });
     document.addEventListener("mousemove", (e) => {
@@ -44,8 +49,12 @@ export class Controls {
     document.addEventListener("mousedown", (e) => {
       if (!this.locked) return;
       if (e.button === 0) this.onDig();
-      else if (e.button === 2) this.onPlace();
+      else if (e.button === 2) {
+        this.useHeld = true;
+        this.onPlace();
+      }
     });
+    document.addEventListener("mouseup", (e) => e.button === 2 && (this.useHeld = false));
     document.addEventListener("contextmenu", (e) => e.preventDefault());
     document.addEventListener(
       "wheel",
@@ -79,7 +88,10 @@ export class Controls {
       }
     });
     window.addEventListener("keyup", (e) => this.held.delete(e.code));
-    window.addEventListener("blur", () => this.held.clear());
+    window.addEventListener("blur", () => {
+      this.held.clear();
+      this.useHeld = false;
+    });
   }
 
   look(dx: number, dy: number) {

@@ -6,7 +6,7 @@ import type { Save } from "../shared/save";
 import { clock } from "../shared/time";
 import { D, W, type World } from "../shared/world";
 import { Npc, type NpcLook } from "./engine/npc";
-import { bangTexture } from "./jobs";
+import { markTexture } from "./jobs";
 import type { Nav } from "./player/nav";
 import { Q } from "./quality";
 import { banjaraWoman, Figure } from "./scene/figure";
@@ -122,7 +122,7 @@ export class Helpers {
     this.crew = HELPER_IDS.map((id, i) => new Labourer(id, this.benchAt[i]));
     for (const l of this.crew) {
       this.group.add(l.fig.root);
-      const mark = new THREE.Sprite(new THREE.SpriteMaterial({ map: bangTexture(), depthWrite: false, toneMapped: false }));
+      const mark = new THREE.Sprite(new THREE.SpriteMaterial({ map: markTexture("!"), depthWrite: false, toneMapped: false }));
       mark.scale.set(0.5, 0.5, 1);
       this.group.add(mark);
       this.marks.set(l.id, mark);

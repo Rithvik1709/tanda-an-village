@@ -3,6 +3,7 @@ import { GODOWN_CAPACITY } from "../src/shared/bank";
 import { dawnOf, duskOf, patchMs, WALK_MS } from "../src/shared/helpers";
 import { apply, type Action, settleHelpers } from "../src/shared/rules";
 import { cloneSave, newSave, type Save } from "../src/shared/save";
+import { daySummary } from "../src/shared/summary";
 import { atHour, DAY_MS } from "../src/shared/time";
 import { generateWorld } from "../src/shared/world";
 
@@ -66,6 +67,9 @@ describe("majoor", () => {
     expect(s.money).toBe(m0 - 750);
     // the freed slot can be booked again for the day after
     ok(s, { t: "hire", who: "vithoba" });
+    // the morning card nets the refund against the wages: 750 + 1000 − 1000 + 1000 over two days
+    expect(daySummary(s, 4).costs + daySummary(s, 5).costs).toBe(1750);
+    expect(daySummary(s, 4).net).toBe(-1750);
   });
 
   it("take their order the next morning, once, and sow only the seeds you hand over", () => {
