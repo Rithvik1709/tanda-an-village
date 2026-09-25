@@ -32,8 +32,52 @@ export function helpRows() {
 export function helpCard(picture = "") {
   return `<div class="panel-card"><button class="x" data-close>✕</button><h2>${pick("How to play", "कसे खेळायचे", "कैसे खेलें")}</h2>
       <p class="lede">${pick("You farm a field in Ukhali Tanda. Grow crops, sell them, and use the money for bulls, a cart and more land.", "तुम्ही उखळी तांड्यात शेती करता. पिके घ्या, विका, आणि त्या पैशातून बैल, गाडी आणि आणखी जमीन घ्या.", "आप उखळी तांडा में खेती करते हैं. फ़सल उगाइए, बेचिए, और उस पैसे से बैल, गाड़ी और ज़मीन लीजिए.")}</p>
-      ${picture}
-      <div class="help-grid">${helpRows().join("")}</div>
+      ${picture || helpPicture()}
+      <details class="help-more"><summary>${pick("All controls", "सर्व नियंत्रणे", "सारे कंट्रोल")}</summary><div class="help-grid">${helpRows().join("")}</div></details>
       <p class="hint">${pick("The golden marker and the goal card (top left) always show what to do next. Your farm is saved online automatically.", "सोनेरी खूण आणि वरच्या डावीकडचे कार्ड नेहमी पुढे काय करायचे ते दाखवतात. तुमचे शेत आपोआप ऑनलाइन जतन होते.", "सुनहरा निशान और ऊपर बाईं ओर का कार्ड हमेशा अगला काम बताते हैं. आपका खेत अपने आप ऑनलाइन सहेजा जाता है.")}</p>
       <div class="big-acts"><button data-close>${pick("Got it", "समजले", "समझ गया")}</button></div></div>`;
+}
+
+/** A drawn keyboard and mouse (or, on a phone, the screen's controls) with the keys that matter labelled. */
+export function helpPicture() {
+  const lab = (x: number, y: number, s: string, a: "start" | "middle" | "end" = "middle") => `<text x="${x}" y="${y}" text-anchor="${a}" class="hp-lab">${s}</text>`;
+  if (TOUCH_UI) {
+    return `<svg viewBox="0 0 520 230" class="help-pic" role="img" aria-label="${pick("The phone controls", "फोनवरची नियंत्रणे", "फ़ोन के कंट्रोल")}">
+      <rect x="10" y="10" width="500" height="210" rx="22" class="hp-screen"/>
+      <circle cx="80" cy="160" r="34" class="hp-pad"/><circle cx="80" cy="160" r="13" class="hp-key hi"/>
+      ${lab(80, 112, pick("walk: thumb anywhere here", "चालणे: इथे कुठेही अंगठा", "चलें: यहाँ कहीं भी अँगूठा"))}
+      <circle cx="445" cy="150" r="34" class="hp-pad"/>${lab(445, 154, pick("look", "पहा", "देखें"))}
+      <circle cx="360" cy="180" r="24" class="hp-key hi"/>${lab(360, 184, pick("Use", "वापरा", "इस्तेमाल"))}
+      ${lab(360, 146, pick("hold for a row", "ओळीसाठी धरा", "क़तार के लिए दबाएँ"))}
+      <circle cx="360" cy="92" r="17" class="hp-key"/>${lab(360, 96, pick("Jump", "उडी", "कूदें"))}
+      <rect x="170" y="150" width="150" height="30" rx="15" class="hp-key hi"/>${lab(245, 170, pick("Talk · Cart · Feed…", "बोला · गाडी · चारा…", "बात · गाड़ी · चारा…"))}
+      ${lab(245, 200, pick("the button that appears", "दिसणारे बटण", "जो बटन दिखे"))}
+      <rect x="400" y="24" width="44" height="22" rx="11" class="hp-key"/>${lab(422, 39, pick("Map", "नकाशा", "नक्शा"))}
+      <circle cx="470" cy="35" r="11" class="hp-key"/>${lab(470, 39, "☰")}
+      <rect x="24" y="24" width="150" height="46" rx="10" class="hp-card"/>${lab(99, 44, pick("your next step", "पुढची पायरी", "अगला कदम"))}${lab(99, 60, pick("(tap to open)", "(उघडण्यासाठी दाबा)", "(खोलने के लिए दबाएँ)"))}
+    </svg>`;
+  }
+  const key = (x: number, y: number, w: number, s: string, hi = false) => `<rect x="${x}" y="${y}" width="${w}" height="30" rx="6" class="hp-key${hi ? " hi" : ""}"/><text x="${x + w / 2}" y="${y + 20}" text-anchor="middle" class="hp-k">${s}</text>`;
+  // the keys that matter are gold; what they do is written underneath, the mouse's beside it
+  return `<svg viewBox="0 0 560 290" class="help-pic" role="img" aria-label="${pick("The keyboard and mouse controls", "कीबोर्ड व माउस नियंत्रणे", "कीबोर्ड और माउस कंट्रोल")}">
+    ${["1", "2", "3", "4", "5", "6"].map((k, i) => key(20 + i * 38, 14, 34, k, true)).join("")}
+    ${key(38, 52, 34, "Q")}${key(76, 52, 34, "W", true)}${key(114, 52, 34, "E", true)}${key(152, 52, 34, "R", true)}${key(190, 52, 34, "T", true)}
+    ${key(48, 90, 34, "A", true)}${key(86, 90, 34, "S", true)}${key(124, 90, 34, "D", true)}${key(162, 90, 34, "F", true)}${key(200, 90, 34, "G", true)}${key(276, 90, 34, "H", true)}
+    ${key(10, 128, 60, "Shift", true)}${key(74, 128, 34, "Z", true)}${key(250, 128, 34, "M", true)}
+    ${key(90, 166, 200, "Space", true)}
+    ${lab(10, 226, pick("1 hand · 2 hoe · 3 can · 4–6 seeds", "1 हात · 2 कुदळ · 3 झारी · 4–6 बियाणे", "1 हाथ · 2 कुदाल · 3 झारा · 4–6 बीज"), "start")}
+    ${lab(10, 246, pick("WASD walk · Shift run · Space jump · E talk", "WASD चाला · Shift धावा · Space उडी · E बोला", "WASD चलें · Shift दौड़ें · Space कूदें · E बात"), "start")}
+    ${lab(10, 266, pick("F feed · G tie · R cart · T torch · M map · H help · Z sleep", "F चारा · G बांधा · R गाडी · T टॉर्च · M नकाशा · H मदत · Z झोप", "F चारा · G बाँधें · R गाड़ी · T टॉर्च · M नक्शा · H मदद · Z नींद"), "start")}
+    <g transform="translate(440 14)">
+      <rect x="0" y="0" width="90" height="140" rx="45" class="hp-mouse"/>
+      <path d="M45 0 L45 60 M0 60 L90 60" class="hp-line"/>
+      <path d="M45 0 A45 45 0 0 0 0 45 L0 60 L45 60 Z" class="hp-key hi"/>
+      <path d="M45 0 A45 45 0 0 1 90 45 L90 60 L45 60 Z" class="hp-key hi"/>
+      <text x="22" y="40" text-anchor="middle" class="hp-k">L</text><text x="68" y="40" text-anchor="middle" class="hp-k">R</text>
+      ${lab(45, 172, pick("L: harvest", "डावे: कापणी", "बायाँ: कटाई"))}
+      ${lab(45, 192, pick("R: use", "उजवे: वापरा", "दायाँ: इस्तेमाल"))}
+      ${lab(45, 212, pick("hold R: a whole row", "उजवे धरा: पूर्ण ओळ", "दायाँ दबाएँ: पूरी क़तार"))}
+      ${lab(45, 232, pick("move: look", "हलवा: पहा", "हिलाएँ: देखें"))}
+    </g>
+  </svg>`;
 }

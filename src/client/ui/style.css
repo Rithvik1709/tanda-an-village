@@ -625,3 +625,17 @@ small.why.shortage { background: rgba(158,214,122,.18); color: var(--good); }
 .howto-art { width: 100%; height: auto; margin: 8px 0 4px; border-radius: 10px; background: rgba(0,0,0,.18); }
 .howto-steps { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; line-height: 1.45; }
 .settings label.check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; margin: 6px 0; }
+/* the picture of the controls */
+.help-pic { width: 100%; height: auto; margin: 6px 0 4px; }
+.help-pic .hp-key { fill: rgba(255,236,200,0.08); stroke: rgba(255,222,170,0.35); stroke-width: 1.2; }
+.help-pic .hp-key.hi { fill: rgba(240,195,106,0.22); stroke: var(--gold); }
+.help-pic .hp-k { font: 700 13px ui-monospace, Menlo, monospace; fill: #fff4dc; }
+.help-pic .hp-lab { font: 600 12px system-ui, "Noto Sans Devanagari", sans-serif; fill: var(--gold-2); }
+.help-pic .hp-mouse { fill: rgba(255,236,200,0.06); stroke: rgba(255,222,170,0.35); }
+.help-pic .hp-line { stroke: rgba(255,222,170,0.35); fill: none; }
+.help-pic .hp-screen { fill: rgba(0,0,0,.25); stroke: rgba(255,222,170,0.35); stroke-width: 2; }
+.help-pic .hp-pad { fill: rgba(255,236,200,0.06); stroke: rgba(255,222,170,0.3); stroke-dasharray: 4 3; }
+.help-pic .hp-card { fill: rgba(28,19,12,.7); stroke: var(--gold); }
+.help-more { margin-top: 6px; }
+.help-more summary { cursor: pointer; font-weight: 700; color: var(--gold); padding: 6px 0; }
+.is-touch .help-pic { max-height: 42vh; }
