@@ -212,7 +212,7 @@ looked at), tick it, log it, commit. Push once at the end.
 Loop: fix, test with a script and screenshots, tick, log, commit; push at the end.
 - [x] **F1 · The cart card can always go somewhere.** When the bulls are sulking or tired, the card says so by the button and offers "Feed them" (using your kadba), or tells you where to buy kadba; Set off is disabled with the reason until they can go.
 - [x] **F2 · E continues a story card.** Single-button cards take E, Enter, Space or a click; choice cards take 1/2/3; the footer says so. A held key doesn't skip the card it opened.
-- [ ] **F3 · The kaam list opens from the keyboard.** K opens and folds it (the chip shows "K"); it starts open the first time it appears; a phone taps it as before.
+- [x] **F3 · The kaam list opens from the keyboard.** K opens and folds it (the chip shows "K"); it starts open the first time it appears; a phone taps it as before.
 - [ ] **F4 · A drip set installs itself.** Buying one installs it on the field you're standing in, or else your first field without drip, and says which; the Your land tab still moves the spare ones.
 - [ ] **F5 · People you can talk to.** No neighbour stands in a shop doorway (Tulsa aaji was at the bank door); E and the hint go to whoever is nearest, a neighbour or a stall; the neighbours by the well, the mandir and the banyan say Ram Ram.
 - [ ] **F6 · Up the tanki.** A proper ladder outside the bowl, with a safety cage and a landing; E at its foot climbs up, you sit on the rim looking over the tanda, and moving climbs back down.
@@ -243,6 +243,7 @@ _(one line per loop iteration: date · task · how it was verified · commit)_
 ---
 - 2026-09-25 · F1 the cart card can always go somewhere · When Sarja and Raja are sulking or too tired, a box above the load table says so and offers "Feed them kadba" (with your count), or says where to buy kadba; Set off reads "Feed them first to set off" and is disabled until they can go. Verified: tsc, scripts/fix/f1.js (no fodder: reason + where to buy, button disabled; with fodder: Feed button; after feeding the box goes), screenshots looked at.
 - 2026-09-25 · F2 E continues a story card · Single-button cards take E as well as Enter, Space or a click; cards with choices show 1, 2… on their buttons and take the number keys; the footer says which ("E or Enter to continue" / "Press 1–2 to choose", translated; none on phones). A key held or repeating from opening the card is ignored for 250 ms. Verified: tsc, scripts/fix/f2.js (story card closed by E; Kashibai's card by E; Bhimrao's two-choice card ignores E and closes on 2), screenshots looked at.
+- 2026-09-25 · F3 the kaam list opens from the keyboard · K opens and folds it (a K key cap on its header; K is in the help picture and list); it starts open the first time and remembers your choice; a tap still toggles it on a phone. Verified: tsc, scripts/fix/f3.js (starts open, K folds and saves "0", K opens), screenshots looked at.
 
 ## 8. Missions (proposed · v1.1)
 A 10-mission story arc for Ukhali Tanda. It replaces the flat goal chain, and each mission teaches one system.

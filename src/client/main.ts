@@ -1337,6 +1337,7 @@ controls.onInteract = () => {
 controls.onEscape = () => closeWindows();
 controls.onMap = () => (map.open ? map.close() : showMap());
 controls.onBoard = () => (board.open ? board.close() : showBoard());
+controls.onKaam = () => jobs.toggle();
 controls.onHelp = () => {
   if (!guide.helpOpen) closeWindows();
   guide.toggleHelp();

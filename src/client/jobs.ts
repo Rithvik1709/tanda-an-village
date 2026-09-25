@@ -86,16 +86,20 @@ export class Jobs {
     this.el = document.createElement("div");
     this.el.className = "kaam";
     d.ui.appendChild(this.el);
-    // folded to a chip until you open it; the choice is remembered
+    // open the first time; after that folded or open as you left it (K or a tap)
     try {
-      if (localStorage.getItem("tanda.kaam.open") === "1") this.el.classList.add("open");
+      if (localStorage.getItem("tanda.kaam.open") !== "0") this.el.classList.add("open");
     } catch { /* ignore */ }
-    this.el.addEventListener("click", () => {
-      const open = this.el.classList.toggle("open");
-      try {
-        localStorage.setItem("tanda.kaam.open", open ? "1" : "0");
-      } catch { /* ignore */ }
-    });
+    this.el.addEventListener("click", () => this.toggle());
+  }
+
+  /** Open or fold the kaam list (K on a keyboard, a tap on a phone); remembered on this device. */
+  toggle() {
+    if (this.el.hidden) return;
+    const open = this.el.classList.toggle("open");
+    try {
+      localStorage.setItem("tanda.kaam.open", open ? "1" : "0");
+    } catch { /* ignore */ }
   }
 
   /** Where each neighbour stands (for the map and for keeping people apart). */
@@ -294,7 +298,7 @@ export class Jobs {
 
   private renderList(jobs: Job[], done: number[], day: boolean) {
     const left = jobs.filter((j) => !done.includes(j.slot)).length;
-    const html = `<div class="kaam-head">${t("📋 Kaam today")} <span>${left ? t("{a} of {b} open", { a: left, b: jobs.length }) : t("all done!")}</span><b class="fold" aria-hidden="true"></b></div>
+    const html = `<div class="kaam-head">${t("📋 Kaam today")} <span>${left ? t("{a} of {b} open", { a: left, b: jobs.length }) : t("all done!")}</span>${document.body.classList.contains("is-touch") ? "" : `<kbd class="kaam-key">K</kbd>`}<b class="fold" aria-hidden="true"></b></div>
       <ul>${jobs.map((j) => `<li class="${done.includes(j.slot) ? "done" : ""}"><i>${done.includes(j.slot) ? "✓" : ""}</i><span>${jobLineT(j)}</span><em>₹${j.pay}</em></li>`).join("")}</ul>
       <small>${t(day ? "Look for the <b>!</b> over their heads · new jobs every day" : "Everyone's gone in for the night — new jobs in the morning")}</small>`;
     if (html !== this.listHtml) this.el.innerHTML = this.listHtml = html;

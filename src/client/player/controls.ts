@@ -26,6 +26,7 @@ export class Controls {
   onTorch: () => void = () => {};
   onHelp: () => void = () => {};
   onBoard: () => void = () => {};
+  onKaam: () => void = () => {};
   onPloughField: () => void = () => {};
   onTie: () => void = () => {};
   onSleep: () => void = () => {};
@@ -79,6 +80,7 @@ export class Controls {
       if (e.code === "KeyT" && !e.repeat) this.onTorch();
       if (e.code === "KeyH" && !e.repeat) this.onHelp();
       if (e.code === "KeyL" && !e.repeat) this.onBoard();
+      if (e.code === "KeyK" && !e.repeat) this.onKaam();
       if (e.code === "KeyP" && !e.repeat) this.onPloughField();
       if (e.code === "KeyG" && !e.repeat) this.onTie();
       if (e.code === "KeyZ" && !e.repeat) this.onSleep();
