@@ -21,7 +21,8 @@ export type MissionState = {
 };
 
 export type Ctx = { world: World; now: number };
-export type Objective = { id: string; text: string; need: number; have: (s: Save, c: Ctx) => number };
+/** `how`: one line on how to do it, shown under the objective while it's the current one. */
+export type Objective = { id: string; text: string; need: number; have: (s: Save, c: Ctx) => number; how?: string };
 export type Reward = { money?: number; items?: Record<string, number>; rep?: number; perk?: string; text: string };
 export type Mission = {
   id: string;
@@ -42,6 +43,7 @@ export type Mission = {
  */
 export const since = (s: Save, key: string) => (s.missions.c[key] ?? 0) - ((s.missions.prevBase ?? {})[key] ?? 0);
 const starter = (w: World) => w.plots.find((p) => p.starter)!;
+const harvested6 = (s: Save) => Math.max(since(s, "harvestN:onion"), since(s, "harvest:onion")) >= 6;
 const cellsIn = (s: Save, w: World, plotId: number) => {
   const p = w.plots[plotId];
   return Object.entries(s.farm).filter(([k]) => {
@@ -57,9 +59,9 @@ export const MISSIONS: Mission[] = [
     story: "Ram Ram, beta! After all these years in the city, you're back. Your Dada's field, Aamrai, has been lying fallow. Come, see me at the kacheri by the chowk, then go and wake that black soil up.",
     done: "The whole tanda saw you ploughing today. Dada would be proud.",
     objectives: [
-      { id: "talk", text: "Talk to Naik Dhavlu at his kacheri (press E near him)", need: 1, have: (s) => since(s, "talk:naik") },
-      { id: "visit", text: "Walk to your field, Aamrai", need: 1, have: (s) => since(s, "visit:aamrai") },
-      { id: "till", text: "Plough 6 patches of Aamrai's soil", need: 6, have: (s, c) => cellsIn(s, c.world, starter(c.world).id).length },
+      { id: "talk", text: "Talk to Naik Dhavlu at his kacheri (press E near him)", need: 1, have: (s) => since(s, "talk:naik"), how: "Follow the golden marker to his door on the chowk, then press E." },
+      { id: "visit", text: "Walk to your field, Aamrai", need: 1, have: (s) => since(s, "visit:aamrai"), how: "It's just north-west of the chowk. Follow the marker, or press M for the map." },
+      { id: "till", text: "Plough 6 patches of Aamrai's soil", need: 6, have: (s, c) => cellsIn(s, c.world, starter(c.world).id).length, how: "Pick the hoe (2), look at the soil and right-click." },
     ],
     reward: { money: 500, items: { "seed:onion": 10 }, text: "₹500 and 10 onion seeds" },
   },
@@ -68,9 +70,12 @@ export const MISSIONS: Mission[] = [
     story: "Onions, eh? Grow them and bring them to me. But a clever farmer checks the prices first — they change every day, and I don't always pay the best.",
     done: "Not bad for a city kid! Here — my old sickle. It'll bring in more from every plant.",
     objectives: [
-      { id: "harvest", text: "Harvest 6 onions", need: 6, have: (s) => Math.max(since(s, "harvestN:onion"), since(s, "harvest:onion")) }, // (older saves only counted harvests, not onions)
-      { id: "prices", text: "Check today's prices at Ganpat's stall (Prices tab)", need: 1, have: (s) => since(s, "visit:prices") },
-      { id: "sell", text: "Sell 6 onions", need: 6, have: (s) => since(s, "sell:onion") },
+      // (sowing and watering were added later: a farmer who has already harvested counts them done)
+      { id: "sow", text: "Sow 6 onions in your ploughed soil", need: 6, have: (s) => (harvested6(s) ? 6 : since(s, "plant:onion")), how: "Pick the onion seeds (5), look at ploughed soil and right-click." },
+      { id: "wet", text: "Water them", need: 6, have: (s) => (harvested6(s) ? 6 : since(s, "water")), how: "Pick the can (3). Fill it at the well by the chowk (right-click the water), then right-click each sown patch." },
+      { id: "harvest", text: "Harvest 6 onions", need: 6, have: (s) => Math.max(since(s, "harvestN:onion"), since(s, "harvest:onion")), how: "Watered onions ripen in 15–20 minutes; dry ones take twice as long. Left-click a ripe one." }, // (older saves only counted harvests, not onions)
+      { id: "prices", text: "Check today's prices at Ganpat's stall (Prices tab)", need: 1, have: (s) => since(s, "visit:prices"), how: "Ganpat's stall is on the chowk. Press E and open the Prices tab." },
+      { id: "sell", text: "Sell 6 onions", need: 6, have: (s) => since(s, "sell:onion"), how: "Sell on Ganpat's Sell tab." },
     ],
     reward: { items: { sickle: 1 }, text: "Ganpat's sickle (+1 produce from every harvest)" },
   },
@@ -79,8 +84,8 @@ export const MISSIONS: Mission[] = [
     story: "Summer has come early. The village well is running low and there's a queue of matkas from dawn. Don't fight over it — take your can to the old vihir out in the fields, west of the village.",
     done: "Good — you didn't let the crop go thirsty. Take this brass can; it holds twice as much.",
     objectives: [
-      { id: "vihir", text: "Fill your can at the vihir in the fields", need: 1, have: (s) => since(s, "refill:vihir") },
-      { id: "water", text: "Water your crops 16 times", need: 16, have: (s) => since(s, "water") },
+      { id: "vihir", text: "Fill your can at the vihir in the fields", need: 1, have: (s) => since(s, "refill:vihir"), how: "The vihir is west of the village, by the big banyan. Pick the can (3) and right-click the water." },
+      { id: "water", text: "Water your crops 16 times", need: 16, have: (s) => since(s, "water"), how: "Right-click sown soil with the can. Dark soil is already wet." },
     ],
     reward: { items: { bigcan: 1 }, text: "A brass watering can (holds 48)" },
   },

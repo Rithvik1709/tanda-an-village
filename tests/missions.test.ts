@@ -214,3 +214,33 @@ describe("nights in the tanda", () => {
     expect(apply(world, s, { t: "friends" }, at(12)).ok).toBe(false);
   });
 });
+
+describe("Pehli Fasal teaches sowing and watering", () => {
+  const into2 = () => {
+    const s = newSave("p2", world, now);
+    ok(s, { t: "talk", npc: "naik" });
+    ok(s, { t: "visit", place: "aamrai" });
+    for (const c of cells(6)) ok(s, { t: "till", ...c });
+    ok(s, { t: "claimMission" });
+    return s;
+  };
+  const got = (s: Save, id: string) => current(s).objectives.find((o) => o.id === id)!.have(s, { world, now });
+  it("counts the onions you sow and the waterings, in order before the harvest", () => {
+    const s = into2();
+    expect(current(s).objectives.map((o) => o.id)).toEqual(["sow", "wet", "harvest", "prices", "sell"]);
+    expect(got(s, "sow")).toBe(0);
+    for (const c of cells(6)) ok(s, { t: "plant", ...c, crop: "onion" });
+    expect(got(s, "sow")).toBe(6);
+    expect(got(s, "wet")).toBe(0);
+    for (const c of cells(6)) ok(s, { t: "water", ...c });
+    expect(got(s, "wet")).toBe(6);
+    // every objective carries a line on how to do it
+    for (const o of current(s).objectives) expect(o.how?.length ?? 0).toBeGreaterThan(10);
+  });
+  it("a farmer who harvested before these steps existed isn't sent back to sow", () => {
+    const s = into2();
+    s.missions.c["harvestN:onion"] = (s.missions.c["harvestN:onion"] ?? 0) + 6; // harvested, but no plant counter yet
+    expect(got(s, "sow")).toBe(6);
+    expect(got(s, "wet")).toBe(6);
+  });
+});

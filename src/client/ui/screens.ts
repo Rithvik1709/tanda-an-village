@@ -1,9 +1,8 @@
-import { forDevice } from "./guide";
 import { detectTier, graphicsChoice, Q, setGraphicsChoice, type TierChoice } from "../quality";
 import type { Save } from "../../shared/save";
 
 /*
- * The screens around the game: the title, settings, the first-time tutorial card and the note for
+ * The screens around the game: the title, settings and the note for
  * phones. Plain DOM; each reports what the player chose through callbacks.
  */
 export type Settings = { sensitivity: number; renderDistance: number; volume: number };
@@ -184,54 +183,3 @@ export class SettingsPanel {
 }
 
 /** First-time help: one step at a time, each ticked off by what the save shows you've done. */
-export class Tutorial {
-  private el: HTMLElement;
-  private doneAt = 0;
-  private dismissed = (() => {
-    try {
-      return localStorage.getItem("bailgaadi.tutorial") === "done";
-    } catch {
-      return false;
-    }
-  })();
-
-  constructor(parent: HTMLElement) {
-    this.el = el("div", "tutorial", parent);
-    this.el.hidden = true;
-    this.el.addEventListener("click", (e) => {
-      if ((e.target as HTMLElement).closest("[data-skip]")) this.finish();
-    });
-  }
-
-  private finish() {
-    this.dismissed = true;
-    this.el.hidden = true;
-    try {
-      localStorage.setItem("bailgaadi.tutorial", "done");
-    } catch {
-      /* ignore */
-    }
-  }
-
-  update(save: Save, onOwnLand: boolean, now: number) {
-    if (this.dismissed) return;
-    const cells = Object.values(save.farm);
-    const steps: [boolean, string][] = [
-      [onOwnLand || cells.length > 0, "Walk to <b>Aamrai</b>, your field — just north-west of the village square. Press <kbd>M</kbd> for the map."],
-      [cells.length > 0, "Pick the <b>hoe</b> <kbd>2</kbd> and right-click the soil to till it."],
-      [save.stats.planted > 0, "Pick <b>seeds</b> <kbd>4</kbd>–<kbd>6</kbd> and right-click tilled soil to sow."],
-      [cells.some((c) => c.wetUntil > 0), "Fill the <b>watering can</b> <kbd>3</kbd> at the well in the square, then right-click your sown soil. Watered soil grows crops twice as fast."],
-      [save.stats.harvested > 0, "Crops grow while you're away too. When one is ripe, left-click it to harvest."],
-      [save.stats.earned > 0, "Take your harvest to <b>Ganpat's stall</b> in the square and press <kbd>E</kbd> to sell."],
-    ];
-    const i = steps.findIndex(([done]) => !done);
-    this.el.hidden = false;
-    if (i < 0) {
-      this.doneAt ||= now;
-      this.el.innerHTML = `<b>Your first profit!</b> Now save up: better seeds, a bull pair and a cart (Sitabai's shop), and more land (the land office).`;
-      if (now - this.doneAt > 20000) this.finish();
-      return;
-    }
-    this.el.innerHTML = `<div class="tut-head">Getting started · ${i + 1} of ${steps.length}<button data-skip title="Hide these tips">skip</button></div>${forDevice(steps[i][1])}`;
-  }
-}

@@ -165,10 +165,6 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .settings-card label b { position: absolute; right: 22px; font-weight: 700; color: #8a5a10; }
 .settings-card label { position: relative; }
 .settings-card input[type="range"] { width: 100%; accent-color: #b8553a; }
-.tutorial { position: absolute; left: 12px; top: 56px; max-width: 300px; padding: 10px 12px; border-radius: 10px; background: rgba(246, 238, 219, 0.94); color: #2a2530; font-size: 14px; line-height: 1.45; pointer-events: auto; box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
-.tutorial .tut-head { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.6; margin-bottom: 4px; }
-.tutorial button { border: 0; background: none; font: 600 11px system-ui; cursor: pointer; opacity: 0.8; text-decoration: underline; }
-.tutorial kbd { margin: 0 1px; }
 .mobile-note { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; pointer-events: auto; background: rgba(20,14,10,0.55); z-index: 20; }
 .mobile-note .panel-card { max-width: 420px; }
 .play-prompt .pause-buttons { display: flex; gap: 8px; justify-content: center; }
@@ -177,7 +173,6 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .title-restore input { font: 14px ui-monospace, Menlo, monospace; padding: 8px 10px; border-radius: 8px; border: 0; width: 200px; text-transform: uppercase; }
 .title-restore button { min-width: 0 !important; padding: 8px 14px !important; font-size: 14px !important; }
 .title-screen .restore-msg { color: #fff; font-size: 13px; min-height: 1em; }
-.tutorial kbd { background: #2a2530; color: #f4ecd8; }
 .panel-card, .map-card { box-sizing: border-box; }
 .mobile-note .panel-card { width: 100%; }
 .slot .icon svg { width: 40px; height: 40px; display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35)); }
@@ -197,7 +192,6 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .welcome .steps { font-size: 15px; line-height: 1.6; padding-left: 20px; }
 .action-tip { position: absolute; left: 50%; top: calc(50% + 24px); transform: translateX(-50%); padding: 5px 12px; border-radius: 8px; background: rgba(30,24,20,0.7); font-size: 14px; font-weight: 600; white-space: nowrap; }
 .action-tip .no { color: #ffb4a0; }
-.tutorial { display: none !important; }
 .welcome { z-index: 30; background: rgba(20,14,10,0.55); }
 .map-credit { font-size: 10px; opacity: 0.55; margin-top: 4px; }
 .order-card { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 12px; margin-bottom: 10px; border-radius: 10px; background: #fbe3b8; font-size: 14px; }
@@ -255,7 +249,7 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
   --serif: Georgia, "Times New Roman", serif;
 }
 .panel { background: rgba(10, 6, 3, 0.42); backdrop-filter: blur(2px); }
-.panel-card, .map-card, .about-card, .goal, .tutorial {
+.panel-card, .map-card, .about-card, .goal {
   background: var(--glass) !important;
   color: var(--ink) !important;
   border: 1px solid var(--line) !important;
@@ -305,7 +299,7 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .bar i { background: var(--gold) !important; }
 .chart .grid { stroke: rgba(255, 236, 200, 0.12) !important; }
 .chart .axis { fill: var(--ink-2) !important; }
-kbd, .goal kbd, .help kbd, .welcome kbd, .tutorial kbd { background: rgba(255, 236, 200, 0.14) !important; color: var(--gold-2) !important; border: 1px solid var(--line); }
+kbd, .goal kbd, .help kbd, .welcome kbd { background: rgba(255, 236, 200, 0.14) !important; color: var(--gold-2) !important; border: 1px solid var(--line); }
 /* the goal card */
 .goal { border-left: 3px solid var(--gold) !important; }
 .goal b { color: #fff4dc; font-family: var(--serif); }
@@ -538,3 +532,6 @@ body:not(.is-touch) .fishing.reeling .fish-foot::after { content: " · hold the 
 .is-touch .kb-score em { font-size: 16px; }
 .is-touch .kb-status { font-size: 11px; max-width: 46vw; padding: 3px 8px; }
 .is-touch .kb-breath { width: 200px; font-size: 12px; }
+.goal ul.objectives li span { display: flex; flex-direction: column; gap: 2px; }
+.goal ul.objectives small.how { font-size: 12px; font-weight: 500; opacity: 0.8; line-height: 1.35; color: var(--gold-2); }
+.is-touch .goal small.how { display: block !important; font-size: 10.5px !important; opacity: 0.85; } /* the one line on how to do it matters most on a phone */

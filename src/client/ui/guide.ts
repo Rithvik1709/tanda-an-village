@@ -27,9 +27,13 @@ export const forDevice = (t: string) =>
         .replace(/\bright-click(ing)?\b/gi, "tap Use")
         .replace(/\bleft-click(ing)?\b/gi, "tap Harvest")
         .replace(/Press M for the map|Press <kbd>M<\/kbd> for the map/g, "Tap Map to see where")
-        .replace(/press 2 for the hoe|Press 2 for the hoe/g, "pick the hoe below")
+        .replace(/Press 2 for the hoe/g, "Pick the hoe below").replace(/press 2 for the hoe/g, "pick the hoe below")
         .replace(/press 3 for the can|\(press 3\)/g, "(pick the can below)")
         .replace(/press 4, 5 or 6 for seeds/g, "pick a seed bag below")
+        .replace(/Pick the hoe \(2\)/g, "Pick the hoe below").replace(/Pick the onion seeds \(5\)/g, "Pick the onion seeds below").replace(/Pick the can \(3\)/g, "Pick the can below")
+        .replace(/look at (the |ploughed )?soil and right-click/g, "look at $1soil and tap Use")
+        .replace(/, then press E\./g, ", then tap the button that appears.").replace(/Press E and open/g, "Tap the button and open")
+        .replace(/or press M for the map/g, "or tap Map")
         .replace(/ ?<kbd>\d<\/kbd>(–<kbd>\d<\/kbd>)?/g, "")
         .replace(/press <kbd>E<\/kbd>/gi, "tap the button that appears");
 
@@ -156,11 +160,7 @@ export class Guide {
     }
     this.welcome = el("div", "panel welcome", parent);
     this.welcome.innerHTML = `<div class="panel-card"><h2>Ram Ram! Welcome home to Ukhali Tanda</h2>
-      <p>You've come back to the tanda to farm <b>Aamrai</b>, your family's small field of black soil.</p>
-      <ol class="steps"><li><b>Grow</b>: plough the soil, sow seeds, water them from the well.</li>
-      <li><b>Sell</b>: take the harvest to Ganpat Seth in the square, or by bullock cart to the town mandi for more.</li>
-      <li><b>Grow bigger</b>: buy bulls, a cart and more land, and rise from small farmer to <b>Bada Kisan</b>.</li></ol>
-      <p class="hint">${forDevice("The <b>goal card</b> (top left) and the <b>golden marker</b> show you what to do next. Press <kbd>H</kbd> any time for the controls.")}</p>
+      <p>Dada's field, <b>Aamrai</b>, is waiting for you. The card at the top left and the golden marker will show you each step.</p>
       <div class="big-acts"><button data-go>Let's farm</button></div></div>`;
     this.welcome.querySelector("[data-go]")!.addEventListener("click", () => {
       try {
@@ -259,7 +259,7 @@ export class Guide {
       const deadline = left !== null ? `<div class="goal-deadline">⏳ ${left >= 1 ? `${Math.floor(left)} day${Math.floor(left) === 1 ? "" : "s"} ${Math.round((left % 1) * 24)} h` : `${Math.round(left * 24)} hours`} left</div>` : "";
       const missed = save.missions.flags.missed && m.deadlineDays ? `<div class="goal-missed">You missed the last deadline — here's another chance.</div>` : "";
       html = `<div class="goal-head">Mission ${save.missions.i + 1} of ${MISSIONS.length} · ${m.who}</div><b>${m.title} <small>${m.local}</small></b>${deadline}${missed}
-        <ul class="objectives">${ps.map((o) => `<li class="${o.got >= o.need ? "done" : o === next ? "now" : ""}"><i>${o.got >= o.need ? "✓" : ""}</i>${forDevice(o.text)}${o.need > 1 ? ` <em>${o.got}/${o.need}</em>` : ""}</li>`).join("")}</ul>
+        <ul class="objectives">${ps.map((o) => `<li class="${o.got >= o.need ? "done" : o === next ? "now" : ""}"><i>${o.got >= o.need ? "✓" : ""}</i><span>${forDevice(o.text)}${o === next && o.how ? `<small class="how">${forDevice(o.how)}</small>` : ""}</span>${o.need > 1 ? ` <em>${o.got}/${o.need}</em>` : ""}</li>`).join("")}</ul>
         <small>Reward: ${m.reward.text} · <kbd>H</kbd> controls</small>`;
       this.target = next ? whereFor(m.id, next.id, c, save) : null;
     }

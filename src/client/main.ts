@@ -45,7 +45,7 @@ import { Leaderboard } from "./ui/leaderboard";
 import { PhoneMenu } from "./ui/phonemenu";
 import { AccountCard } from "./ui/account";
 import { current } from "../shared/missions";
-import { loadSettings, SettingsPanel, TitleScreen, Tutorial } from "./ui/screens";
+import { loadSettings, SettingsPanel, TitleScreen } from "./ui/screens";
 import { isTouch, TouchControls } from "./player/touch";
 import { FrameWatch, Q } from "./quality";
 import { closedText, hoursText, isOpen } from "../shared/hours";
@@ -253,7 +253,6 @@ controls.sensitivity = settings.sensitivity;
 audio.setVolume(settings.volume);
 const titleScreen = new TitleScreen(uiRoot);
 const settingsPanel = new SettingsPanel(uiRoot, settings);
-const tutorial = new Tutorial(uiRoot);
 const guide = new Guide(uiRoot, scene, (x, z) => hf.at(x, z));
 guide.act = (a) => game.act(a);
 guide.onToast = (m, k) => hud.toast(m, k);
@@ -1327,7 +1326,6 @@ renderer.setAnimationLoop(() => {
       signInOffered = true;
       showAccount(true);
     }
-    if (!titleScreen.open) tutorial.update(game.save, game.save.plots.includes(world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)]), now);
   }
   if (ploughJob) {
     updatePloughJob(now);

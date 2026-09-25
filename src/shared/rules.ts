@@ -762,6 +762,7 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
       if (!has(`seed:${a.crop}`)) return fail(`No ${CROPS[a.crop].name.toLowerCase()} seeds left.`);
       if (!ownedPlot(world, save, x, z)) return fail("You can only farm your own land.");
       take(`seed:${a.crop}`);
+      bump(save, `plant:${a.crop}`);
       // resting land recovers: +0.05 quality per game day since the last harvest
       cell.q = Math.min(cell.baseQ, cell.q + ((now - cell.restedAt) / DAY_MS) * 0.05);
       const speed = CROPS[a.crop].season[season] * (0.7 + 0.3 * cell.q);
