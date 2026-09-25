@@ -57,8 +57,9 @@ import { GIVERS } from "../shared/jobs";
 import { awaySummary, daySummary } from "../shared/summary";
 import { SummaryCard } from "./ui/summary";
 import { HowToCard } from "./ui/howto";
-import { cropName, isEnglish, t as tr } from "./i18n";
+import { cropName, isEnglish, LANG as LANG_CODE, t as tr } from "./i18n";
 import { SHOP_HOURS } from "../shared/hours";
+import { arrived, firstTime, metric } from "./metrics";
 
 type Hooks = {
   ready: boolean;
@@ -292,6 +293,7 @@ function enterGame(lock: boolean) {
   titleScreen.hide();
   uiRoot.classList.remove("ui-title");
   mode = "play";
+  arrived({ touch: TOUCH, lang: LANG_CODE, mission: game.save.missions.i });
   audio.unlock();
   hud.setPlaying(false);
   if (TOUCH) {
@@ -1138,7 +1140,7 @@ function sunDial(h: number) {
 }
 game.onChange(refreshStatus);
 // money you earn pops up by the purse; the first harvest and the first sale get a moment of their own
-let lastMoney: number | null = null, lastHarvested = -1, lastEarned = -1;
+let lastMoney: number | null = null, lastHarvested = -1, lastEarned = -1, lastMission = -1;
 game.onChange(() => {
   const s = game.save;
   if (!booted_) return;
@@ -1150,11 +1152,15 @@ game.onChange(() => {
   if (lastHarvested === 0 && s.stats.harvested > 0) {
     celebrate();
     hud.toast("Your first harvest! Take it to Ganpat Seth on the chowk.");
+    firstTime("first_harvest", { mission: s.missions.i });
   }
   if (lastEarned === 0 && s.stats.earned > 0 && s.ledger.some((l) => l.kind === "sell")) {
     celebrate();
     hud.toast("Your first sale — the tanda's newest farmer is in business!");
+    firstTime("first_sale", { mission: s.missions.i });
   }
+  if (lastMission >= 0 && s.missions.i > lastMission) for (let i = lastMission; i < s.missions.i; i++) metric("mission_done", { mission: i + 1 });
+  lastMission = s.missions.i;
   lastMoney = s.money;
   lastHarvested = s.stats.harvested;
   lastEarned = s.stats.earned;
@@ -1995,6 +2001,8 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     kabaddiTag: () => kabaddi.tag(body.pos),
     fishing: () => ({ casts: fishing.castsLeft(), ...fishing.debug() }),
     ripeMarks: () => fields.ripeCount,
+    metrics: () => (window as unknown as { __metrics: unknown[] }).__metrics,
+    arrive: () => arrived({ touch: TOUCH, lang: LANG_CODE, mission: game.save.missions.i }),
     confetti: () => confetti.length,
     celebrate: () => celebrate(),
     fishPress: () => fishing.press(),
