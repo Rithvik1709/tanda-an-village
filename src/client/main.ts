@@ -19,7 +19,7 @@ import { buildTerrain } from "./scene/terrain";
 import { Water } from "./scene/water";
 import { Grass } from "./scene/grass";
 import { Trees } from "./scene/trees";
-import { Village } from "./scene/village";
+import { TANK_LADDER_R, Village } from "./scene/village";
 import { Fields } from "./scene/crops";
 import { Post } from "./scene/post";
 import { FARMER, Figure } from "./scene/figure";
@@ -296,6 +296,7 @@ function enterGame(lock: boolean) {
   uiRoot.classList.remove("ui-title");
   mode = "play";
   arrived({ touch: TOUCH, lang: LANG_CODE, mission: game.save.missions.i });
+  installSpareDrip();
   audio.unlock();
   hud.setPlaying(false);
   if (TOUCH) {
@@ -494,13 +495,13 @@ const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: N
   {
     kind: "bank",
     at: { x: world.landmarks.bank.x + 0.5, y: world.landmarks.bank.y, z: world.landmarks.bank.z - 0.3 },
-    npc: new Npc({ kurta: "#dfe6ee", dhoti: "#3a3a44", hat: "#2a2a30", skin: "#b07a52" }, world.landmarks.bank.x + 0.5, world.landmarks.bank.y, world.landmarks.bank.z + 1.3, Math.PI),
+    npc: new Npc({ kurta: "#dfe6ee", dhoti: "#3a3a44", hat: "#2a2a30", skin: "#b07a52" }, world.landmarks.bank.x - 0.75, world.landmarks.bank.y, world.landmarks.bank.z + 1.45, -Math.PI / 2), // beside the door, outside the wall
     label: "Loans & the godown at the Sahakari Bank",
   },
   {
     kind: "sahukar",
-    at: { x: 102.5, y: hf.at(102.5, 124.5), z: 124.5 },
-    npc: new Npc({ kurta: "#f2e6c8", dhoti: "#f6f0e0", hat: "#c0392b", hatTall: true, skin: "#b07a52" }, 108.5, hf.at(102.5, 126.3), 126.3, Math.PI),
+    at: { x: 108.5, y: hf.at(108.5, 125), z: 125 }, // just in front of him (it was 6 m off, by the well)
+    npc: new Npc({ kurta: "#f2e6c8", dhoti: "#f6f0e0", hat: "#c0392b", hatTall: true, skin: "#b07a52" }, 108.5, hf.at(108.5, 126.3), 126.3, Math.PI),
     label: "Borrow from Sahukar Motilal (fast, but dear)",
   },
   {
@@ -635,6 +636,8 @@ function pastimeHint(): string {
   const job = jobs.hint(body.pos, h) || helpers.hint(body.pos, h);
   if (job) return job;
   if (nearDagdu() && DAYTIME(h)) return `<kbd>E</kbd> ${tr("Talk to Dagdu mama, the old fisherman")}`;
+  const nb = nearNeighbour();
+  if (nb) return `<kbd>E</kbd> ${tr("Say Ram Ram to {name}", { name: NEIGHBOUR_TALK[nb.i].name.split(" · ")[0] })}`;
   if (atTalavEdge(body.pos.x, body.pos.z) && !body.inWater) {
     if (!game.save.inv.rod) return tr("🎣 Fish here with a gal (rod) — Sitabai sells one");
     return fishing.castsLeft() > 0 ? `<kbd>E</kbd> ${tr("Cast your line into the talav")} <small class="hours">${tr(" · {n} casts left today", { n: fishing.castsLeft() })}</small>` : tr("🎣 The fish have stopped biting today — come back tomorrow");
@@ -653,6 +656,12 @@ function pastimeInteract(): boolean {
   if (jobs.interact(body.pos, h) || helpers.interact(body.pos, h)) return true;
   if (nearDagdu() && DAYTIME(h)) {
     guide.dialogue("Dagdu mama · दगडू मामा", "The old fisherman", "Sit, sit. The talav fills from the tekdi every monsoon, and the fish come with it. Cast out past the lotus. When the float dips — strike! Then reel slowly: when the fish pulls hard, let it run, or your line will snap. They bite best at dawn and in the evening. And the maral… the maral you must earn.", [{ label: "Thank you, mama", onClick: () => guide.onDialogue(false) }]);
+    return true;
+  }
+  const nb = nearNeighbour();
+  if (nb) {
+    const n = NEIGHBOUR_TALK[nb.i];
+    guide.dialogue(n.name, tr("Ram Ram!"), n.lines[clock(game.now()).day % n.lines.length], [{ label: tr("Ram Ram"), onClick: () => guide.onDialogue(false) }]);
     return true;
   }
   if (atTalavEdge(body.pos.x, body.pos.z) && !body.inWater) {
@@ -708,6 +717,7 @@ const panels = new Panels(document.getElementById("ui")!, {
   onTab: (tab) => {
     if (tab === "prices" && current(game.save)?.id === "firstcrop") game.act({ t: "visit", place: "prices" });
   },
+  lastField: () => lastOwnField,
 });
 panels.onClose = () => resumePlay();
 
@@ -839,7 +849,9 @@ function cartHint(): string {
   }
   if (polaHere()) return `<kbd>E</kbd> ${tr("Lead Sarja & Raja in the Pola procession")}`;
   if (isNight(nowHour()) && nearHome()) return `<kbd>E</kbd> ${tr("Go home and sleep till morning")}`;
-  if (Nights.evening(nowHour()) && nearFire()) return `<kbd>E</kbd> ${tr("Sit with your friends by the fire")}`;
+  if (seat) return seat.climb ? "" : seat.kind === "tank" ? tr("Move to climb down") : tr("Move to stand up") + (game.save.friendsDay === clock(game.now()).day ? ` <small class="hours">${tr("· tonight's chai ✓")}</small>` : "");
+  if (Nights.evening(nowHour()) && nearFire()) return game.save.friendsDay === clock(game.now()).day ? `<kbd>E</kbd> ${tr("Sit by the fire again")} <small class="hours">${tr("· tonight's chai ✓")}</small>` : `<kbd>E</kbd> ${tr("Sit with your friends by the fire")}`;
+  if (nearLadder()) return `<kbd>E</kbd> ${tr("Climb the tanki")}`;
   if (schoolHere()) {
     const ms = game.save.missions;
     const sabha = (ms.c["visit:gramsabha"] ?? 0) > (ms.base["visit:gramsabha"] ?? 0);
@@ -861,8 +873,20 @@ function bullsChip(): string {
   return `🐂 <b>Sarja & Raja</b> <span>stamina ${Math.round(b.stamina)}</span> <span>${bullsMoodWord(b.mood)}</span>${trip}`;
 }
 
+/** A drip set bought but never installed (before sets installed themselves) goes onto a field now. */
+function installSpareDrip() {
+  const s = game.save;
+  while ((s.inv.drip ?? 0) > 0) {
+    const plot = s.plots.find((id) => !s.drip.includes(id));
+    if (plot === undefined) return;
+    const r = game.act({ t: "installDrip", plot });
+    if (!r.ok) return;
+    hud.toast(`💧 ${r.msg} · your spare drip set is in`, "ok");
+  }
+}
+
 /** A small toast when you walk onto a different plot. */
-let lastPlot = -2;
+let lastPlot = -2, lastOwnField = -1;
 function checkPlotEntry() {
   const id = world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)] ?? -1;
   if (id === lastPlot) return;
@@ -872,13 +896,83 @@ function checkPlotEntry() {
   const p = world.plots[id];
   const day = clock(game.now()).day;
   const mine = game.save.plots.includes(id);
+  if (mine) lastOwnField = id;
   if (world.plots[id].starter && current(game.save)?.id === "homecoming") game.act({ t: "visit", place: "aamrai" });
   hud.toast(mine ? `${p.name} · your land` : forSale(p, day) ? `${p.name} · for sale, ₹${askingPrice(p, day).toLocaleString("en-IN")}` : `${p.name} · a neighbour's field`);
 }
 
 /** The stall the player is standing at, if any (within a few steps of its counter). */
+/*
+ * Sitting down: in the circle round the evening fire, or up on the tanki's roof. While seated the
+ * farmer doesn't walk; moving (or E) stands you up — from the tanki you climb back down.
+ */
+type Seat = { kind: "fire" | "tank"; at: { x: number; y: number; z: number }; face: number; climb?: { from: THREE.Vector3; to: THREE.Vector3; t: number; dur: number; then: "sit" | "stand" } };
+let seat: Seat | null = null;
+const TANK = (() => {
+  const s = world.structures.find((x) => x.kind === "tank") as { x: number; z: number; y: number } | undefined;
+  if (!s) return null;
+  const cx = s.x + 0.5, cz = s.z + 0.5, base = s.y - 1, roof = base + 11 + 1.6 + 2.8;
+  const fx = cx - TANK_LADDER_R - 0.45;
+  return { foot: new THREE.Vector3(fx, 0, cz), rung: cx - TANK_LADDER_R - 0.3, cx, cz, roof };
+})();
+const nearLadder = () => !!TANK && !seat && Math.hypot(body.pos.x - TANK.foot.x, body.pos.z - TANK.foot.z) < 1.6;
+function climbTank() {
+  if (!TANK) return;
+  const ground = hf.at(TANK.foot.x, TANK.foot.z);
+  const from = new THREE.Vector3(TANK.rung, Math.max(body.pos.y, ground), TANK.foot.z);
+  const up = new THREE.Vector3(TANK.rung, TANK.roof, TANK.foot.z);
+  seat = { kind: "tank", at: { x: TANK.cx - 2.9, y: TANK.roof, z: TANK.cz }, face: -Math.PI / 2, climb: { from, to: up, t: 0, dur: (TANK.roof - from.y) / 2.4, then: "sit" } };
+  hud.toast(tr("Up the tanki ladder… hold on tight!"));
+}
+function sitByFire() {
+  const p = nights.seatBy(body.pos.x, body.pos.z);
+  seat = { kind: "fire", at: { x: p.x, y: p.y, z: p.z }, face: p.face };
+}
+/** Stand up (from the tanki: climb down first). */
+function standUp() {
+  if (!seat || seat.climb) return;
+  if (seat.kind === "tank" && TANK) {
+    const ground = hf.at(TANK.foot.x, TANK.foot.z);
+    seat.climb = { from: new THREE.Vector3(TANK.rung, TANK.roof, TANK.foot.z), to: new THREE.Vector3(TANK.rung, ground, TANK.foot.z), t: 0, dur: (TANK.roof - ground) / 3, then: "stand" };
+    return;
+  }
+  seat = null;
+}
+/** Each frame while seated or climbing: hold the farmer in place (or move them up the ladder). */
+function updateSeat(dt: number, wants: { forward: number; right: number; jump: boolean }) {
+  if (!seat) return false;
+  if (mode !== "play" || farmyard.ride) {
+    seat = null;
+    return false;
+  }
+  const c = seat.climb;
+  if (c) {
+    c.t = Math.min(1, c.t + dt / Math.max(0.5, c.dur));
+    const p = c.from.clone().lerp(c.to, c.t);
+    Object.assign(body.pos, { x: p.x, y: p.y, z: p.z });
+    body.heading = Math.PI / 2; // facing the ladder
+    if (c.t >= 1) {
+      if (c.then === "sit") {
+        seat.climb = undefined;
+        hud.toast(tr("The whole tanda below you. Move to climb down."), "ok");
+      } else {
+        Object.assign(body.pos, { x: TANK!.foot.x, y: c.to.y, z: TANK!.foot.z });
+        seat = null;
+      }
+    }
+  } else {
+    Object.assign(body.pos, seat.at);
+    body.heading = seat.face;
+    farmer.action = "sit";
+    if ((wants.forward || wants.right || wants.jump) && !windowOpen()) standUp();
+  }
+  Object.assign(body.vel, { x: 0, y: 0, z: 0 });
+  return true;
+}
+
 function nearStall() {
-  // the nearest one wins (the Naik's door and Ganpat's stall are neighbours on the chowk)
+  // the nearest one wins (the Naik's door and Ganpat's stall are neighbours on the chowk), and a
+  // neighbour standing closer than the counter gets E instead
   let best: (typeof STALLS)[number] | undefined, bd = 3.4;
   for (const s of STALLS) {
     if ((s.kind === "kamlabai" || s.kind === "shankar") && current(game.save)?.id !== "election") continue;
@@ -888,7 +982,26 @@ function nearStall() {
       best = s;
     }
   }
+  if (best) {
+    const gd = DAYTIME(nowHour()) ? jobs.giverDist(body.pos) : Infinity;
+    if ((gd < 2.4 && gd < bd) || (nearNeighbour()?.d ?? Infinity) < bd) return undefined;
+  }
   return best;
+}
+/** The neighbours who stand about (by the well, the mandir, the banyan): E greets them. */
+const NEIGHBOUR_TALK = [
+  { name: "Gangubai · गंगूबाई", lines: ["Ram Ram! The well is sweet this year — Sevalal's blessing.", "My daughter-in-law says your jowar looks good. I say wait for the harvest."] },
+  { name: "Parvati · पार्वती", lines: ["Ram Ram, bala! Carry your water early, before the sun climbs.", "Kashibai always needs a hand. Ask her, she pays in bhakri and rupees."] },
+  { name: "Jamnabai · जमनाबाई", lines: ["Ram Ram. I light a diya here every evening for the tanda.", "At Teej the girls sing here till midnight. You'll see."] },
+  { name: "Harishchandra baba · हरिश्चंद्र बाबा", lines: ["Ram Ram, beta. I've sat under this banyan for sixty years.", "Our people carried salt across the Deccan once. Now we carry onions to Jalna!"] },
+];
+function nearNeighbour() {
+  let best: { i: number; d: number } | null = null;
+  NEIGHBOURS.forEach((n, i) => {
+    const d = Math.hypot(body.pos.x - n.group.position.x, body.pos.z - n.group.position.z);
+    if (d < 2.2 && (!best || d < best.d)) best = { i, d };
+  });
+  return best as { i: number; d: number } | null;
 }
 const TALK: Partial<Record<PanelKind, string>> = { land: "naik", trader: "ganpat", shop: "sitabai", sahukar: "motilal", town: "haribhau", bank: "joshi", kamlabai: "kamlabai", shankar: "shankar" };
 function openStall(kind: PanelKind, tab?: string) {
@@ -1323,7 +1436,12 @@ controls.onInteract = () => {
   if (kabaddi.active) return;
   const h = nowHour();
   if (isNight(h) && nearHome() && !nearStall()) return void goHomeToSleep();
+  if (seat) return standUp();
+  if (nearLadder() && !nearStall()) return climbTank();
   if (Nights.evening(h) && nearFire() && !nearStall()) {
+    const again = game.save.friendsDay === clock(game.now()).day;
+    sitByFire();
+    if (again) return hud.toast(tr("More chai, more stories."));
     const r = game.act({ t: "friends" });
     const line = FIRESIDE[clock(game.now()).day % FIRESIDE.length];
     guide.dialogue("Friends at the chowk", "Evening round the fire", line.replace(/^[^:]+: /, "").replace(/^"|"$/g, ""), [{ label: r.ok ? (r.msg ?? "Good night!") : r.error, onClick: () => guide.onDialogue(false) }]);
@@ -1354,6 +1472,7 @@ controls.onInteract = () => {
 controls.onEscape = () => closeWindows();
 controls.onMap = () => (map.open ? map.close() : showMap());
 controls.onBoard = () => (board.open ? board.close() : showBoard());
+controls.onKaam = () => jobs.toggle();
 controls.onHelp = () => {
   if (!guide.helpOpen) closeWindows();
   guide.toggleHelp();
@@ -1500,7 +1619,7 @@ renderer.setAnimationLoop(() => {
     const wants = controls.input();
     // a window is open, or you're at the talav with your line out: the farmer stands still
     const input = windowOpen() || fishing.active ? STILL : wants;
-    for (let i = 0; i < n; i++) walker.step(input, controls.yaw, dt / n);
+    if (!updateSeat(dt, wants)) for (let i = 0; i < n; i++) walker.step(input, controls.yaw, dt / n);
     if (fishing.active) {
       fishing.update(dt, controls.held.has("Space"), !windowOpen() && (wants.forward !== 0 || wants.right !== 0), nowHour(), body.pos);
       body.heading = fishing.heading;
@@ -1598,7 +1717,7 @@ renderer.setAnimationLoop(() => {
   const cur = hotbar.current;
   if (now > actionUntil) smartHold = null;
   farmer.hold(fishing.active ? "rod" : smartHold && cur.kind === "hand" ? smartHold : cur.kind === "tool" ? (cur.tool === "hoe" ? "hoe" : "can") : cur.kind === "seed" ? "bag" : "none");
-  if (now > actionUntil && !fishing.active) farmer.action = "none";
+  if (now > actionUntil && !fishing.active) farmer.action = seat && !seat.climb ? "sit" : "none";
   updateDrops(dt);
   hud.tickMoney(dt);
   worldRenderer.cull(camera.position, mode === "title" ? 200 : settings.renderDistance);
@@ -1613,7 +1732,7 @@ renderer.setAnimationLoop(() => {
   villagers.update(dt, now / 1000, hourOverride ?? clock(game.now()).hour, game.save, clock(game.now()).day, game.now(), camera.position);
   prof.villagers = prof.villagers * 0.95 + (performance.now() - tv0) * 0.05;
   // nobody walks through anybody: villagers, the stall keepers, and you
-  if (mode === "play" && !farmyard.ride) {
+  if (mode === "play" && !farmyard.ride && !seat) {
     playerBody.pos.x = body.pos.x;
     playerBody.pos.z = body.pos.z;
     const people = villagers.bodies();
@@ -1873,6 +1992,7 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
       mode = "play";
     },
     teleport: (x: number, y: number, z: number, yaw = controls.yaw, pitch = controls.pitch) => {
+      seat = null;
       enterGame(false);
       mode = "play";
       hud.setPlaying(true); // scripted play counts as playing: hide the click prompt
@@ -1906,6 +2026,8 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
       return r;
     },
     inv: () => ({ ...game.save.inv }),
+    local: () => game.save, // the live local save, for tests that set up odd states
+
     // what a cheater could do in devtools: edit the local save. The server must undo it.
     tamperLocal: (item: string, n: number) => {
       game.save.inv[item] = n;
@@ -2020,6 +2142,8 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
     kabaddiTag: () => kabaddi.tag(body.pos),
     fishing: () => ({ casts: fishing.castsLeft(), ...fishing.debug() }),
     ripeMarks: () => fields.ripeCount,
+    seat: () => (seat ? { kind: seat.kind, climbing: !!seat.climb, pose: farmer.action, y: +body.pos.y.toFixed(2) } : null),
+    places: () => ({ fire: { x: nights.fire.x, y: nights.fire.y, z: nights.fire.z }, ladder: TANK && { x: TANK.foot.x, z: TANK.foot.z, roof: TANK.roof } }),
     metrics: () => (window as unknown as { __metrics: unknown[] }).__metrics,
     arrive: () => arrived({ touch: TOUCH, lang: LANG_CODE, mission: game.save.missions.i }),
     confetti: () => confetti.length,

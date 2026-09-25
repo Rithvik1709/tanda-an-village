@@ -3,6 +3,7 @@ import { complete, current, deadlineAt, MISSIONS, progress } from "../../shared/
 import type { Action, Result } from "../../shared/rules";
 import { DAY_MS } from "../../shared/time";
 import { helpCard } from "./help";
+import { t } from "../i18n";
 
 /** On phones, key names in the text become the on-screen buttons. */
 const TOUCH_UI = typeof matchMedia !== "undefined" && (matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1);
@@ -169,24 +170,28 @@ export class Guide {
     this.dlg?.remove();
     const d = el("div", "panel dialogue", this.card.parentElement!);
     this.dlg = d;
-    d.innerHTML = `<div class="panel-card"><div class="dlg-who">${who}</div><h2>${title}</h2><p class="dlg-text">“${text}”</p><div class="big-acts"></div>${buttons.length === 1 ? `<div class="panel-foot">Enter to continue</div>` : ""}</div>`;
+    const touch = document.body.classList.contains("is-touch");
+    const foot = touch ? "" : buttons.length === 1 ? t("E or Enter to continue") : t("Press 1–{n} to choose", { n: buttons.length });
+    d.innerHTML = `<div class="panel-card"><div class="dlg-who">${who}</div><h2>${title}</h2><p class="dlg-text">“${text}”</p><div class="big-acts"></div>${foot ? `<div class="panel-foot">${foot}</div>` : ""}</div>`;
     const acts = d.querySelector(".big-acts")!;
-    // Enter or Space picks the first button, when there's only one to pick
-    if (buttons.length === 1) {
-      const onKey = (e: KeyboardEvent) => {
-        if (!d.isConnected) return window.removeEventListener("keydown", onKey, true);
-        if (e.code === "Enter" || e.code === "Space") {
-          e.preventDefault();
-          e.stopPropagation();
-          (acts.querySelector("button") as HTMLButtonElement | null)?.click();
-          window.removeEventListener("keydown", onKey, true);
-        }
-      };
-      window.addEventListener("keydown", onKey, true);
-    }
+    // E, Enter or Space picks the only button; 1, 2, 3… pick one of several. A key still held from
+    // opening the card (or repeating) doesn't count.
+    const opened = performance.now();
+    const onKey = (e: KeyboardEvent) => {
+      if (!d.isConnected) return window.removeEventListener("keydown", onKey, true);
+      if (e.repeat || performance.now() - opened < 250) return;
+      const btns = [...acts.querySelectorAll("button")] as HTMLButtonElement[];
+      const pick = buttons.length === 1 && (e.code === "Enter" || e.code === "Space" || e.code === "KeyE") ? 0 : /^Digit[1-9]$/.test(e.code) ? Number(e.code.slice(5)) - 1 : -1;
+      if (pick < 0 || !btns[pick]) return;
+      e.preventDefault();
+      e.stopPropagation();
+      window.removeEventListener("keydown", onKey, true);
+      btns[pick].click();
+    };
+    window.addEventListener("keydown", onKey, true);
     for (const b of buttons) {
       const btn = document.createElement("button");
-      btn.innerHTML = b.label + (b.sub ? `<small>${b.sub}</small>` : "");
+      btn.innerHTML = (buttons.length > 1 ? `<kbd class="dlg-n">${acts.children.length + 1}</kbd>` : "") + b.label + (b.sub ? `<small>${b.sub}</small>` : "");
       btn.addEventListener("click", () => {
         d.remove();
         this.dlg = null;

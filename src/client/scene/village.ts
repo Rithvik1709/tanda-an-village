@@ -12,6 +12,9 @@ import { mat, TEX } from "./textures";
  */
 type Bucket = { mat: THREE.Material; geos: THREE.BufferGeometry[] };
 
+/** How far out from the tanki's centre its ladder stands (outside the 3.4 m drum). */
+export const TANK_LADDER_R = 3.6;
+
 export class Village {
   readonly group = new THREE.Group();
   private buckets = new Map<string, Bucket>();
@@ -515,9 +518,18 @@ export class Village {
     this.put("tankC", concrete, dome, new THREE.Matrix4().makeTranslation(cx, top + dh + 0.02, cz));
     this.box("tankC", concrete, 0.7, 0.3, 0.7, cx + 1.2, top + dh + 0.4, cz);
     this.put("dark", M.dark, new THREE.CylinderGeometry(0.08, 0.08, 0.6, 8), new THREE.Matrix4().makeTranslation(cx - 0.6, top + dh + 0.7, cz + 0.4));
-    // the ladder up one column, and a railing on posts round the rim
-    for (let k = 0; k < H + 1.6; k += 0.5) this.box("dark", M.dark, 0.5, 0.04, 0.04, cx + 2.8, y + k, cz);
-    for (const dz of [-0.25, 0.25]) this.box("dark", M.dark, 0.04, H + 1.6, 0.04, cx + 2.8, y + (H + 1.6) / 2, cz + dz);
+    // the ladder: outside the bowl on the village side, from the plinth to the roof, braced to a
+    // column, with a safety cage from head height up and hand-rails over the rim
+    const lx = cx - TANK_LADDER_R, lh = top + dh + 1.0 - (y + 0.4), l0 = y + 0.4;
+    for (const dz of [-0.28, 0.28]) this.box("dark", M.dark, 0.06, lh, 0.06, lx, l0 + lh / 2, cz + dz);
+    for (let k = 0.3; k < top + dh - l0; k += 0.3) this.box("dark", M.dark, 0.04, 0.04, 0.56, lx, l0 + k, cz);
+    for (let k = 1.5; k < H; k += 2.2) this.box("dark", M.dark, TANK_LADDER_R - 2.5, 0.05, 0.05, cx - (TANK_LADDER_R + 2.5) / 2, l0 + k, cz); // braces to a column
+    for (let k = 2.4; k < top + dh - l0; k += 0.8) {
+      const hoop = new THREE.TorusGeometry(0.4, 0.02, 4, 14, Math.PI).rotateX(Math.PI / 2).rotateY(Math.PI / 2);
+      this.put("dark", M.dark, hoop, new THREE.Matrix4().makeTranslation(lx - 0.02, l0 + k, cz));
+    }
+    for (const dz of [-0.36, 0, 0.36]) this.box("dark", M.dark, 0.03, top + dh - l0 - 2.4, 0.03, lx - 0.4 + Math.abs(dz) * 0.5, l0 + 2.4 + (top + dh - l0 - 2.4) / 2, cz + dz);
+    // a railing on posts round the rim
     const rail = new THREE.TorusGeometry(3.3, 0.035, 4, 48).rotateX(Math.PI / 2);
     this.put("dark", M.dark, rail, new THREE.Matrix4().makeTranslation(cx, top + dh + 0.75, cz));
     for (let i = 0; i < 16; i++) {
