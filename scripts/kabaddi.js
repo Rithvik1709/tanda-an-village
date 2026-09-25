@@ -4,7 +4,7 @@
 (async () => {
   const g = window.__bailgaadi;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  localStorage.setItem("tanda.welcomed", "1");
+  localStorage.setItem("tanda.welcomed", "1"); localStorage.setItem("tanda.howto.fishing", "1"); localStorage.setItem("tanda.howto.kabaddi", "1");
   g.setView("third");
   g.play();
   g.autoSkipStory(true);

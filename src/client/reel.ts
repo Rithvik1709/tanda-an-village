@@ -9,8 +9,9 @@ export const newReel = (): Reel => ({ progress: 0.3, tension: 0.15, surge: 0, su
 /** A surge builds over its first moments (the float starts to thrash), so you can react to it. */
 const SURGE_RAMP = 0.35;
 
-/** Advance the fight by dt seconds. `rnd` is a 0..1 random source. */
-export function reelStep(r: Reel, holding: boolean, dt: number, fight: number, rnd: () => number): "fighting" | "landed" | "snapped" | "escaped" {
+/** Advance the fight by dt seconds. `rnd` is a 0..1 random source. `easy`: a gentler fish, and the line never snaps. */
+export function reelStep(r: Reel, holding: boolean, dt: number, fight0: number, rnd: () => number, easy = false): "fighting" | "landed" | "snapped" | "escaped" {
+  const fight = easy ? fight0 * 0.5 : fight0;
   r.t += dt;
   // the fish's mood: calm spells, then a surge (stronger fish surge longer and more often)
   if (r.surge > 0) {
@@ -29,7 +30,7 @@ export function reelStep(r: Reel, holding: boolean, dt: number, fight: number, r
     r.tension -= 0.9 * dt;
     r.progress -= (surging ? 0.03 + fight * 0.05 : 0.02 + fight * 0.02) * dt;
   }
-  r.tension = Math.max(0, r.tension);
+  r.tension = Math.max(0, easy ? Math.min(0.97, r.tension) : r.tension);
   if (r.tension >= 1) return "snapped";
   if (r.progress >= 1) return "landed";
   if (r.progress <= 0) return "escaped";

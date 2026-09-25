@@ -4,7 +4,7 @@
   const g = window.__bailgaadi;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   for (const id of ["homecoming", "firstcrop", "water", "order", "bulls"]) localStorage.setItem("tanda.mission." + id, "1");
-  localStorage.setItem("tanda.welcomed", "1");
+  localStorage.setItem("tanda.welcomed", "1"); localStorage.setItem("tanda.howto.fishing", "1"); localStorage.setItem("tanda.howto.kabaddi", "1");
   const log = {};
   g.setView("third");
   g.play();

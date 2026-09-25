@@ -208,6 +208,11 @@ export const SOUNDS: Record<string, Fx> = {
     call(t + 0.2, 540, 680, 0.14);
     call(t + 0.42, 560, 900, 0.75);
   },
+  tug: (c, o, t) => {
+    // the rod bends: a low thump and a creak
+    tone(c, o, t, { type: "triangle", f: 120, f2: 70, peak: 0.28, a: 0.005, d: 0.18 });
+    burst(c, o, t + 0.02, { type: "bandpass", f: 900, q: 4, peak: 0.1, a: 0.01, d: 0.12 });
+  },
   ripe: (c, o, t) => {
     // a soft two-note chime: something in your field is ready
     bell(c, o, t, 1046, 0.1);

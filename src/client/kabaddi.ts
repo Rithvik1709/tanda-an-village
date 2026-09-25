@@ -182,6 +182,15 @@ export class Kabaddi {
     }
   }
 
+  /** Holding the action: tag (or tackle) the moment someone is within reach, never diving at thin air. */
+  hold(me: P) {
+    if (this.cool > 0) return;
+    if (this.phase === "raid" && this.crossed) {
+      const near = this.boys.some((b) => b.team === "them" && !b.out && !this.tags.has(b) && Math.hypot(b.pos.x - me.x, b.pos.z - me.z) < REACH);
+      if (near) this.tag(me);
+    } else if (this.phase === "their" && this.raider && this.raider.pos.z < COURT.mid && Math.hypot(this.raider.pos.x - me.x, this.raider.pos.z - me.z) < REACH) this.tag(me);
+  }
+
   private result() {
     this.phase = "result";
     this.timer = 1.4;

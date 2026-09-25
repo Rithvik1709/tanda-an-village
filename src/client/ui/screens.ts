@@ -6,10 +6,10 @@ import type { Save } from "../../shared/save";
  * The screens around the game: the title, settings and the note for
  * phones. Plain DOM; each reports what the player chose through callbacks.
  */
-export type Settings = { sensitivity: number; renderDistance: number; volume: number; uiScale: number };
+export type Settings = { sensitivity: number; renderDistance: number; volume: number; uiScale: number; easyFishing: boolean };
 const KEY = "bailgaadi.settings";
 const touchDevice = typeof matchMedia !== "undefined" && (matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1);
-export const DEFAULTS: Settings = { sensitivity: 0.0022, renderDistance: touchDevice ? 90 : 128, volume: 0.8, uiScale: 1 };
+export const DEFAULTS: Settings = { sensitivity: 0.0022, renderDistance: touchDevice ? 90 : 128, volume: 0.8, uiScale: 1, easyFishing: false };
 /** How big the HUD, cards and buttons are drawn (a setting, for small screens and tired eyes). */
 /** On a phone the screen is small: "Large" is as far as it goes before the controls collide. */
 const UI_SIZES: [number, string][] = touchDevice ? [[1, "Normal"], [1.2, "Large"]] : [[1, "Normal"], [1.25, "Large"], [1.5, "Largest"]];
@@ -143,6 +143,7 @@ export class SettingsPanel {
       if (t.name === "rd") this.s.renderDistance = Number(t.value);
       if (t.name === "vol") this.s.volume = Number(t.value) / 100;
       if (t.name === "lang") return setLang(t.value as Lang);
+      if (t.name === "easyfish") this.s.easyFishing = t.checked;
       if (t.name === "ui") {
         this.s.uiScale = Number(t.value);
         applyUiScale(this.s);
@@ -181,6 +182,7 @@ export class SettingsPanel {
       <datalist id="rd-stops"><option value="80"></option><option value="128"></option><option value="200"></option></datalist>
       <label>${tr("Sound")} <b class="v-vol"></b><input type="range" name="vol" min="0" max="100" value="${Math.round(this.s.volume * 100)}"></label>
       <fieldset class="seg"><legend>${tr("Text and buttons")}</legend>${UI_SIZES.map(([v, name]) => `<label><input type="radio" name="ui" value="${v}" ${Math.min(this.s.uiScale || 1, UI_SIZES[UI_SIZES.length - 1][0]) === v ? "checked" : ""}><span>${tr(name)}</span></label>`).join("")}</fieldset>
+      <label class="check"><input type="checkbox" name="easyfish" ${this.s.easyFishing ? "checked" : ""}> <span>${tr("Easy fishing: a gentler fight, and the line never snaps")}</span></label>
       <label class="gfx">${tr("Graphics")} <b>${tr("running at {tier}", { tier: tr(Q.tier) })}${Q.shadows ? "" : tr(", no shadows")}</b>
         <select name="gfx">${(["auto", "low", "medium", "high"] as const).map((c) => `<option value="${c}" ${graphicsChoice() === c ? "selected" : ""}>${c === "auto" ? tr("Auto (best for this device: {t})", { t: tr(detectTier()) }) : c === "low" ? tr("Low: smoothest, for older phones and laptops") : c === "medium" ? tr("Medium") : tr("High: shadows, bloom and dense grass")}</option>`).join("")}</select></label>
       <p class="hint gfx-msg">${tr("If the game stutters, choose Low. On Auto, it also lowers itself if your device can't keep up.")}</p>

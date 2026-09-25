@@ -620,3 +620,8 @@ small.why.shortage { background: rgba(158,214,122,.18); color: var(--good); }
 .title-langs { display: flex; gap: 6px; margin-top: 10px; }
 .title-langs button { font: 600 13px "Noto Sans Devanagari", system-ui, sans-serif; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(20,12,4,0.35); color: var(--ink); cursor: pointer; pointer-events: auto; }
 .title-langs button.on { background: var(--gold); color: #2a1a08; border-color: var(--gold); }
+.howto { z-index: 26; }
+.howto .panel-card { max-width: 520px; }
+.howto-art { width: 100%; height: auto; margin: 8px 0 4px; border-radius: 10px; background: rgba(0,0,0,.18); }
+.howto-steps { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; line-height: 1.45; }
+.settings label.check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; margin: 6px 0; }

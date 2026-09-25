@@ -23,6 +23,8 @@ type Deps = {
   act: (a: Action) => Result;
   toast: (m: string, k?: "ok" | "bad") => void;
   sound: (name: string) => void;
+  /** Settings → Easy fishing. */
+  easy: () => boolean;
 };
 type State = "off" | "cast" | "wait" | "bite" | "reel" | "landed";
 
@@ -50,6 +52,7 @@ export class Fishing {
   private t = 0;
   private reelSfx = 0;
   private prevSpace = false;
+  private wasSurging = false;
   /** Which way the farmer should face while fishing. */
   heading = 0;
 
@@ -242,8 +245,11 @@ export class Fishing {
       }
       case "reel": {
         const fish = FISH[this.bite!.fish];
-        const out = reelStep(this.reel, holding, dt, fish.fight, Math.random);
+        const out = reelStep(this.reel, holding, dt, fish.fight, Math.random, this.d.easy());
         const surging = isSurging(this.reel);
+        // a tug you can hear as a surge begins, so you can let go without watching the bar
+        if (surging && !this.wasSurging) this.d.sound("tug");
+        this.wasSurging = surging;
         // the float is dragged in towards the bank as you win line, and thrashes when it surges
         const from = tip ?? this.target;
         const k = Math.min(0.85, this.reel.progress * 0.85);

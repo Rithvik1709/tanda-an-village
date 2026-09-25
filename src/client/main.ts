@@ -56,6 +56,7 @@ import { DAYTIME, Jobs } from "./jobs";
 import { GIVERS } from "../shared/jobs";
 import { awaySummary, daySummary } from "../shared/summary";
 import { SummaryCard } from "./ui/summary";
+import { HowToCard } from "./ui/howto";
 import { cropName, isEnglish, t as tr } from "./i18n";
 import { SHOP_HOURS } from "../shared/hours";
 
@@ -354,6 +355,8 @@ function showAccount(prompted = false) {
 }
 hud.onAccountCard = () => showAccount();
 const summary = new SummaryCard(uiRoot);
+const howto = new HowToCard(uiRoot);
+howto.onClose = () => resumePlay();
 summary.onClose = () => resumePlay();
 hud.clockText = () => fmtHour(nowHour());
 hud.onLog = () => resumePlay();
@@ -366,6 +369,7 @@ const WINDOWS = () => [
   { open: () => phoneMenu.open, close: () => phoneMenu.close() },
   { open: () => accountCard.open, close: () => accountCard.close() },
   { open: () => summary.open, close: () => summary.close() },
+  { open: () => howto.open, close: () => howto.close() },
   { open: () => hud.logOpen, close: () => hud.closeLog() },
 ];
 function closeWindows() {
@@ -602,7 +606,7 @@ const kabaddi = new Kabaddi({
   },
 });
 scene.add(kabaddi.group);
-const fishing = new Fishing({ scene, ui: uiRoot, farmer, save: () => game.save, now: () => game.now(), act: (a) => game.act(a), toast: (m, k) => hud.toast(m, k), sound: (n) => audio.play(n) });
+const fishing = new Fishing({ scene, ui: uiRoot, farmer, save: () => game.save, now: () => game.now(), act: (a) => game.act(a), toast: (m, k) => hud.toast(m, k), sound: (n) => audio.play(n), easy: () => settings.easyFishing });
 const onMaidan = () => body.pos.x > MAIDAN.x0 - 0.5 && body.pos.x < MAIDAN.x1 + 1.5 && body.pos.z > MAIDAN.z0 - 0.5 && body.pos.z < MAIDAN.z1 + 1.5;
 const nearDagdu = () => Math.hypot(body.pos.x - playground.dagduAt.x, body.pos.z - playground.dagduAt.z) < 2.3;
 /** What E would do here among the pastimes (the hint line), or "". */
@@ -633,12 +637,31 @@ function pastimeInteract(): boolean {
     return true;
   }
   if (atTalavEdge(body.pos.x, body.pos.z) && !body.inWater) {
-    fishing.start(body.pos, controls.yaw);
-    // look along the line from a little to the side, so the rod, the line and the float all show
-    if (fishing.active) {
-      controls.yaw = fishing.heading + Math.PI + 0.6;
-      controls.pitch = -0.32;
-    }
+    const cast = () => {
+      fishing.start(body.pos, controls.yaw);
+      // look along the line from a little to the side, so the rod, the line and the float all show
+      if (fishing.active) {
+        controls.yaw = fishing.heading + Math.PI + 0.6;
+        controls.pitch = -0.32;
+      }
+    };
+    // the first time: a picture card on how it's done
+    if (!HowToCard.seen("fishing") && game.save.inv.rod) {
+      closeWindows();
+      howto.show("fishing", () => {
+        resumePlay();
+        cast();
+      });
+      hud.setPlaying(true);
+      releaseMouse();
+    } else cast();
+    return true;
+  }
+  if (onMaidan() && Kabaddi.canPlay(h) && !HowToCard.seen("kabaddi")) {
+    closeWindows();
+    howto.show("kabaddi", () => kabaddi.start());
+    hud.setPlaying(true);
+    releaseMouse();
     return true;
   }
   if (onMaidan() && Kabaddi.canPlay(h)) {
@@ -1528,6 +1551,8 @@ renderer.setAnimationLoop(() => {
     updatePloughJob(now);
     syncFields();
   }
+  // in kabaddi, holding the action tags the moment someone is in reach (and never stumbles)
+  if (kabaddi.active && controls.useHeld && !windowOpen()) kabaddi.hold(body.pos);
   // hold to work a row: every new tile you aim at gets the same kind of use, about 8 a second
   if (controls.useHeld && mode === "play" && !windowOpen() && !kabaddi.active && !fishing.active && !farmyard.ride && target) {
     const k = `${target.x},${target.y},${target.z}`;
