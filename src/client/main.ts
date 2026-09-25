@@ -337,6 +337,12 @@ accountCard.onGoogle = () => net.google();
 accountCard.onEmail = (email) => net.emailLink(email);
 accountCard.onSignOut = () => net.signOut();
 accountCard.onClose = () => (titleScreen.open ? hud.setPlaying(true) : resumePlay());
+function showLogWindow() {
+  closeWindows();
+  hud.showLog();
+  hud.setPlaying(true);
+  releaseMouse();
+}
 function showAccount(prompted = false) {
   closeWindows();
   accountCard.show(game.save.missions.i, prompted);
@@ -346,6 +352,8 @@ function showAccount(prompted = false) {
 hud.onAccountCard = () => showAccount();
 const summary = new SummaryCard(uiRoot);
 summary.onClose = () => resumePlay();
+hud.clockText = () => fmtHour(nowHour());
+hud.onLog = () => resumePlay();
 const WINDOWS = () => [
   { open: () => !!panels.open, close: () => panels.close() },
   { open: () => map.open, close: () => map.close() },
@@ -355,6 +363,7 @@ const WINDOWS = () => [
   { open: () => phoneMenu.open, close: () => phoneMenu.close() },
   { open: () => accountCard.open, close: () => accountCard.close() },
   { open: () => summary.open, close: () => summary.close() },
+  { open: () => hud.logOpen, close: () => hud.closeLog() },
 ];
 function closeWindows() {
   switching = true;
@@ -364,7 +373,7 @@ function closeWindows() {
 function windowOpen() {
   return !!ploughJob || WINDOWS().some((w) => w.open()) || guide.dialogueOpen || !!document.querySelector(".welcome, .fs-gate:not([hidden])");
 }
-phoneMenu.onPick = (what) => (what === "account" ? showAccount() : what === "map" ? showMap() : what === "board" ? showBoard() : what === "help" ? controls.onHelp() : what === "view" ? controls.onView() : what === "torch" ? controls.onTorch() : settingsPanel.show());
+phoneMenu.onPick = (what) => (what === "log" ? showLogWindow() : what === "account" ? showAccount() : what === "map" ? showMap() : what === "board" ? showBoard() : what === "help" ? controls.onHelp() : what === "view" ? controls.onView() : what === "torch" ? controls.onTorch() : settingsPanel.show());
 phoneMenu.onClose = () => resumePlay();
 phoneMenu.onRestore = async (code) => {
   const err = await net.restore(code);

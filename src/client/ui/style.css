@@ -568,3 +568,14 @@ small.why.shortage { background: rgba(158,214,122,.18); color: var(--good); }
 .sum-rows b.due { color: var(--bad); }
 .sum-rows span { font-size: 13px; color: var(--ink-2); }
 .summary .dlg-who { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+/* the message log */
+.log-bell { position: absolute; left: 14px; bottom: 16px; pointer-events: auto; border: 1px solid var(--line); background: rgba(30,24,20,0.6); color: #fff; border-radius: 10px; padding: 6px 9px; font-size: 16px; cursor: pointer; }
+.log-bell b { font: 700 10px system-ui; background: var(--rust); color: #fff; border-radius: 999px; padding: 1px 5px; margin-left: 3px; vertical-align: top; }
+.is-touch .log-bell { display: none; }
+.msglog { z-index: 27; }
+.msglog .panel-card { max-width: 560px; }
+.log-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 60vh; overflow: auto; }
+.log-list li { display: grid; grid-template-columns: 48px 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.log-list li.bad span { color: var(--bad); }
+.log-list time { font: 500 12px ui-monospace, Menlo, monospace; opacity: .6; padding-top: 2px; }
+.log-list em { font-style: normal; opacity: .6; }

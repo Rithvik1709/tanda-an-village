@@ -47,6 +47,7 @@ export class Hud {
       this.counts.push(el("span", "count", cell));
     });
     this.refresh();
+    this.paintBell();
   }
 
   refresh() {
@@ -142,7 +143,59 @@ export class Hud {
     this.tip.hidden = !text;
   }
 
+  /*
+   * Every message is also kept in a short log (last 30) you can open again: a bell by the hotbar on a
+   * computer, "Recent messages" in the phone menu. Repeats fold into one line with a count.
+   */
+  readonly log: { msg: string; kind: "ok" | "bad"; at: string; n: number }[] = [];
+  /** The game's clock as text, for the log. */
+  clockText: () => string = () => "";
+  onLog: () => void = () => {};
+  private bell?: HTMLElement;
+  private unread = 0;
+  private logEl?: HTMLElement;
+  get logOpen() {
+    return !!this.logEl && !this.logEl.hidden;
+  }
+  showLog() {
+    this.logEl ??= (() => {
+      const e = el("div", "panel msglog", this.root.parentElement!);
+      e.addEventListener("click", (ev) => {
+        const t = ev.target as HTMLElement;
+        if (t === e || t.closest("[data-close]")) this.closeLog();
+      });
+      return e;
+    })();
+    this.logEl.innerHTML = `<div class="panel-card"><button class="x" data-close>✕</button><h2>Recent messages</h2>
+      ${this.log.length ? `<ul class="log-list">${[...this.log].reverse().map((l) => `<li class="${l.kind}"><time>${l.at}</time><span>${escapeHtml(l.msg)}${l.n > 1 ? ` <em>×${l.n}</em>` : ""}</span></li>`).join("")}</ul>` : `<p class="empty">Nothing yet. Messages from the village show up here.</p>`}</div>`;
+    this.logEl.hidden = false;
+    this.unread = 0;
+    this.paintBell();
+  }
+  closeLog() {
+    if (!this.logOpen) return;
+    this.logEl!.hidden = true;
+    this.onLog();
+  }
+  private paintBell() {
+    if (!this.bell) {
+      this.bell = el("button", "log-bell", this.root);
+      this.bell.title = "Recent messages";
+      this.bell.addEventListener("click", () => this.showLog());
+    }
+    this.bell.innerHTML = `🔔${this.unread ? `<b>${Math.min(99, this.unread)}</b>` : ""}`;
+  }
+  private record(msg: string, kind: "ok" | "bad") {
+    const last = this.log[this.log.length - 1];
+    if (last && last.msg === msg) last.n++;
+    else this.log.push({ msg, kind, at: this.clockText(), n: 1 });
+    if (this.log.length > 30) this.log.shift();
+    this.unread++;
+    this.paintBell();
+  }
+
   toast(msg: string, kind: "ok" | "bad" = "ok") {
+    this.record(msg, kind);
     // the same message again just bumps a counter on the newest toast
     const last = this.toasts.lastElementChild as HTMLElement | null;
     if (last && last.dataset.msg === msg && !last.classList.contains("gone")) {
@@ -281,7 +334,4 @@ function el(tag: string, cls: string, parent: HTMLElement) {
   return e;
 }
 
-
-
-
-
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
