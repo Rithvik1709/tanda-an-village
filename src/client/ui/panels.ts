@@ -28,6 +28,8 @@ type Ctx = {
   showMap: () => void;
   ride: (dest: "town" | "home") => void;
   onTab: (tab: string) => void;
+  /** The field of yours you were last in (for installing a drip set straight away), or -1. */
+  lastField: () => number;
 };
 
 const CROP_COLOR: Record<CropId, string> = { jowar: "#e0b060", onion: "#e07a9a", sugarcane: "#9ccf5a" };
@@ -172,7 +174,18 @@ export class Panels {
     else if (what === "list") {
       const input = this.el.querySelector(`input[data-price="${a}"]`) as HTMLInputElement | null;
       r = this.ctx.act({ t: "listPlot", plot: Number(a), price: Math.round(Number(input?.value.replace(/[^0-9]/g, "")) || 0) });
-    } else if (what === "buy") r = this.ctx.act({ t: "buy", item: t.dataset.item!, n: Number(t.dataset.n ?? 1) });
+    } else if (what === "buy") {
+      r = this.ctx.act({ t: "buy", item: t.dataset.item!, n: Number(t.dataset.n ?? 1) });
+      // a drip set goes straight onto a field: the one you were last in, else your first without drip
+      if (r.ok && t.dataset.item === "drip") {
+        const s2 = this.ctx.save(), last = this.ctx.lastField();
+        const plot = s2.plots.includes(last) && !s2.drip.includes(last) ? last : s2.plots.find((id) => !s2.drip.includes(id));
+        if (plot !== undefined) {
+          const d = this.ctx.act({ t: "installDrip", plot });
+          if (d.ok) r = { ...d, msg: `${d.msg} · the pipes and motor are in` };
+        } else r = { ...r, msg: "Drip set bought · every field of yours already has drip. Install it when you buy more land (Naik Dhavlu → Your land)." };
+      }
+    }
     if (r) this.ctx.toast(r.ok ? (r.msg ?? "Done") : r.error, r.ok ? "ok" : "bad");
     this.render();
   }

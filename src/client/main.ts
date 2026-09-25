@@ -294,6 +294,7 @@ function enterGame(lock: boolean) {
   uiRoot.classList.remove("ui-title");
   mode = "play";
   arrived({ touch: TOUCH, lang: LANG_CODE, mission: game.save.missions.i });
+  installSpareDrip();
   audio.unlock();
   hud.setPlaying(false);
   if (TOUCH) {
@@ -692,6 +693,7 @@ const panels = new Panels(document.getElementById("ui")!, {
   onTab: (tab) => {
     if (tab === "prices" && current(game.save)?.id === "firstcrop") game.act({ t: "visit", place: "prices" });
   },
+  lastField: () => lastOwnField,
 });
 panels.onClose = () => resumePlay();
 
@@ -844,8 +846,20 @@ function bullsChip(): string {
   return `🐂 <b>Sarja & Raja</b> <span>stamina ${Math.round(b.stamina)}</span> <span>${bullsMoodWord(b.mood)}</span>${trip}`;
 }
 
+/** A drip set bought but never installed (before sets installed themselves) goes onto a field now. */
+function installSpareDrip() {
+  const s = game.save;
+  while ((s.inv.drip ?? 0) > 0) {
+    const plot = s.plots.find((id) => !s.drip.includes(id));
+    if (plot === undefined) return;
+    const r = game.act({ t: "installDrip", plot });
+    if (!r.ok) return;
+    hud.toast(`💧 ${r.msg} · your spare drip set is in`, "ok");
+  }
+}
+
 /** A small toast when you walk onto a different plot. */
-let lastPlot = -2;
+let lastPlot = -2, lastOwnField = -1;
 function checkPlotEntry() {
   const id = world.plotMap[Math.floor(body.pos.x) + W * Math.floor(body.pos.z)] ?? -1;
   if (id === lastPlot) return;
@@ -855,6 +869,7 @@ function checkPlotEntry() {
   const p = world.plots[id];
   const day = clock(game.now()).day;
   const mine = game.save.plots.includes(id);
+  if (mine) lastOwnField = id;
   if (world.plots[id].starter && current(game.save)?.id === "homecoming") game.act({ t: "visit", place: "aamrai" });
   hud.toast(mine ? `${p.name} · your land` : forSale(p, day) ? `${p.name} · for sale, ₹${askingPrice(p, day).toLocaleString("en-IN")}` : `${p.name} · a neighbour's field`);
 }
