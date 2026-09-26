@@ -100,6 +100,8 @@ export const SOUNDS: Record<string, Fx> = {
     tone(c, o, t + 0.07, { type: "triangle", f: 660, peak: 0.1, a: 0.004, d: 0.12 });
   },
   refused: (c, o, t) => tone(c, o, t, { type: "square", f: 140, f2: 110, peak: 0.08, a: 0.01, d: 0.18 }),
+  // the panchayat's rubber stamp coming down on a decision
+  stamp: (c, o, t) => burst(c, o, t, { type: "lowpass", f: 380, peak: 0.35, a: 0.002, d: 0.12 }),
   bells: (c, o, t) => {
     // ghungroo: a handful of tiny bells jingling
     for (let i = 0; i < 6; i++) bell(c, o, t + i * 0.045 + Math.random() * 0.02, 2600 + Math.random() * 900, 0.05);

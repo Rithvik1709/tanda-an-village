@@ -8,6 +8,7 @@ export const SHOP_HOURS: Record<string, Hours> = {
   trader: { open: 7, close: 20, name: "Ganpat Seth's stall" },
   shop: { open: 8, close: 20, name: "Sitabai's shop" },
   land: { open: 9, close: 19, name: "Naik Dhavlu's kacheri" },
+  panchayat: { open: 9, close: 18, name: "The Sarpanch's desk at Rathod Bhuvan" },
   bank: { open: 9, close: 18, name: "The Sahakari Bank" },
   sahukar: { open: 7, close: 21, name: "Sahukar Motilal" },
   town: { open: 5, close: 21, name: "The Jalna mandi" },

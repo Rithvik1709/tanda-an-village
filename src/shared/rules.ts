@@ -13,6 +13,8 @@ import { D, H, idx, talavOut, W, type World } from "./world.js";
 import { BASKET, biteFor, CASTS_PER_DAY, FISH, FISH_IDS, type FishId, fishCount, fishPrice, isFish } from "./fish.js";
 import { GIVERS, jobsFor } from "./jobs.js";
 import { bondOf, ganpatBonus, GIFT_BOND, giftName, giftSize, giftTaste, GREET, hearts, isGiftable, isNeighbour, KAAM_BOND, kaamPay, MAX_BOND, type NeighbourId, NEIGHBOUR_IDS, NEIGHBOURS, sitabaiOff, TRADE_CAP } from "./neighbours.js";
+import { deskOn, requestsFor } from "./panchayat.js";
+import { closedText, isOpen } from "./hours.js";
 import { BHOG_N, BHOG_REP, DIYA_BOND, DIYA_REP, FEST_HOUR, FESTIVALS, festivalOn, gher, HOLIKA_REP, yearOf } from "./festivals.js";
 import { arriveAt, CANCEL_REFUND, cartAway, duskOf, HELPER_MIN_PLOTS, HELPERS, type HelperId, type HelperJob, hireDay, HIRE_MAX, type Hire, isHelper, JOB_NAMES, MUKADAM, ORDER_BY, patchMs, restMs, sellTimes, WALK_MS } from "./helpers.js";
 
@@ -62,6 +64,7 @@ export type Action =
   | { t: "kabaddi"; won: boolean }
   | { t: "hire"; who: HelperId }
   | { t: "cancelHire"; who: HelperId }
+  | { t: "panchayat"; slot: number; choice: string }
   | { t: "greet"; who: NeighbourId }
   | { t: "gift"; who: NeighbourId; item: string }
   | { t: "festival"; what: "diyas" | "bhog" | "fire"; item?: CropId }
@@ -110,7 +113,7 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
-const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends", "tieBulls", "ploughField", "job", "fish", "sellFish", "kabaddi", "hire", "cancelHire", "orderHelper", "greet", "gift", "festival"]);
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends", "tieBulls", "ploughField", "job", "fish", "sellFish", "kabaddi", "hire", "cancelHire", "orderHelper", "greet", "gift", "festival", "panchayat"]);
 export const isNight = (hour: number) => hour >= 19.5 || hour < 4;
 /** How long until 6 am, from a night hour (ms). */
 export const untilMorning = (hour: number) => msBetween(hour, 6);
@@ -407,6 +410,40 @@ function regular(save: Save, id: "ganpat" | "sitabai", n: number, per: number, d
   const before = Math.min(TRADE_CAP, Math.floor(t.n / per)), after = Math.min(TRADE_CAP, Math.floor((t.n + n) / per));
   save.bonds = { ...save.bonds, [id]: { ...b, trade: { day, n: t.n + n } } };
   return after > before ? befriend(save, id, after - before, day) : "";
+}
+
+/** The Sarpanch settles one of the day's requests at the panchayat office. */
+function sarpanchDesk(save: Save, a: Extract<Action, { t: "panchayat" }>, now: number): Result {
+  if (!save.perks.includes("sarpanch")) return fail("Only the Sarpanch decides at this desk.");
+  const c = clock(now);
+  if (!isOpen("panchayat", c.hour)) return fail(closedText("panchayat"));
+  const desk = deskOn(save.panchayat, c.day, yearOf);
+  const req = requestsFor(c.day).find((r) => r.slot === a.slot);
+  if (!req) return fail("Nobody brought that today.");
+  if (desk.done.includes(req.slot)) return fail("You've already settled that today.");
+  const ch = req.choices.find((x) => x.id === a.choice);
+  if (!ch) return fail("Choose one.");
+  const e = ch.effect;
+  if (e.fund && desk.fund + e.fund < 0) return fail(`The panchayat fund has only ₹${desk.fund.toLocaleString("en-IN")}.`);
+  if (e.money && save.money + e.money < 0) return fail(`That needs ₹${(-e.money).toLocaleString("en-IN")} of your own.`);
+  desk.fund += e.fund ?? 0;
+  desk.done.push(req.slot);
+  save.panchayat = desk;
+  if (e.money) {
+    save.money += e.money;
+    if (e.money > 0) save.stats.earned += e.money;
+    else save.stats.spent -= e.money;
+    record(save, { day: c.day, kind: e.money > 0 ? "sell" : "buy", item: `panchayat:${req.key}`, n: 1, amount: Math.abs(e.money), where: req.who });
+  }
+  if (e.rep) save.rep = Math.max(0, save.rep + e.rep);
+  const warmer: string[] = [];
+  for (const [id, n] of Object.entries(e.bonds ?? {}) as [NeighbourId, number][]) {
+    if (n > 0) {
+      const w = befriend(save, id, n, c.day);
+      if (w) warmer.push(w);
+    } else save.bonds = { ...save.bonds, [id]: { ...bondOf(save, id), pts: Math.max(0, bondOf(save, id).pts + n) } };
+  }
+  return { ok: true, msg: [ch.said, ...warmer].join(" · ") };
 }
 
 /** Greeting a neighbour, giving a gift, and the festivals. */
@@ -772,6 +809,11 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
   }
   if (a.t === "talk" || a.t === "visit" || a.t === "deliver" || a.t === "choose" || a.t === "claimMission" || a.t === "decorate" || a.t === "installDrip") {
     const r = story(world, save, a, now);
+    if (r.ok) save.updatedAt = now;
+    return r;
+  }
+  if (a.t === "panchayat") {
+    const r = sarpanchDesk(save, a, now);
     if (r.ok) save.updatedAt = now;
     return r;
   }

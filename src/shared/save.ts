@@ -5,6 +5,7 @@ import { type MissionState, newMissions } from "./missions.js";
 import type { Bulls } from "./bulls.js";
 import type { Hire } from "./helpers.js";
 import type { Bond, NeighbourId } from "./neighbours.js";
+import type { PanchayatState } from "./panchayat.js";
 import type { Listing } from "./land.js";
 import { LAYOUT, STARTER_PLOT, type World } from "./world.js";
 
@@ -55,6 +56,7 @@ export type Save = {
   kabaddi?: { day: number; played: number; wins: number }; // the day the last prize was given
   helpers?: Hire[]; // labourers hired from the mukadam, for today or tomorrow
   bonds?: Partial<Record<NeighbourId, Bond>>; // how well each neighbour knows you (shared/neighbours.ts)
+  panchayat?: PanchayatState; // the Sarpanch's desk: the fund, and today's requests settled
   fests?: Record<string, number>; // festival rewards taken: "holi:fire", "holi:gher:tulsa", … → the year
 };
 

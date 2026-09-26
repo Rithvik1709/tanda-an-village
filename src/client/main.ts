@@ -65,6 +65,7 @@ import { cartAway, HELPER_MIN_PLOTS } from "../shared/helpers";
 import { bondOf } from "../shared/neighbours";
 import { chat, greet, type TalkDeps } from "./neighbours";
 import { Festivals } from "./festivals";
+import { PanchayatDesk } from "./panchayat";
 import { FESTIVALS, festivalOn } from "../shared/festivals";
 
 type Hooks = {
@@ -617,6 +618,16 @@ scene.add(helpers.group);
 const festivals = new Festivals({ world, nav, ground: (x, z) => hf.at(x, z), ...talkDeps });
 scene.add(festivals.group);
 let festHeralded = -1; // the day the festival was last announced
+// ---- the Sarpanch's desk in Rathod Bhuvan's aangan: sit, and the tanda comes to you ----
+const panchayat = new PanchayatDesk({
+  world,
+  nav,
+  ground: (x, z) => hf.at(x, z),
+  ...talkDeps,
+  dialogueOpen: () => guide.dialogueOpen,
+  sit: (at, face) => (seat = { kind: "desk", at, face }),
+});
+scene.add(panchayat.group);
 fixedBodies.push(...jobs.bodies(), ...helpers.bodies(), { pos: playground.dagduAt, r: 0.4, fixed: true });
 const kabaddi = new Kabaddi({
   ui: uiRoot,
@@ -643,7 +654,7 @@ const nearDagdu = () => Math.hypot(body.pos.x - playground.dagduAt.x, body.pos.z
 function pastimeHint(): string {
   if (kabaddi.active || fishing.active) return "";
   const h = nowHour();
-  const job = jobs.hint(body.pos, h) || helpers.hint(body.pos, h) || festivals.hint(body.pos, h);
+  const job = jobs.hint(body.pos, h) || helpers.hint(body.pos, h) || festivals.hint(body.pos, h) || panchayat.hint(body.pos, h);
   if (job) return job;
   if (nearDagdu() && DAYTIME(h)) return `<kbd>E</kbd> ${tr("Talk to Dagdu mama, the old fisherman")}`;
   const nb = nearNeighbour();
@@ -663,7 +674,7 @@ function pastimeInteract(): boolean {
   }
   if (kabaddi.active) return true;
   const h = nowHour();
-  if (jobs.interact(body.pos, h) || helpers.interact(body.pos, h) || festivals.interact(body.pos, h)) return true;
+  if (jobs.interact(body.pos, h) || helpers.interact(body.pos, h) || festivals.interact(body.pos, h) || panchayat.interact(body.pos, h)) return true;
   if (nearDagdu() && DAYTIME(h)) {
     // the first time, he teaches you to fish; after that he's an old friend (or getting to be one)
     const first = !bondOf(game.save, "dagdu").pts;
@@ -861,6 +872,7 @@ function cartHint(): string {
   }
   if (polaHere()) return `<kbd>E</kbd> ${tr("Lead Sarja & Raja in the Pola procession")}`;
   if (isNight(nowHour()) && nearHome()) return `<kbd>E</kbd> ${tr("Go home and sleep till morning")}`;
+  if (seat?.kind === "desk") return panchayat.hint(body.pos, nowHour());
   if (seat) return seat.climb ? "" : seat.kind === "tank" ? tr("Move to climb down") : tr("Move to stand up") + (game.save.friendsDay === clock(game.now()).day ? ` <small class="hours">${tr("· tonight's chai ✓")}</small>` : "");
   if (Nights.evening(nowHour()) && nearFire()) return game.save.friendsDay === clock(game.now()).day ? `<kbd>E</kbd> ${tr("Sit by the fire again")} <small class="hours">${tr("· tonight's chai ✓")}</small>` : `<kbd>E</kbd> ${tr("Sit with your friends by the fire")}`;
   if (nearLadder()) return `<kbd>E</kbd> ${tr("Climb the tanki")}`;
@@ -918,7 +930,7 @@ function checkPlotEntry() {
  * Sitting down: in the circle round the evening fire, or up on the tanki's roof. While seated the
  * farmer doesn't walk; moving (or E) stands you up — from the tanki you climb back down.
  */
-type Seat = { kind: "fire" | "tank"; at: { x: number; y: number; z: number }; face: number; climb?: { from: THREE.Vector3; to: THREE.Vector3; t: number; dur: number; then: "sit" | "stand" } };
+type Seat = { kind: "fire" | "tank" | "desk"; at: { x: number; y: number; z: number }; face: number; climb?: { from: THREE.Vector3; to: THREE.Vector3; t: number; dur: number; then: "sit" | "stand" } };
 let seat: Seat | null = null;
 const TANK = (() => {
   const s = world.structures.find((x) => x.kind === "tank") as { x: number; z: number; y: number } | undefined;
@@ -1455,7 +1467,7 @@ controls.onInteract = () => {
   if (kabaddi.active) return;
   const h = nowHour();
   if (isNight(h) && nearHome() && !nearStall()) return void goHomeToSleep();
-  if (seat) return standUp();
+  if (seat) return seat.kind === "desk" && panchayat.press() ? undefined : standUp(); // at the desk, E hears whoever's waiting
   if (nearLadder() && !nearStall()) return climbTank();
   if (Nights.evening(h) && nearFire() && !nearStall()) {
     const again = game.save.friendsDay === clock(game.now()).day;
@@ -1796,6 +1808,8 @@ renderer.setAnimationLoop(() => {
     jobs.update(dt, now / 1000, h, camera.position, body.pos);
     helpers.update(dt, h, camera.position);
     festivals.update(dt, h);
+    panchayat.seated = seat?.kind === "desk";
+    panchayat.update(dt, h, camera.position);
     helpers.group.visible = !titleScreen.open;
     // the kaam list waits until you know your way round (after Mission 1), and never covers a window
     jobs.hidden = mode !== "play" || titleScreen.open || !!farmyard.ride || windowOpen() || game.save.missions.i < 1;
