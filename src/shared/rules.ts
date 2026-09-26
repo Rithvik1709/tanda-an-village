@@ -12,6 +12,8 @@ import { clock, DAY_MS, msBetween } from "./time.js";
 import { D, H, idx, talavOut, W, type World } from "./world.js";
 import { BASKET, biteFor, CASTS_PER_DAY, FISH, FISH_IDS, type FishId, fishCount, fishPrice, isFish } from "./fish.js";
 import { GIVERS, jobsFor } from "./jobs.js";
+import { bondOf, ganpatBonus, GIFT_BOND, giftName, giftSize, giftTaste, GREET, hearts, isGiftable, isNeighbour, KAAM_BOND, kaamPay, MAX_BOND, type NeighbourId, NEIGHBOUR_IDS, NEIGHBOURS, sitabaiOff, TRADE_CAP } from "./neighbours.js";
+import { BHOG_N, BHOG_REP, DIYA_BOND, DIYA_REP, FEST_HOUR, FESTIVALS, festivalOn, gher, HOLIKA_REP, yearOf } from "./festivals.js";
 import { arriveAt, CANCEL_REFUND, cartAway, duskOf, HELPER_MIN_PLOTS, HELPERS, type HelperId, type HelperJob, hireDay, HIRE_MAX, type Hire, isHelper, JOB_NAMES, MUKADAM, ORDER_BY, patchMs, restMs, sellTimes, WALK_MS } from "./helpers.js";
 
 /*
@@ -60,6 +62,9 @@ export type Action =
   | { t: "kabaddi"; won: boolean }
   | { t: "hire"; who: HelperId }
   | { t: "cancelHire"; who: HelperId }
+  | { t: "greet"; who: NeighbourId }
+  | { t: "gift"; who: NeighbourId; item: string }
+  | { t: "festival"; what: "diyas" | "bhog" | "fire"; item?: CropId }
   | { t: "orderHelper"; who: HelperId; job: HelperJob; plot: number; crop?: CropId; seeds?: number; load?: Record<string, number> };
 
 export type Result = { ok: true; msg?: string; gained?: Record<string, number> } | { ok: false; error: string };
@@ -105,7 +110,7 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
-const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends", "tieBulls", "ploughField", "job", "fish", "sellFish", "kabaddi", "hire", "cancelHire", "orderHelper"]);
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends", "tieBulls", "ploughField", "job", "fish", "sellFish", "kabaddi", "hire", "cancelHire", "orderHelper", "greet", "gift", "festival"]);
 export const isNight = (hour: number) => hour >= 19.5 || hour < 4;
 /** How long until 6 am, from a night hour (ms). */
 export const untilMorning = (hour: number) => msBetween(hour, 6);
@@ -292,12 +297,14 @@ function pastimes(save: Save, a: Extract<Action, { t: "job" | "fish" | "sellFish
         take(save, "water", job.n);
       }
       js.done.push(job.slot);
-      save.money += job.pay;
-      save.stats.earned += job.pay;
+      const pay = kaamPay(save, job.who, job.pay); // more from a neighbour who knows you
+      save.money += pay;
+      save.stats.earned += pay;
       save.rep += job.rep;
       bump(save, "job");
-      record(save, { day, kind: "sell", item: `job:${job.kind}`, n: 1, amount: job.pay, where: job.kind === "parcel" ? GIVERS[job.to].name : who });
-      return { ok: true, msg: `+₹${job.pay} · ★ +${job.rep} from ${job.kind === "parcel" ? GIVERS[job.to].name : who}`, gained: { money: job.pay } };
+      record(save, { day, kind: "sell", item: `job:${job.kind}`, n: 1, amount: pay, where: job.kind === "parcel" ? GIVERS[job.to].name : who });
+      const warmer = [befriend(save, job.who, KAAM_BOND, day), job.kind === "parcel" ? befriend(save, job.to, KAAM_BOND / 2, day) : ""].filter(Boolean).join(" · ");
+      return { ok: true, msg: `+₹${pay} · ★ +${job.rep} from ${job.kind === "parcel" ? GIVERS[job.to].name : who}${warmer ? ` · ${warmer}` : ""}`, gained: { money: pay } };
     }
     case "fish": {
       if (!save.inv.rod) return fail("You need a fishing rod — Sitabai sells a bamboo gal.");
@@ -366,6 +373,108 @@ function checkDeadline(world: World, save: Save, now: number) {
 /** During "The land deal", Bandh is for sale until Deshmukh saheb buys it. */
 export const missionForSale = (save: Save, plotId: number, now: number) =>
   current(save)?.id === "land" && plotId === BANDH_PLOT && now - save.missions.startedAt < 6 * DAY_MS && !save.plots.includes(plotId);
+/** Seeds cost less with Sitabai's discount (from her order) and a point off for every heart she has for you. */
+export const seedPrice = (save: Save, item: string) => (item.startsWith("seed:") ? (save.perks.includes("discount") ? 0.8 : 1) - sitabaiOff(save) : 1);
+
+/**
+ * Warm a neighbour by n points. Returns a word for the toast when a heart is won, and at five hearts
+ * hands over their gift (once).
+ */
+function befriend(save: Save, id: NeighbourId, n: number, day: number): string {
+  const b = { ...bondOf(save, id) };
+  const before = hearts(save, id);
+  b.pts = Math.min(MAX_BOND, b.pts + n);
+  save.bonds = { ...save.bonds, [id]: b };
+  const after = hearts(save, id);
+  if (after <= before) return "";
+  const who = NEIGHBOURS[id].name;
+  if (after < 5 || b.gave) return `${who} ${"❤".repeat(after)}`;
+  b.gave = true;
+  const g = NEIGHBOURS[id].gift;
+  for (const [item, k] of Object.entries(g.items ?? {})) save.inv[item] = (save.inv[item] ?? 0) + k;
+  if (g.money) {
+    save.money += g.money;
+    save.stats.earned += g.money;
+    record(save, { day, kind: "sell", item: "gift", n: 1, amount: g.money, where: who });
+  }
+  if (g.rep) save.rep += g.rep;
+  return `${who} ❤❤❤❤❤ — a gift: ${g.text}`;
+}
+/** Ganpat and Sitabai warm to a regular: a point per `per` sold or spent, at most TRADE_CAP a day. */
+function regular(save: Save, id: "ganpat" | "sitabai", n: number, per: number, day: number) {
+  const b = bondOf(save, id);
+  const t = b.trade?.day === day ? b.trade : { day, n: 0 };
+  const before = Math.min(TRADE_CAP, Math.floor(t.n / per)), after = Math.min(TRADE_CAP, Math.floor((t.n + n) / per));
+  save.bonds = { ...save.bonds, [id]: { ...b, trade: { day, n: t.n + n } } };
+  return after > before ? befriend(save, id, after - before, day) : "";
+}
+
+/** Greeting a neighbour, giving a gift, and the festivals. */
+function neighbourly(world: World, save: Save, a: Extract<Action, { t: "greet" | "gift" | "festival" }>, now: number): Result {
+  const c = clock(now), fest = festivalOn(c.day), year = yearOf(c.day), twice = fest ? 2 : 1;
+  const once = (k: string) => {
+    if (save.fests?.[k] === year) return false;
+    save.fests = { ...save.fests, [k]: year };
+    return true;
+  };
+  if (a.t === "greet" || a.t === "gift") {
+    if (!isNeighbour(a.who)) return fail("Who?");
+    const who = NEIGHBOURS[a.who].name, b = bondOf(save, a.who);
+    if (a.t === "greet") {
+      const lines: string[] = [];
+      if (b.greeted !== c.day) {
+        save.bonds = { ...save.bonds, [a.who]: { ...b, greeted: c.day } };
+        const w = befriend(save, a.who, GREET * twice, c.day);
+        if (w) lines.push(w);
+      }
+      // Holi: every neighbour gives you gher, more the better they know you
+      if (fest === "holi" && once(`holi:gher:${a.who}`)) {
+        const m = gher(hearts(save, a.who));
+        save.money += m;
+        save.stats.earned += m;
+        record(save, { day: c.day, kind: "sell", item: "gher", n: 1, amount: m, where: who });
+        lines.unshift(`${who} gives you ₹${m} for Holi`);
+      }
+      return { ok: true, msg: lines.join(" · ") };
+    }
+    if (!isGiftable(a.item)) return fail(`${who} would rather have produce or a fish.`);
+    if (b.gifted === c.day) return fail(`You've already brought ${who} something today.`);
+    const n = giftSize(a.item);
+    if ((save.inv[a.item] ?? 0) < n) return fail(`You don't have ${giftName(a.item)}.`);
+    take(save, a.item, n);
+    save.bonds = { ...save.bonds, [a.who]: { ...bondOf(save, a.who), gifted: c.day } };
+    const taste = giftTaste(a.who, a.item);
+    const w = befriend(save, a.who, GIFT_BOND[taste] * twice, c.day);
+    const said = taste === "loves" ? `${who} loves it!` : taste === "likes" ? `${who} is pleased.` : `${who} thanks you.`;
+    return { ok: true, msg: `${said}${w ? ` · ${w}` : ""}` };
+  }
+  // the festivals
+  const need = { diyas: "dawali", bhog: "sevalal", fire: "holi" } as const;
+  const f = need[a.what];
+  if (!f) return fail("What?");
+  if (fest !== f) return fail(`That's for ${FESTIVALS[f].name}.`);
+  if ((a.what === "diyas" || a.what === "fire") && c.hour < FEST_HOUR) return fail(a.what === "diyas" ? "Light the diyas after dark, after 7 pm." : "The Holi fire is lit after dark, after 7 pm.");
+  if (save.fests?.[`${f}:${a.what}`] === year) return fail("You've done that this year.");
+  if (a.what === "bhog") {
+    if (!a.item || !isCrop(a.item)) return fail("Offer produce as bhog.");
+    if ((save.inv[a.item] ?? 0) < BHOG_N) return fail(`Bhog is ${BHOG_N} ${CROPS[a.item].name.toLowerCase()} — you have ${save.inv[a.item] ?? 0}.`);
+    take(save, a.item, BHOG_N);
+    // Maharaj's blessing: rain on every field of yours
+    for (const p of save.plots) for (const k of cellsOf(world, save, p)) wet(save.farm[k], now);
+  }
+  once(`${f}:${a.what}`);
+  if (a.what === "diyas") {
+    save.rep += DIYA_REP;
+    for (const id of NEIGHBOUR_IDS) if (bondOf(save, id).pts > 0) befriend(save, id, DIYA_BOND, c.day);
+    return { ok: true, msg: `The diyas glow along Rathod Bhuvan — the whole lane sees them · ★ +${DIYA_REP} · every neighbour who knows you warms to you` };
+  }
+  if (a.what === "fire") {
+    save.rep += HOLIKA_REP;
+    return { ok: true, msg: `You sing the lengi songs round the Holi fire till late · ★ +${HOLIKA_REP}` };
+  }
+  save.rep += BHOG_REP;
+  return { ok: true, msg: `Sevalal Maharaj's blessing: rain falls on all your fields · ★ +${BHOG_REP}` };
+}
 export const repBonus = (save: Save) => 1 + Math.min(0.1, (save.rep ?? 0) / 400);
 
 /** The bank, the sahukar and the godown. */
@@ -560,26 +669,28 @@ function trade(save: Save, a: Extract<Action, { t: "sell" | "buy" }>, now: numbe
     if (!isCrop(a.item)) return fail("The trader doesn't buy that.");
     if (a.where !== "village") return fail("You can only sell here at the village stall."); // the town trip arrives with the cart
     if ((save.inv[a.item] ?? 0) < a.n) return fail(`You don't have ${a.n} ${CROPS[a.item].name.toLowerCase()}.`);
-    const amount = Math.round(buyerPrice(a.item, day, a.where) * a.n * repBonus(save));
+    const amount = Math.round(buyerPrice(a.item, day, a.where) * a.n * repBonus(save) * ganpatBonus(save));
     bump(save, `sell:${a.item}`, a.n);
+    const warmer = regular(save, "ganpat", a.n, 40, day); // a steady seller: a point per 40 sold
     save.inv[a.item] -= a.n;
     if (!save.inv[a.item]) delete save.inv[a.item];
     save.money += amount;
     save.stats.earned += amount;
     record(save, { day, kind: "sell", item: a.item, n: a.n, amount, where: a.where });
-    return { ok: true, msg: `Sold ${a.n} ${CROPS[a.item].name.toLowerCase()} for ₹${amount}`, gained: { money: amount } };
+    return { ok: true, msg: `Sold ${a.n} ${CROPS[a.item].name.toLowerCase()} for ₹${amount}${warmer ? ` · ${warmer}` : ""}`, gained: { money: amount } };
   }
   const item = shopItem(a.item);
   if (!item) return fail("The shop doesn't sell that.");
   if (item.max && (save.inv[item.id] ?? 0) + a.n > item.max) return fail(`You already have the ${item.name.toLowerCase()}.`);
-  const amount = Math.round(item.price * a.n * (item.id.startsWith("seed:") && save.perks.includes("discount") ? 0.8 : 1) * (item.id === "drip" && save.perks.includes("dripSubsidy") ? 0.5 : 1));
+  const amount = Math.round(item.price * a.n * seedPrice(save, item.id) * (item.id === "drip" && save.perks.includes("dripSubsidy") ? 0.5 : 1));
   if (save.money < amount) return fail(`That costs ₹${amount} — you have ₹${save.money}.`);
   save.money -= amount;
   save.inv[item.id] = (save.inv[item.id] ?? 0) + a.n;
   if (item.id === "bulls") save.bulls = newBulls(now);
   save.stats.spent += amount;
   record(save, { day, kind: "buy", item: item.id, n: a.n, amount });
-  return { ok: true, msg: `Bought ${a.n} × ${item.name.toLowerCase()} for ₹${amount}` };
+  const warmer = regular(save, "sitabai", amount, 150, day); // a good customer: a point per ₹150
+  return { ok: true, msg: `Bought ${a.n} × ${item.name.toLowerCase()} for ₹${amount}${warmer ? ` · ${warmer}` : ""}` };
 }
 
 export function apply(world: World, save: Save, a: Action, now: number): Result {
@@ -661,6 +772,11 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
   }
   if (a.t === "talk" || a.t === "visit" || a.t === "deliver" || a.t === "choose" || a.t === "claimMission" || a.t === "decorate" || a.t === "installDrip") {
     const r = story(world, save, a, now);
+    if (r.ok) save.updatedAt = now;
+    return r;
+  }
+  if (a.t === "greet" || a.t === "gift" || a.t === "festival") {
+    const r = neighbourly(world, save, a, now);
     if (r.ok) save.updatedAt = now;
     return r;
   }

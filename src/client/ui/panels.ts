@@ -1,6 +1,8 @@
 import { hoursText } from "../../shared/hours";
 import { CROP_IDS, CROPS, type CropId } from "../../shared/crops";
 import { buyerPrice, LEDGER_DAYS, news, SHOP } from "../../shared/economy";
+import { ganpatBonus } from "../../shared/neighbours";
+import { repBonus, seedPrice } from "../../shared/rules";
 import { block } from "../../shared/blocks";
 import type { Action, Result } from "../../shared/rules";
 import type { Save } from "../../shared/save";
@@ -257,7 +259,7 @@ export class Panels {
 
   /** Everything you could sell here right now, and what it would fetch (what Ganpat will pay, rep bonus and all). */
   private sellAllTotal(s: Save, day: number) {
-    const bonus = 1 + Math.min(0.1, (s.rep ?? 0) / 400);
+    const bonus = repBonus(s) * ganpatBonus(s); // your standing with the tanda, and with Ganpat himself
     let total = 0, n = 0;
     for (const c of CROP_IDS) if (s.inv[c]) {
       total += Math.round(buyerPrice(c, day, "village") * s.inv[c] * bonus);
@@ -547,7 +549,7 @@ export class Panels {
       const owned = one && have >= 1;
       const afford = (n: number) => (s.money >= i.price * n ? "" : "disabled");
       const icon = i.id === "drip" ? "💧" : i.id === "gerua" ? "🎨" : i.id === "bulls" ? "🐂" : i.id === "cart" ? "🛞" : i.id === "fodder" ? "🌾" : i.id === "plough" ? "⛏" : i.id.startsWith("block:") ? `<i class="dot sq" style="background:${blockColor(Number(i.id.slice(6)))}"></i>` : i.id.startsWith("seed:") ? `<i class="dot" style="background:${CROP_COLOR[i.id.slice(5) as CropId]}"></i>` : "🪣";
-      return `${head}<tr><td>${icon} ${i.name}${i.note ? `<br><small>${i.note}</small>` : ""}</td><td class="num">${one ? (owned ? "owned" : "—") : have}</td><td class="num">${i.id.startsWith("seed:") && s.perks.includes("discount") ? `<s>${rs(i.price)}</s> ${rs(i.price * 0.8)}` : rs(i.price)}</td>
+      return `${head}<tr><td>${icon} ${i.name}${i.note ? `<br><small>${i.note}</small>` : ""}</td><td class="num">${one ? (owned ? "owned" : "—") : have}</td><td class="num">${seedPrice(s, i.id) < 1 ? `<s>${rs(i.price)}</s> ${rs(Math.round(i.price * seedPrice(s, i.id)))}` : rs(i.price)}</td>
         <td class="acts">${owned ? "" : `<button data-do="buy" data-item="${i.id}" data-n="1" ${afford(1)}>Buy${one ? "" : " 1"}</button>`}${one ? "" : `<button data-do="buy" data-item="${i.id}" data-n="10" ${afford(10)}>10</button>`}</td></tr>`;
     }).join("");
     return `<table><thead><tr><th>Item</th><th class="num">You have</th><th class="num">Price</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;

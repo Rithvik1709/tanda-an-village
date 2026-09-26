@@ -9,6 +9,8 @@ import type { World } from "../shared/world";
 import { Npc, type NpcLook } from "./engine/npc";
 import { mergeParts } from "./engine/merge";
 import { giverName, jobLineT, jobWhat, t } from "./i18n";
+import { kaamPay } from "../shared/neighbours";
+import { chat, giftButtons, greet, neighboursHtml, whoLine } from "./neighbours";
 import { Q } from "./quality";
 import type { Nav } from "./player/nav";
 
@@ -196,20 +198,22 @@ export class Jobs {
     const id = this.nearGiver(p);
     if (!id) return false;
     const w = this.wants(id);
-    const who = `${GIVERS[id].name} · ${GIVERS[id].local}`;
     if (!w.length) {
       const { done, jobs } = this.today();
       const helped = jobs.some((j) => done.includes(j.slot) && (j.who === id || (j.kind === "parcel" && j.to === id)));
-      this.d.toast(helped ? `${GIVERS[id].name}: "Thank you again, bala. Come by tomorrow."` : `${GIVERS[id].name}: "Ram Ram! Nothing today — but ask the others, someone always needs a hand."`);
+      chat(this.d, id, helped ? "Thank you again for today, bala." : "Nothing to ask of you today — but ask the others, someone always needs a hand.");
       return true;
     }
-    this.offer(id, who, w.find((x) => this.ready(x, id)) ?? w[0]);
+    greet(this.d, id);
+    this.offer(id, whoLine(this.d.save(), id), w.find((x) => this.ready(x, id)) ?? w[0]);
     return true;
   }
 
   private offer(id: GiverId, who: string, j: Job) {
     const s = this.d.save();
-    const reward = `+₹${j.pay} · ★ +${j.rep}`;
+    const reward = `+₹${kaamPay(s, j.who, j.pay)} · ★ +${j.rep}`;
+    // every job's dialogue also offers a gift, once a day
+    const dialogue = (w: string, title: string, text: string, buttons: { label: string; sub?: string; onClick: () => void }[]) => this.d.dialogue(w, title, text, [...buttons, ...giftButtons(this.d, id, () => this.offer(id, who, j))]);
     const done = (r: Result, line: string) => {
       this.d.closeDialogue();
       if (!r.ok) return this.d.toast(r.error, "bad");
@@ -224,21 +228,21 @@ export class Jobs {
       case "produce": {
         const have = s.inv[j.item] ?? 0;
         const name = CROPS[j.item].name.toLowerCase();
-        return this.d.dialogue(who, title, j.ask, have >= j.n ? [{ label: `Give ${j.n} ${name}`, sub: reward, onClick: () => done(act({ t: "job", slot: j.slot }), j.thanks) }, later("Not now")] : [later("I'll bring them", `you have ${have} of ${j.n} ${name}`)]);
+        return dialogue(who, title, j.ask, have >= j.n ? [{ label: `Give ${j.n} ${name}`, sub: reward, onClick: () => done(act({ t: "job", slot: j.slot }), j.thanks) }, later("Not now")] : [later("I'll bring them", `you have ${have} of ${j.n} ${name}`)]);
       }
       case "fish": {
         const have = fishCount(s.inv);
-        return this.d.dialogue(who, title, j.ask, have >= j.n ? [{ label: `Give ${j.n === 1 ? "a fish" : `${j.n} fish`}`, sub: reward + " · the smallest go first", onClick: () => done(act({ t: "job", slot: j.slot }), j.thanks) }, later("Not now")] : [later("I'll go fishing", s.inv.rod ? "the talav is behind the Z.P. school" : "Sitabai sells a fishing rod (gal)")]);
+        return dialogue(who, title, j.ask, have >= j.n ? [{ label: `Give ${j.n === 1 ? "a fish" : `${j.n} fish`}`, sub: reward + " · the smallest go first", onClick: () => done(act({ t: "job", slot: j.slot }), j.thanks) }, later("Not now")] : [later("I'll go fishing", s.inv.rod ? "the talav is behind the Z.P. school" : "Sitabai sells a fishing rod (gal)")]);
       }
       case "water": {
         const have = s.inv.water ?? 0;
-        return this.d.dialogue(who, title, j.ask, have >= j.n ? [{ label: `Pour ${j.n} from your can`, sub: reward, onClick: () => done(act({ t: "job", slot: j.slot }), j.thanks) }, later("Not now")] : [later("I'll fill my can", `you have ${have} of ${j.n} · fill it at the well, the vihir or the talav`)]);
+        return dialogue(who, title, j.ask, have >= j.n ? [{ label: `Pour ${j.n} from your can`, sub: reward, onClick: () => done(act({ t: "job", slot: j.slot }), j.thanks) }, later("Not now")] : [later("I'll fill my can", `you have ${have} of ${j.n} · fill it at the well, the vihir or the talav`)]);
       }
       case "parcel": {
-        if (j.to === id) return this.d.dialogue(who, "Your tiffin", "Arre, my tiffin! Did Baba send you all this way? Come, sit a moment.", [{ label: "Here you are", sub: reward, onClick: () => done(act({ t: "job", slot: j.slot }), j.thanks) }]);
+        if (j.to === id) return dialogue(who, "Your tiffin", "Arre, my tiffin! Did Baba send you all this way? Come, sit a moment.", [{ label: "Here you are", sub: reward, onClick: () => done(act({ t: "job", slot: j.slot }), j.thanks) }]);
         const { carrying } = this.today();
-        if (carrying === j.slot) return this.d.dialogue(who, title, `Go on, it'll get cold! ${GIVERS[j.to].name} is ${GIVERS[j.to].about}.`, [later("On my way")]);
-        return this.d.dialogue(who, title, j.ask, [
+        if (carrying === j.slot) return dialogue(who, title, `Go on, it'll get cold! ${GIVERS[j.to].name} is ${GIVERS[j.to].about}.`, [later("On my way")]);
+        return dialogue(who, title, j.ask, [
           {
             label: "I'll take it",
             sub: `to ${GIVERS[j.to].name}, ${GIVERS[j.to].about}`,
@@ -252,8 +256,8 @@ export class Jobs {
         ]);
       }
       case "goat": {
-        if (this.goatFollowing) return this.d.dialogue(who, "Chinki!", "Chinki! There you are, you wicked thing!", [{ label: "Here she is", sub: reward, onClick: () => { this.goatFollowing = false; done(act({ t: "job", slot: j.slot }), j.thanks); } }]);
-        return this.d.dialogue(who, title, `${j.ask} Someone saw her ${GOAT_SPOTS[j.at][2]}.`, [later("I'll find her")]);
+        if (this.goatFollowing) return dialogue(who, "Chinki!", "Chinki! There you are, you wicked thing!", [{ label: "Here she is", sub: reward, onClick: () => { this.goatFollowing = false; done(act({ t: "job", slot: j.slot }), j.thanks); } }]);
+        return dialogue(who, title, `${j.ask} Someone saw her ${GOAT_SPOTS[j.at][2]}.`, [later("I'll find her")]);
       }
     }
   }
@@ -309,7 +313,8 @@ export class Jobs {
   private renderList(jobs: Job[], done: number[], day: boolean) {
     const left = jobs.filter((j) => !done.includes(j.slot)).length;
     const html = `<div class="kaam-head">${t("📋 Kaam today")} <span>${left ? t("{a} of {b} open", { a: left, b: jobs.length }) : t("all done!")}</span>${document.body.classList.contains("is-touch") ? "" : `<kbd class="kaam-key">K</kbd>`}<b class="fold" aria-hidden="true"></b></div>
-      <ul>${jobs.map((j) => `<li class="${done.includes(j.slot) ? "done" : ""}"><i>${done.includes(j.slot) ? "✓" : ""}</i><span>${jobLineT(j)}</span><em>₹${j.pay}</em></li>`).join("")}</ul>
+      <ul>${jobs.map((j) => `<li class="${done.includes(j.slot) ? "done" : ""}"><i>${done.includes(j.slot) ? "✓" : ""}</i><span>${jobLineT(j)}</span><em>₹${kaamPay(this.d.save(), j.who, j.pay)}</em></li>`).join("")}</ul>
+      ${neighboursHtml(this.d.save())}
       <small>${t(day ? "Look for the <b>!</b> over their heads · new jobs every day" : "Everyone's gone in for the night — new jobs in the morning")}</small>`;
     if (html !== this.listHtml) this.el.innerHTML = this.listHtml = html;
   }
