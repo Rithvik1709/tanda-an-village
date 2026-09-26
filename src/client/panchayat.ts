@@ -37,8 +37,8 @@ type Deps = {
   sit: (at: { x: number; y: number; z: number }, face: number) => void;
 };
 
-const SEVAK: NpcLook = { kurta: "#dfe6ee", dhoti: "#3b4a5a", hat: "", skin: "#86573a" };
-const WHO = "Balu · the gram sevak · ग्रामसेवक";
+// Balu dresses like the government clerk he is: a blue shirt and dark trousers, nothing like the old Sarpanch's white
+const SEVAK: NpcLook = { kurta: "#3f6ea8", dhoti: "#24272e", hat: "", skin: "#86573a" };
 const rs = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 const names = (id: keyof typeof NEIGHBOURS) => NEIGHBOURS[id].name;
 const SPEED = 1.8;
@@ -81,6 +81,15 @@ function furniture() {
   return g;
 }
 
+/** Who keeps the chair when you aren't in it. */
+type SitterId = "balu" | "kamlabai" | "munshi" | "ramrao";
+const SITTERS: Record<SitterId, { name: string; make: () => Figure; says: string }> = {
+  balu: { name: "Balu, the gram sevak", make: () => new Figure({ kurta: SEVAK.kurta, dhoti: SEVAK.dhoti, hat: "", hatStyle: "none", skin: SEVAK.skin! }), says: "" },
+  kamlabai: { name: "Sarpanch Kamlabai Jadhav", make: () => new Figure(banjaraWoman("#1f6b5a", "#d9a520")), says: "Ram Ram, bhau. The taps are coming, lane by lane — the tanki fills them by the monsoon. If your lane has a trouble, bring it to me here, any morning." },
+  munshi: { name: "Motilal seth's munshi", make: () => new Figure({ kurta: "#efe6cf", dhoti: "#e6dcc4", hat: "#2a2a2a", hatStyle: "topi", skin: "#9a6a48" }), says: "Sarpanch Shankar Pawar is… out. He's usually out. I keep the stamp for him. Anything that needs stamping goes through Motilal seth first, you understand." },
+  ramrao: { name: "Ramrao kaka, the old Sarpanch", make: () => new Figure({ kurta: "#f4f1e8", dhoti: "#efe9d8", hat: "#f4f1e8", hatStyle: "topi", skin: "#7e4e30" }), says: "Ram Ram, beta. Twenty years I've kept this desk. The election comes soon, and I'm too old for another. Start at the bottom — be Naik Dhavlu's Karbhari, then stand for your ward. The chair will find you." },
+};
+
 type Visitor = { req: Request; fig: Figure; pos: P; heading: number; path: P[]; leaving: boolean; asked: boolean };
 
 export class PanchayatDesk {
@@ -93,6 +102,9 @@ export class PanchayatDesk {
   private sevak: Npc;
   private mark = new THREE.Sprite(new THREE.SpriteMaterial({ map: markTexture("!"), depthWrite: false, toneMapped: false }));
   private visitor: Visitor | null = null;
+  private sitter: { id: SitterId; fig: Figure } | null = null;
+  /** Whoever gave up the chair, walking off down the lane. */
+  private leavers: { fig: Figure; pos: P; heading: number; path: P[] }[] = [];
   private sent = new Set<string>(); // "day:slot" — who has already come today (and gone off unheard)
   seated = false;
 
@@ -111,7 +123,9 @@ export class PanchayatDesk {
     this.group.add(f, this.sevak.group, this.mark);
   }
 
+  /** The desk is the Sarpanch's alone. */
   private sarpanch = () => this.d.save().perks.includes("sarpanch");
+  private title = () => "Sarpanch";
   private day = () => clock(this.d.now()).day;
   private desk() {
     return deskOn(this.d.save().panchayat, this.day(), yearOf);
@@ -121,6 +135,11 @@ export class PanchayatDesk {
     const done = this.desk().done;
     return requestsFor(this.day()).filter((r) => !done.includes(r.slot));
   }
+  private sitterId(): SitterId {
+    const s = this.d.save();
+    if (this.sarpanch()) return "balu";
+    return s.perks.includes("dripSubsidy") ? "kamlabai" : s.perks.includes("sahukarRaj") ? "munshi" : "ramrao";
+  }
   private near(p: P) {
     return Math.hypot(p.x - this.table.x, p.z - this.table.z) < 2.4;
   }
@@ -128,7 +147,41 @@ export class PanchayatDesk {
   update(dt: number, hour: number, player: THREE.Vector3) {
     const office = isOpen("panchayat", hour);
     const far = Math.hypot(player.x - this.table.x, player.z - this.table.z) > Q.peopleFar;
-    this.sevak.group.visible = office && !far;
+    // someone keeps the chair whenever you're not in it: Balu for you, or whoever runs the panchayat
+    const who = this.sitterId();
+    // Balu minds your chair only while you're away: come near and he gets up, and it stays free for you
+    const away = Math.hypot(player.x - this.chair.x, player.z - this.chair.z) > 6;
+    const sitting = office && !far && !this.seated && (who !== "balu" || away);
+    if (sitting && this.sitter?.id !== who) {
+      const old = this.sitter;
+      if (old && old.fig.root.visible && old.id !== "balu") {
+        // the old keeper of the chair gets up and walks off home — the desk has a new Sarpanch
+        old.fig.action = "none";
+        this.leavers.push({ fig: old.fig, pos: { x: this.chair.x, z: this.chair.z + 0.8 }, heading: Math.PI / 2, path: [] });
+        if (who === "balu") this.d.toast(`${SITTERS[old.id].name.split(",")[0]} gets up, hands Balu the panchayat stamp and walks home. The chair is yours, Sarpanch.`);
+      } else if (old) this.group.remove(old.fig.root);
+      this.sitter = { id: who, fig: SITTERS[who].make() };
+      this.sitter.fig.action = "sit";
+      this.sitter.fig.root.position.set(this.chair.x, this.d.ground(this.chair.x, this.chair.z) + CHAIR_Y, this.chair.z);
+      this.sitter.fig.root.rotation.y = Math.PI / 2; // facing the lane, over the table
+      this.group.add(this.sitter.fig.root);
+    }
+    if (this.sitter) {
+      this.sitter.fig.root.visible = sitting;
+      if (sitting) this.sitter.fig.animate(dt, 0);
+    }
+    for (const l of [...this.leavers]) {
+      const there = this.step(l, this.lane, dt);
+      l.fig.animate(dt, there ? 0 : SPEED);
+      l.fig.root.rotation.y = l.heading;
+      l.fig.root.position.set(l.pos.x, this.d.ground(l.pos.x, l.pos.z), l.pos.z);
+      if (there) {
+        this.group.remove(l.fig.root);
+        this.leavers.splice(this.leavers.indexOf(l), 1);
+      }
+    }
+    // Balu stands at the table's side — unless he's minding your chair
+    this.sevak.group.visible = office && !far && !(sitting && who === "balu");
     if (this.sevak.group.visible) this.sevak.update(dt, player);
     this.mark.visible = office && !far && !this.seated && this.sarpanch() && this.waiting().length > 0;
     // seated in office hours: send for the next person with a request
@@ -157,7 +210,7 @@ export class PanchayatDesk {
   }
 
   /** Walk a visitor toward p along the nav grid; true once there. */
-  private step(v: Visitor, p: P, dt: number) {
+  private step(v: { pos: P; heading: number; path: P[] }, p: P, dt: number) {
     if (!v.path.length || Math.hypot(v.path[v.path.length - 1].x - p.x, v.path[v.path.length - 1].z - p.z) > 0.5) v.path = [...this.d.nav.path(v.pos, p), p];
     while (v.path.length) {
       const q = v.path[0], dx = q.x - v.pos.x, dz = q.z - v.pos.z, dd = Math.hypot(dx, dz);
@@ -193,26 +246,21 @@ export class PanchayatDesk {
     }
     if (!this.near(p)) return "";
     if (!isOpen("panchayat", hour)) return closedText("panchayat");
-    if (!this.sarpanch()) return "<kbd>E</kbd> Talk to Balu, the gram sevak";
+    if (!this.sarpanch()) return `<kbd>E</kbd> Talk to ${SITTERS[this.sitterId()].name}`;
     const n = this.waiting().length;
-    return `<kbd>E</kbd> Sit at the Sarpanch's desk <small class="hours">· ${n ? `${n} waiting to see you` : "all heard today"} · fund ${rs(this.desk().fund)}</small>`;
+    return `<kbd>E</kbd> Sit at the ${this.title()}'s desk <small class="hours">· ${n ? `${n} waiting to see you` : "all heard today"} · fund ${rs(this.desk().fund)}</small>`;
   }
 
   /** E by the desk: sit down (the Sarpanch) or talk to Balu. True if it did something. */
   interact(p: P, hour: number): boolean {
     if (!this.near(p) || !isOpen("panchayat", hour)) return false;
     if (!this.sarpanch()) {
-      const s = this.d.save();
-      const text = s.perks.includes("dripSubsidy")
-        ? "Sarpanch Kamlabai Jadhav hears the tanda's troubles at the panchayat every morning. The taps are coming, lane by lane."
-        : s.perks.includes("sahukarRaj")
-          ? "Sarpanch Shankar Pawar is… out. He's usually out. Motilal seth's munshi comes by for the stamp when it's needed."
-          : "When the tanda elects its Sarpanch, I'll set up the desk wherever they sit. Some say you could stand yourself, if the tanda trusts you.";
-      this.d.dialogue(WHO, "Gram panchayat, Ukhali", text, [{ label: "Ram Ram", onClick: this.d.closeDialogue }]);
+      const who = SITTERS[this.sitterId()];
+      this.d.dialogue(`${who.name} · at the panchayat desk`, "Gram panchayat, Ukhali", who.says, [{ label: "Ram Ram", onClick: this.d.closeDialogue }]);
       return true;
     }
     this.d.sit({ x: this.chair.x, y: this.d.ground(this.chair.x, this.chair.z) + CHAIR_Y, z: this.chair.z }, Math.PI / 2);
-    this.d.toast(this.waiting().length ? `Balu opens the register: "${this.waiting().length} to see you today, Sarpanch saheb."` : `Balu: "Everyone's been heard today, saheb. The fund stands at ${rs(this.desk().fund)}."`);
+    this.d.toast(this.waiting().length ? `Balu opens the register: "${this.waiting().length} to see you today, ${this.title()} saheb."` : `Balu: "Everyone's been heard today, saheb. The fund stands at ${rs(this.desk().fund)}."`);
     return true;
   }
 
@@ -228,7 +276,7 @@ export class PanchayatDesk {
     const v = this.visitor;
     if (!v) return;
     const r = v.req, fund = this.desk().fund, money = this.d.save().money;
-    this.d.dialogue(`${r.who} · before the Sarpanch`, r.title, `${r.ask}\n\n(Panchayat fund: ${rs(fund)})`, [
+    this.d.dialogue(`${r.who} · before the ${this.title()}`, r.title, `${r.ask}\n\n(Panchayat fund: ${rs(fund)})`, [
       ...r.choices.map((ch) => {
         const short = (ch.effect.fund ?? 0) + fund < 0 ? " · the fund can't cover it" : (ch.effect.money ?? 0) + money < 0 ? " · you can't afford it" : "";
         return {

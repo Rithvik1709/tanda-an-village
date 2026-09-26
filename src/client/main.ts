@@ -1288,7 +1288,7 @@ function refreshStatus() {
     hud.toast(`${FESTIVALS[fest].icon} ${FESTIVALS[fest].name} today in Ukhali! ${FESTIVALS[fest].about}`);
     audio.play("templebell");
   }
-  hud.setInfo(`${fest ? `<span class="fest" title="${FESTIVALS[fest].about}">${FESTIVALS[fest].icon} ${FESTIVALS[fest].name}</span>` : ""}${s.perks.includes("sarpanch") ? `<span class="title">${tr("Sarpanch")}</span>` : ""}<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${tr(title.name)}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${s.rep ? `<span class="rep" title="Reputation with the tanda: better prices from Ganpat">★ ${s.rep}</span>` : ""}${overdue ? `<span class="debt">${tr("loan overdue!")}</span>` : ""}${sync}${TOUCH && carriedNow(s) ? `<span class="basket" title="What you're carrying">🧺 ${carriedNow(s)}</span>` : ""}<span class="clock" title="${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}">${sunDial(h)}${fmtHour(h)}</span><span class="season">${tr(SEASON_NAMES[c.season].split(" · ")[0])} · ${c.dayOfSeason + 1}/${SEASON_DAYS}</span>`);
+  hud.setInfo(`${fest ? `<span class="fest" title="${FESTIVALS[fest].about}">${FESTIVALS[fest].icon} ${FESTIVALS[fest].name}</span>` : ""}${s.perks.includes("sarpanch") ? `<span class="title">${tr("Sarpanch")}</span>` : s.roles?.panch !== undefined ? `<span class="title" title="Ward member of the gram panchayat">Panch</span>` : s.roles?.karbhari !== undefined ? `<span class="title" title="Naik Dhavlu's Karbhari">Karbhari</span>` : ""}<span class="title" title="Net worth ₹${worth.total.toLocaleString("en-IN")}">${tr(title.name)}</span><span class="money">₹${s.money.toLocaleString("en-IN")}</span>${s.rep ? `<span class="rep" title="Reputation with the tanda: better prices from Ganpat">★ ${s.rep}</span>` : ""}${overdue ? `<span class="debt">${tr("loan overdue!")}</span>` : ""}${sync}${TOUCH && carriedNow(s) ? `<span class="basket" title="What you're carrying">🧺 ${carriedNow(s)}</span>` : ""}<span class="clock" title="${SEASON_NAMES[c.season]} · day ${c.dayOfSeason + 1} of ${SEASON_DAYS}">${sunDial(h)}${fmtHour(h)}</span><span class="season">${tr(SEASON_NAMES[c.season].split(" · ")[0])} · ${c.dayOfSeason + 1}/${SEASON_DAYS}</span>`);
 }
 /** Produce and fish in hand (phones show this in the info chip; the counts chip is too wide for them). */
 const carriedNow = (s: typeof game.save) => Object.entries(s.inv).reduce((a, [k, n]) => a + (CROPS[k as keyof typeof CROPS] || k.startsWith("fish:") ? n : 0), 0);
@@ -2090,8 +2090,8 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
             await worldRenderer.flush();
             return game.skew;
           },
-          jumpMission: async (i: number, rep: number) => {
-            await net.skip(0, 0, { mission: i, rep });
+          jumpMission: async (i: number, rep: number, panch = 0) => {
+            await net.skip(0, 0, { mission: i, rep, panch });
             refreshStatus();
           },
           grant: async (money: number) => {

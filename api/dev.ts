@@ -1,7 +1,7 @@
 import { begin } from "../src/shared/missions.js";
 import { authed, devClockAllowed, json, publish, readJson, serverNow, unauthorized, updateSave } from "./_lib/game.js";
 
-/** POST /api/dev { skipMs?, money? } — dev only: fast-forward this save's clock, or grant money for tests. 404 in production. */
+/** POST /api/dev { skipMs?, money?, mission?, rep?, panch? } — dev only: fast-forward this save's clock, or grant money for tests. 404 in production. */
 export async function POST(req: Request): Promise<Response> {
   if (!devClockAllowed()) return json({ error: "not found" }, 404);
   const id = await authed(req);
@@ -10,6 +10,7 @@ export async function POST(req: Request): Promise<Response> {
   const skip = Number(body?.skipMs ?? 0);
   const jump = body?.mission === undefined ? null : Number(body.mission);
   const rep = body?.rep === undefined ? null : Number(body.rep);
+  const panch = !!body?.panch; // make this test farm the Karbhari and a Panch (so it can stand for Sarpanch)
   const money = Number(body?.money ?? 0);
   if (!Number.isFinite(skip) || skip < 0 || skip > 30 * 24 * 3600e3 || !Number.isInteger(money) || money < 0 || money > 1e7) return json({ error: "bad request" }, 400);
   const done = await updateSave(id, (save) => {
@@ -18,6 +19,7 @@ export async function POST(req: Request): Promise<Response> {
     save.money += money;
     if (jump !== null && Number.isInteger(jump) && jump >= 0) begin(save, jump, serverNow(save));
     if (rep !== null && Number.isFinite(rep)) save.rep = rep;
+    if (panch) save.roles = { karbhari: 0, panch: 0 };
   });
   if (!done) return unauthorized();
   const { save } = done;

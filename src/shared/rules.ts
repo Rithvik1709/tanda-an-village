@@ -14,6 +14,7 @@ import { BASKET, biteFor, CASTS_PER_DAY, FISH, FISH_IDS, type FishId, fishCount,
 import { GIVERS, jobsFor } from "./jobs.js";
 import { bondOf, ganpatBonus, GIFT_BOND, giftName, giftSize, giftTaste, GREET, hearts, isGiftable, isNeighbour, KAAM_BOND, kaamPay, MAX_BOND, type NeighbourId, NEIGHBOUR_IDS, NEIGHBOURS, sitabaiOff, TRADE_CAP } from "./neighbours.js";
 import { deskOn, requestsFor } from "./panchayat.js";
+import { COLLECT_EACH, dutyFor, DUTY_HONOUR, DUTY_REP, FRIEND_HEARTS, KARBHARI_FRIENDS, KARBHARI_REP, PANCH_DAYS, PANCH_REP, PANCH_VOTES, verdicts, WARD } from "./roles.js";
 import { closedText, isOpen } from "./hours.js";
 import { BHOG_N, BHOG_REP, DIYA_BOND, DIYA_REP, FEST_HOUR, FESTIVALS, festivalOn, gher, HOLIKA_REP, yearOf } from "./festivals.js";
 import { arriveAt, CANCEL_REFUND, cartAway, duskOf, HELPER_MIN_PLOTS, HELPERS, type HelperId, type HelperJob, hireDay, HIRE_MAX, type Hire, isHelper, JOB_NAMES, MUKADAM, ORDER_BY, patchMs, restMs, sellTimes, WALK_MS } from "./helpers.js";
@@ -65,6 +66,8 @@ export type Action =
   | { t: "hire"; who: HelperId }
   | { t: "cancelHire"; who: HelperId }
   | { t: "panchayat"; slot: number; choice: string }
+  | { t: "role"; what: "karbhari" | "panch" }
+  | { t: "duty"; step: "take" | "choose" | "deliver" | "visit" | "finish"; choice?: string; who?: NeighbourId }
   | { t: "greet"; who: NeighbourId }
   | { t: "gift"; who: NeighbourId; item: string }
   | { t: "festival"; what: "diyas" | "bhog" | "fire"; item?: CropId }
@@ -113,7 +116,7 @@ export function soilQuality(world: World, x: number, z: number, soilBlock: numbe
   return Math.round(Math.max(0.3, Math.min(1, q)) * 1000) / 1000;
 }
 
-const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends", "tieBulls", "ploughField", "job", "fish", "sellFish", "kabaddi", "hire", "cancelHire", "orderHelper", "greet", "gift", "festival", "panchayat"]);
+const KNOWN = new Set(["dig", "place", "till", "plant", "water", "refill", "harvest", "sell", "buy", "buyPlot", "listPlot", "delist", "acceptOffer", "feed", "plough", "startTrip", "sellTown", "borrow", "repay", "store", "withdraw", "talk", "visit", "deliver", "choose", "claimMission", "decorate", "installDrip", "setName", "sleep", "friends", "tieBulls", "ploughField", "job", "fish", "sellFish", "kabaddi", "hire", "cancelHire", "orderHelper", "greet", "gift", "festival", "panchayat", "role", "duty"]);
 export const isNight = (hour: number) => hour >= 19.5 || hour < 4;
 /** How long until 6 am, from a night hour (ms). */
 export const untilMorning = (hour: number) => msBetween(hour, 6);
@@ -180,6 +183,7 @@ function story(world: World, save: Save, a: Extract<Action, { t: "talk" | "visit
       if (m.id === "election") {
         if (since(save, "visit:gramsabha") < 1) return fail("Hear everyone at the gram sabha first.");
         if (a.option === "self") {
+          if (!save.roles?.panch) return fail("Only a Panch can stand for Sarpanch. Become Naik Dhavlu's Karbhari, then stand for your ward (ask at his kacheri).");
           if (save.rep < 50) return fail(`The tanda doesn't know you well enough yet (★ ${save.rep} of 50). Help your neighbours first.`);
           if (save.money < 1000) return fail("The nomination deposit is ₹1,000.");
           save.money -= 1000;
@@ -410,6 +414,100 @@ function regular(save: Save, id: "ganpat" | "sitabai", n: number, per: number, d
   const before = Math.min(TRADE_CAP, Math.floor(t.n / per)), after = Math.min(TRADE_CAP, Math.floor((t.n + n) / per));
   save.bonds = { ...save.bonds, [id]: { ...b, trade: { day, n: t.n + n } } };
   return after > before ? befriend(save, id, after - before, day) : "";
+}
+
+/** How far you are from each role: what's still missing ("" when you can take it up). */
+export function roleNeeds(save: Save, what: "karbhari" | "panch", day: number): string[] {
+  const miss: string[] = [];
+  if (what === "karbhari") {
+    if (save.rep < KARBHARI_REP) miss.push(`★ ${save.rep} of ${KARBHARI_REP}`);
+    const friends = NEIGHBOUR_IDS.filter((id) => hearts(save, id) >= FRIEND_HEARTS).length;
+    if (friends < KARBHARI_FRIENDS) miss.push(`${friends} of ${KARBHARI_FRIENDS} neighbours at ${"❤".repeat(FRIEND_HEARTS)}`);
+    return miss;
+  }
+  if (save.roles?.karbhari === undefined) return ["be the Naik's Karbhari first"];
+  if (day - save.roles.karbhari < PANCH_DAYS) miss.push(`${day - save.roles.karbhari} of ${PANCH_DAYS} days as Karbhari`);
+  if (save.rep < PANCH_REP) miss.push(`★ ${save.rep} of ${PANCH_REP}`);
+  const votes = WARD.filter((id) => hearts(save, id) >= FRIEND_HEARTS).length;
+  if (votes < PANCH_VOTES) miss.push(`${votes} of ${PANCH_VOTES} ward votes (${WARD.filter((id) => hearts(save, id) < FRIEND_HEARTS).map((id) => NEIGHBOURS[id].name).join(", ")} not with you yet)`);
+  return miss;
+}
+
+/** Taking up a role: the Naik's Karbhari, then your ward's Panch. */
+function takeRole(save: Save, a: Extract<Action, { t: "role" }>, now: number): Result {
+  const day = clock(now).day;
+  if (a.what !== "karbhari" && a.what !== "panch") return fail("What role?");
+  if (save.roles?.[a.what] !== undefined) return fail(`You're already the ${a.what === "karbhari" ? "Karbhari" : "Panch"}.`);
+  if (!isOpen("land", clock(now).hour)) return fail(closedText("land"));
+  const miss = roleNeeds(save, a.what, day);
+  if (miss.length) return fail(`Not yet: ${miss.join(" · ")}.`);
+  save.roles = { ...save.roles, [a.what]: day };
+  if (a.what === "karbhari") {
+    save.rep += 5;
+    return { ok: true, msg: "Naik Dhavlu ties a turban on you: you are the tanda's Karbhari · ★ +5 · come to the kacheri each day for your duty" };
+  }
+  save.rep += 10;
+  return { ok: true, msg: "Your ward votes you in: Panch of Ukhali's ward 2 · ★ +10 · you may now stand for Sarpanch in the panchayat election" };
+}
+
+/** The Karbhari's duty for the day, given at the Naik's kacheri. */
+function naikDuty(save: Save, a: Extract<Action, { t: "duty" }>, now: number): Result {
+  if (save.roles?.karbhari === undefined) return fail("Only the Karbhari does the Naik's work.");
+  const c = clock(now), duty = dutyFor(c.day);
+  const st = save.duty?.day === c.day ? { ...save.duty, got: [...save.duty.got] } : { day: c.day, got: [] as string[] };
+  if (st.done) return fail("You've done the Naik's work for today.");
+  const atKacheri = a.step === "take" || a.step === "choose" || a.step === "finish";
+  if (atKacheri && !isOpen("land", c.hour)) return fail(closedText("land"));
+  const reward = (extra: string[]): Result => {
+    st.done = true;
+    delete st.step;
+    save.duty = st;
+    save.money += DUTY_HONOUR;
+    save.stats.earned += DUTY_HONOUR;
+    save.rep += DUTY_REP;
+    record(save, { day: c.day, kind: "sell", item: "duty", n: 1, amount: DUTY_HONOUR, where: "Naik Dhavlu" });
+    return { ok: true, msg: [...extra, `the Naik's honour: +₹${DUTY_HONOUR} · ★ +${DUTY_REP}`].filter(Boolean).join(" · "), gained: { money: DUTY_HONOUR } };
+  };
+  const warm = (id: NeighbourId, n: number) => (n > 0 ? befriend(save, id, n, c.day) : ((save.bonds = { ...save.bonds, [id]: { ...bondOf(save, id), pts: Math.max(0, bondOf(save, id).pts + n) } }), ""));
+  if (duty.kind === "quarrel") {
+    if (a.step !== "choose") return fail("Settle the quarrel at the kacheri.");
+    const v = verdicts(duty).find((x) => x.id === a.choice);
+    if (!v) return fail("How do you settle it?");
+    const said = Object.entries(v.bonds).map(([id, n]) => warm(id as NeighbourId, n));
+    if (v.rep) save.rep += v.rep;
+    return reward([v.id === "both" ? `${NEIGHBOURS[duty.a].name} and ${NEIGHBOURS[duty.b].name} shake hands` : `${NEIGHBOURS[v.id === "a" ? duty.a : duty.b].name} goes home satisfied`, ...said]);
+  }
+  if (duty.kind === "message") {
+    if (a.step === "take") {
+      if (st.step === "carrying") return fail("You're already carrying the Naik's word.");
+      st.step = "carrying";
+      save.duty = st;
+      return { ok: true, msg: `The Naik's word for ${NEIGHBOURS[duty.to].name}: "${duty.text.replace(/^Tell [^ ]+( [^ ]+)? /, "")}"` };
+    }
+    if (a.step !== "deliver") return fail("Carry the Naik's word.");
+    if (st.step !== "carrying") return fail("Take the Naik's word from the kacheri first.");
+    if (a.who !== duty.to) return fail(`The message is for ${NEIGHBOURS[duty.to].name}.`);
+    return reward([`${NEIGHBOURS[duty.to].name} has the Naik's word`, warm(duty.to, 5)]);
+  }
+  // collect: three houses, then back to the Naik with what they gave
+  if (a.step === "take") {
+    if (st.step === "collecting") return fail("You're already going round.");
+    st.step = "collecting";
+    save.duty = st;
+    return { ok: true, msg: `Go round ${duty.from.map((id) => NEIGHBOURS[id].name).join(", ")} for ${duty.forWhat}` };
+  }
+  if (a.step === "visit") {
+    if (st.step !== "collecting") return fail("Start at the kacheri.");
+    if (!a.who || !duty.from.includes(a.who)) return fail("Not one of the houses on the Naik's list.");
+    if (st.got.includes(a.who)) return fail("They've given already.");
+    st.got.push(a.who);
+    save.duty = st;
+    warm(a.who, 2);
+    return { ok: true, msg: `${NEIGHBOURS[a.who].name} gives ₹${COLLECT_EACH} for ${duty.forWhat} · ${st.got.length} of ${duty.from.length}` };
+  }
+  if (a.step !== "finish") return fail("Go round the houses.");
+  if (st.got.length < duty.from.length) return fail(`${duty.from.length - st.got.length} more houses to go.`);
+  return reward([`₹${COLLECT_EACH * duty.from.length} handed over for ${duty.forWhat}`]);
 }
 
 /** The Sarpanch settles one of the day's requests at the panchayat office. */
@@ -809,6 +907,11 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
   }
   if (a.t === "talk" || a.t === "visit" || a.t === "deliver" || a.t === "choose" || a.t === "claimMission" || a.t === "decorate" || a.t === "installDrip") {
     const r = story(world, save, a, now);
+    if (r.ok) save.updatedAt = now;
+    return r;
+  }
+  if (a.t === "role" || a.t === "duty") {
+    const r = a.t === "role" ? takeRole(save, a, now) : naikDuty(save, a, now);
     if (r.ok) save.updatedAt = now;
     return r;
   }

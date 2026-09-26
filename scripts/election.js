@@ -5,7 +5,7 @@
   const log = {};
   g.setHour(11);
   g.setView("third");
-  await g.jumpMission(9, 60);
+  await g.jumpMission(9, 60, 1); // a Panch, so standing for Sarpanch is allowed
   await g.grant(3000);
   const closeStory = async () => { for (let i = 0; i < 10; i++) { const d = document.querySelector(".dialogue"); if (d && /Let's do it/.test(d.innerText)) { d.querySelector("button").click(); } await wait(150); } };
   await closeStory();

@@ -10,7 +10,7 @@ import { Npc, type NpcLook } from "./engine/npc";
 import { mergeParts } from "./engine/merge";
 import { giverName, jobLineT, jobWhat, t } from "./i18n";
 import { kaamPay } from "../shared/neighbours";
-import { chat, giftButtons, greet, neighboursHtml, whoLine } from "./neighbours";
+import { chat, dutyHtml, giftButtons, greet, neighboursHtml, whoLine } from "./neighbours";
 import { Q } from "./quality";
 import type { Nav } from "./player/nav";
 
@@ -314,7 +314,7 @@ export class Jobs {
     const left = jobs.filter((j) => !done.includes(j.slot)).length;
     const html = `<div class="kaam-head">${t("📋 Kaam today")} <span>${left ? t("{a} of {b} open", { a: left, b: jobs.length }) : t("all done!")}</span>${document.body.classList.contains("is-touch") ? "" : `<kbd class="kaam-key">K</kbd>`}<b class="fold" aria-hidden="true"></b></div>
       <ul>${jobs.map((j) => `<li class="${done.includes(j.slot) ? "done" : ""}"><i>${done.includes(j.slot) ? "✓" : ""}</i><span>${jobLineT(j)}</span><em>₹${kaamPay(this.d.save(), j.who, j.pay)}</em></li>`).join("")}</ul>
-      ${neighboursHtml(this.d.save())}
+      ${dutyHtml(this.d.save(), clock(this.d.now()).day)}${neighboursHtml(this.d.save())}
       <small>${t(day ? "Look for the <b>!</b> over their heads · new jobs every day" : "Everyone's gone in for the night — new jobs in the morning")}</small>`;
     if (html !== this.listHtml) this.el.innerHTML = this.listHtml = html;
   }

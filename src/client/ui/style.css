@@ -545,6 +545,11 @@ body:not(.is-touch) .fishing.reeling .fish-foot::after { content: " · hold the 
 .info .dial { width: 22px; height: 13px; color: #fff; }
 .info .season { opacity: 0.75; }
 .info .fest { color: var(--gold-2); font-weight: 700; }
+.tanda-duties h3 { margin: 14px 0 4px; font-size: 15px; }
+.tanda-duties h3 small { font-weight: 400; opacity: 0.7; font-size: 12px; }
+.tanda-duties p { margin: 4px 0; font-size: 13.5px; }
+.tanda-duties .needs { margin: 4px 0; padding-left: 18px; font-size: 12.5px; opacity: 0.8; }
+.tanda-duties .big-acts button small { display: block; font-size: 11px; opacity: 0.75; font-weight: 400; }
 .goods[hidden] { display: none !important; }
 .touch .t-use.long { font-size: 11px; line-height: 1.1; padding: 0 4px; }
 .sell-all { margin: 4px 0 10px; }

@@ -2,6 +2,7 @@ import { CROP_IDS } from "../shared/crops";
 import { FISH_IDS } from "../shared/fish";
 import { festivalOn, FESTIVALS } from "../shared/festivals";
 import { bondOf, giftName, giftSize, giftTaste, hearts, heartsText, lovesName, NEIGHBOUR_IDS, type NeighbourId, NEIGHBOURS } from "../shared/neighbours";
+import { COLLECT_EACH, dutyFor } from "../shared/roles";
 import type { Action, Result } from "../shared/rules";
 import type { Save } from "../shared/save";
 import { clock } from "../shared/time";
@@ -44,6 +45,34 @@ export function greet(d: TalkDeps, id: NeighbourId) {
     d.toast(r.msg);
     if (/₹/.test(r.msg)) d.sound("cash");
   }
+  karbhariErrand(d, id);
+}
+
+/** As Karbhari: talking to the one the Naik's word is for delivers it; on a collection round, they give. */
+function karbhariErrand(d: TalkDeps, id: NeighbourId) {
+  const s = d.save(), day = clock(d.now()).day, st = s.duty;
+  if (s.roles?.karbhari === undefined || st?.day !== day || st.done) return;
+  const duty = dutyFor(day);
+  const step = duty.kind === "message" && st.step === "carrying" && duty.to === id ? "deliver" : duty.kind === "collect" && st.step === "collecting" && duty.from.includes(id) && !st.got.includes(id) ? "visit" : null;
+  if (!step) return;
+  const r = d.act({ t: "duty", step, who: id });
+  if (!r.ok) return;
+  d.toast(r.msg ?? "");
+  d.sound("cash");
+}
+
+/** The Karbhari's duty for the kaam card, or "". */
+export function dutyHtml(s: Save, day: number) {
+  if (s.roles?.karbhari === undefined) return "";
+  const st = s.duty?.day === day ? s.duty : undefined, d = dutyFor(day);
+  const line = st?.done
+    ? "✓ done for today"
+    : d.kind === "quarrel"
+      ? `settle ${d.about} at the kacheri`
+      : d.kind === "message"
+        ? st?.step === "carrying" ? `take the Naik's word to ${NEIGHBOURS[d.to].name}` : "the Naik has a message to carry"
+        : st?.step === "collecting" ? `collect ₹${COLLECT_EACH} each: ${d.from.map((id) => `${st.got.includes(id) ? "✓" : ""}${NEIGHBOURS[id].name}`).join(", ")}${st.got.length === d.from.length ? " — back to the Naik" : ""}` : `a collection for ${d.forWhat}`;
+  return `<div class="kaam-friends"><b>🪪 Karbhari · the Naik's duty</b><span>${line}</span></div>`;
 }
 
 /** A heading for their dialogue: the name and the hearts. */

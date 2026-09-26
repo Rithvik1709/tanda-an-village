@@ -161,10 +161,10 @@ export function effectText(e: Effect, names: (id: NeighbourId) => string) {
 }
 
 /** The desk as it stands on `day`: a new Sarpanch starts with the grant, each new year adds one, and each day's requests start fresh. */
-export function deskOn(p: PanchayatState | undefined, day: number, yearOf: (day: number) => number): PanchayatState {
+export function deskOn(p: PanchayatState | undefined, day: number, yearOf: (day: number) => number, grant = GRANT): PanchayatState {
   const year = yearOf(day);
-  const s = p ? { ...p, done: [...p.done] } : { fund: GRANT, year, day, done: [] };
-  if (s.year !== year) Object.assign(s, { fund: s.fund + GRANT * Math.max(0, year - s.year), year });
+  const s = p ? { ...p, done: [...p.done] } : { fund: grant, year, day, done: [] };
+  if (s.year !== year) Object.assign(s, { fund: s.fund + grant * Math.max(0, year - s.year), year });
   if (s.day !== day) Object.assign(s, { day, done: [] });
   return s;
 }

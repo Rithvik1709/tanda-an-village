@@ -114,6 +114,8 @@ describe("the ten missions", () => {
     expect(tries).toBeLessThan(24);
     const repBefore = s.rep;
     if (s.rep < 50) s.rep = 50;
+    expect(apply(world, s, { t: "choose", option: "self" }, now).ok).toBe(false); // only a Panch can stand
+    s.roles = { karbhari: 0, panch: 1 };
     ok(s, { t: "choose", option: "self" });
     ok(s, { t: "visit", place: "vote" });
     no(s, { t: "visit", place: "vote" }); // only once
