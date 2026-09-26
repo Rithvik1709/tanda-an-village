@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GODOWN_CAPACITY } from "../src/shared/bank";
-import { dawnOf, duskOf, patchMs, WALK_MS } from "../src/shared/helpers";
+import { dawnOf, duskOf, helperPhase, patchMs, WALK_MS } from "../src/shared/helpers";
 import { apply, type Action, settleHelpers } from "../src/shared/rules";
 import { cloneSave, newSave, type Save } from "../src/shared/save";
 import { daySummary } from "../src/shared/summary";
@@ -10,7 +10,7 @@ import { generateWorld } from "../src/shared/world";
 const world = generateWorld();
 const starter = world.plots.find((p) => p.starter)!;
 const other = world.plots.find((p) => !p.starter)!;
-let now = atHour(4, 10);
+let now = atHour(4, 14);
 const ok = (s: Save, a: Action) => {
   const r = apply(world, s, a, now);
   if (!r.ok) throw new Error(`${a.t}: ${r.error}`);
@@ -33,7 +33,7 @@ const planted = (s: Save) => Object.values(s.farm).filter((c) => c.plant).length
 
 describe("majoor", () => {
   it("needs two fields and the day's wage, paid up front", () => {
-    now = atHour(4, 10);
+    now = atHour(4, 14);
     const s = newSave("h", world, now);
     s.money = 5000;
     expect(no(s, { t: "hire", who: "sakharam" })).toMatch(/own 2/);
@@ -73,7 +73,7 @@ describe("majoor", () => {
   });
 
   it("take their order the next morning, once, and sow only the seeds you hand over", () => {
-    now = atHour(4, 10);
+    now = atHour(4, 14);
     const s = farmer(12);
     ok(s, { t: "hire", who: "sakharam" });
     const order: Action = { t: "orderHelper", who: "sakharam", job: "plant", plot: starter.id, crop: "onion", seeds: 8 };
@@ -101,7 +101,7 @@ describe("majoor", () => {
   });
 
   it("give back unsown seeds at dusk", () => {
-    now = atHour(4, 10);
+    now = atHour(4, 14);
     const s = farmer(5);
     ok(s, { t: "hire", who: "parvati" });
     now = atHour(5, 7);
@@ -121,7 +121,7 @@ describe("majoor", () => {
   });
 
   it("works the same however often the server looks", () => {
-    now = atHour(4, 10);
+    now = atHour(4, 14);
     const a = farmer(20);
     ok(a, { t: "hire", who: "vithoba" });
     now = atHour(5, 6.5);
@@ -134,7 +134,7 @@ describe("majoor", () => {
   });
 
   it("water only dry patches, and not drip fields", () => {
-    now = atHour(4, 10);
+    now = atHour(4, 14);
     const s = farmer(6);
     ok(s, { t: "hire", who: "sakharam" });
     now = atHour(5, 7);
@@ -148,12 +148,12 @@ describe("majoor", () => {
   });
 
   it("harvest into the godown, and stop when it's full", () => {
-    now = atHour(4, 10);
+    now = atHour(4, 14);
     const s = farmer(8);
     for (let i = 0; i < 8; i++) ok(s, { t: "plant", x: starter.x0 + 2 + i, y: starter.y, z: starter.z0 + 2, crop: "onion" });
     now += 12 * DAY_MS; // ripe, even dry
     const day = Math.floor((now - atHour(0, 6)) / DAY_MS);
-    now = atHour(day, 10);
+    now = atHour(day, 14);
     ok(s, { t: "hire", who: "vithoba" });
     now = dawnOf(day + 1) + 1000;
     const before = s.inv.onion ?? 0;
@@ -170,7 +170,7 @@ describe("majoor", () => {
   });
 
   it("stop if you sell the field under them", () => {
-    now = atHour(4, 10);
+    now = atHour(4, 14);
     const s = farmer(10);
     ok(s, { t: "hire", who: "sakharam" });
     now = atHour(5, 7);
@@ -181,5 +181,43 @@ describe("majoor", () => {
     settleHelpers(world, s, now);
     expect(planted(s)).toBe(0);
     expect(s.inv["seed:onion"]).toBe(seeds); // every seed comes back
+  });
+
+  it("hired in the morning, come the same day after an hour's walk; after noon, the next morning", () => {
+    now = atHour(4, 9.25);
+    const s = farmer(12);
+    const r = ok(s, { t: "hire", who: "vithoba" });
+    expect(r.ok && r.msg).toMatch(/on the way/);
+    const h = s.helpers![0];
+    expect(h.day).toBe(4);
+    expect(h.from).toBe(now + WALK_MS);
+    expect(no(s, { t: "hire", who: "vithoba" })).toMatch(/coming to you today/);
+    const order: Action = { t: "orderHelper", who: "vithoba", job: "plant", plot: starter.id, crop: "onion", seeds: 6 };
+    // still walking over from the mukadam's: no orders yet, but he can still be cancelled
+    expect(helperPhase(h, now + WALK_MS - 1)).toBe("booked");
+    expect(no(s, order)).toMatch(/on the way/);
+    now += WALK_MS;
+    expect(helperPhase(h, now)).toBe("waiting");
+    expect(no(s, { t: "cancelHire", who: "vithoba" })).toMatch(/too late/);
+    ok(s, order);
+    now = duskOf(4) + 1;
+    settleHelpers(world, s, now);
+    expect(planted(s)).toBe(6);
+    // noon and after: tomorrow at 6 am, as before
+    now = atHour(4, 12);
+    ok(s, { t: "hire", who: "sakharam" });
+    expect(s.helpers!.find((x) => x.who === "sakharam")).toEqual({ who: "sakharam", day: 5 });
+  });
+
+  it("can be cancelled on the way over, for the full wage", () => {
+    now = atHour(4, 8);
+    const s = farmer(0);
+    const m0 = s.money;
+    ok(s, { t: "hire", who: "parvati" });
+    now += WALK_MS / 2;
+    const r = ok(s, { t: "cancelHire", who: "parvati" });
+    expect(r.ok && r.msg).toMatch(/won't come today/);
+    expect(s.money).toBe(m0);
+    expect(s.helpers).toBeUndefined();
   });
 });

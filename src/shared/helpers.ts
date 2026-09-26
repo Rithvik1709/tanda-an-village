@@ -1,8 +1,9 @@
 import { atHour, clock, DAY_MS } from "./time.js";
 
 /*
- * Majoor: labourers you hire by the day from Devidas Chavan, the mukadam. Hire today, and tomorrow
- * at 6 am they wait in the aangan by Rathod Bhuvan; tell them one job on one of your fields and
+ * Majoor: labourers you hire by the day from Devidas Chavan, the mukadam. Hire in the morning and
+ * they walk straight over to the aangan by Rathod Bhuvan; hire later, and they're there at 6 am the
+ * next day. Tell them one job on one of your fields and
  * they stick to it until dusk. Their work is laid out on fixed time slots from the moment you give
  * the order, so the server can recompute exactly what they did, however often it looks.
  */
@@ -25,6 +26,7 @@ export const HIRE_MAX = 2; // labourers a day
 export const CANCEL_REFUND = 1; // share of the wage back if you cancel before they come (at 6 am)
 export const DUSK_HOUR = 19.5; // they go home at dusk
 export const ORDER_BY = 17; // after 5 pm it isn't worth starting
+export const SAME_DAY_BY = 12; // hired before noon, they come the same day
 /** Real ms in one game hour of daylight (hours run faster at night). */
 export const DAYLIGHT_HOUR_MS = atHour(0, 7) - atHour(0, 6);
 /** The walk from the aangan out to a field. */
@@ -36,6 +38,7 @@ export const patchMs = (id: HelperId) => Math.round(DAYLIGHT_HOUR_MS / HELPERS[i
 export type Hire = {
   who: HelperId;
   day: number;
+  from?: number; // hired the same morning: when they reach your aangan (otherwise 6 am)
   job?: {
     kind: HelperJob;
     plot: number;
@@ -51,18 +54,20 @@ export type Hire = {
   };
 };
 
-/** The game day a hire made now is for: the coming morning. */
+/** The game day a hire made now is for: today until noon, then the coming morning. */
 export function hireDay(now: number) {
   const c = clock(now);
-  return c.hour < 6 ? c.day : c.day + 1;
+  return c.hour < SAME_DAY_BY ? c.day : c.day + 1;
 }
 export const duskOf = (day: number) => atHour(day, DUSK_HOUR);
 export const dawnOf = (day: number) => atHour(day, 6);
+/** When a labourer reaches your aangan: 6 am, or an hour after a same-morning hire. */
+export const arriveAt = (h: Hire) => h.from ?? dawnOf(h.day);
 
 /** What a labourer is up to right now, for drawing them and for the hint line. */
 export type HelperPhase = "booked" | "waiting" | "walking" | "working" | "resting" | "home";
 export function helperPhase(h: Hire, now: number): HelperPhase {
-  if (now < dawnOf(h.day)) return "booked";
+  if (now < arriveAt(h)) return "booked";
   if (now >= duskOf(h.day) || now >= dawnOf(h.day) + DAY_MS) return "home";
   if (!h.job) return "waiting";
   if (now < h.job.startAt) return "walking";

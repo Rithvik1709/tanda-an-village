@@ -1,4 +1,4 @@
-// Majoor: hire a labourer at the mukadam's, give the order next morning, and watch them sow.
+// Majoor: hire a labourer at the mukadam's in the morning, give the order once he's over, and watch them sow.
 //   node scripts/shots.mjs --name helpers-end --eval "$(cat scripts/helpers.js)"
 (async () => {
   const g = window.__bailgaadi;
@@ -52,10 +52,11 @@
   await window.__shot("helpers-mukadam");
   await click("Hire Vithoba");
   log.afterHire = { money: g.money(), hires: g.helpers().hires };
-  // to 7 am tomorrow
-  const day = g.helpers().hires[0].day;
-  const gameNow = Date.now() + (await g.skip(0));
-  await g.skip(EPOCH + day * DAY + HOUR - gameNow);
+  // hired at 8 am, he walks over the same morning: an hour on, he's in the aangan
+  log.onTheWay = g.helpers().crew.find((c) => c.id === "vithoba");
+  await wait(3000);
+  await window.__shot("helpers-on-the-way");
+  await g.skip(HOUR * 1.1);
   await wait(1500);
   const v = g.helpers().crew.find((c) => c.id === "vithoba");
   log.morning = v;

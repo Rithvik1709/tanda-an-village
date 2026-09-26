@@ -12,7 +12,7 @@ import { clock, DAY_MS, msBetween } from "./time.js";
 import { D, H, idx, talavOut, W, type World } from "./world.js";
 import { BASKET, biteFor, CASTS_PER_DAY, FISH, FISH_IDS, type FishId, fishCount, fishPrice, isFish } from "./fish.js";
 import { GIVERS, jobsFor } from "./jobs.js";
-import { CANCEL_REFUND, dawnOf, duskOf, HELPER_MIN_PLOTS, HELPERS, type HelperId, type HelperJob, hireDay, HIRE_MAX, type Hire, isHelper, MUKADAM, ORDER_BY, patchMs, WALK_MS } from "./helpers.js";
+import { arriveAt, CANCEL_REFUND, duskOf, HELPER_MIN_PLOTS, HELPERS, type HelperId, type HelperJob, hireDay, HIRE_MAX, type Hire, isHelper, MUKADAM, ORDER_BY, patchMs, WALK_MS } from "./helpers.js";
 
 /*
  * The rules of the game: the ONLY way a save changes. The client runs these for instant feedback;
@@ -952,19 +952,21 @@ function hands(world: World, save: Save, a: Extract<Action, { t: "hire" | "cance
   const hires = save.helpers ?? [];
   if (a.t === "hire") {
     if (save.plots.length < HELPER_MIN_PLOTS) return fail(`${MUKADAM.name}: "One field you can work yourself. Come back when you own ${HELPER_MIN_PLOTS}."`);
-    const day = hireDay(now);
-    if (hires.some((h) => h.who === a.who && h.day === day)) return fail(`${who.name} is already coming to you tomorrow.`);
+    const day = hireDay(now), today = day === c.day;
+    if (hires.some((h) => h.who === a.who && h.day === day)) return fail(`${who.name} is already coming to you ${today ? "today" : "tomorrow"}.`);
     if (hires.filter((h) => h.day === day).length >= HIRE_MAX) return fail(`The mukadam sends at most ${HIRE_MAX} labourers to one farmer.`);
     if (save.money < who.wage) return fail(`${who.name} asks ₹${who.wage} for the day — you have ₹${save.money.toLocaleString("en-IN")}.`);
     save.money -= who.wage;
     save.stats.spent += who.wage;
     record(save, { day: c.day, kind: "buy", item: `hire:${a.who}`, n: 1, amount: who.wage, where: MUKADAM.name });
-    save.helpers = [...hires, { who: a.who, day }];
-    return { ok: true, msg: `Paid ₹${who.wage} · ${who.name} will be waiting by Rathod Bhuvan at 6 am` };
+    // a morning hire walks straight over from the mukadam's (before 6 am, they come at dawn as usual)
+    const from = today && c.hour >= 6 ? now + WALK_MS : undefined;
+    save.helpers = [...hires, { who: a.who, day, ...(from ? { from } : {}) }];
+    return { ok: true, msg: `Paid ₹${who.wage} · ${who.name} ${from ? "is on the way to Rathod Bhuvan — there within the hour" : "is going over to Rathod Bhuvan · starts work at 6 am tomorrow"}` };
   }
   if (a.t === "cancelHire") {
-    // until they set out at 6 am, the mukadam can send them elsewhere
-    const h = hires.find((x) => x.who === a.who && now < dawnOf(x.day));
+    // until they reach your aangan, the mukadam can send them elsewhere
+    const h = hires.find((x) => x.who === a.who && now < arriveAt(x));
     if (!h) return fail(hires.some((x) => x.who === a.who) ? `${who.name} has already started the day — it's too late to cancel.` : `${who.name} isn't coming to you.`);
     const back = Math.round(who.wage * CANCEL_REFUND);
     save.money += back;
@@ -972,10 +974,10 @@ function hands(world: World, save: Save, a: Extract<Action, { t: "hire" | "cance
     record(save, { day: c.day, kind: "sell", item: `unhire:${a.who}`, n: 1, amount: back, where: MUKADAM.name });
     save.helpers = hires.filter((x) => x !== h);
     if (!save.helpers.length) delete save.helpers;
-    return { ok: true, msg: `${who.name} won't come tomorrow · ₹${back} back from ${MUKADAM.name}` };
+    return { ok: true, msg: `${who.name} won't come ${h.day === c.day ? "today" : "tomorrow"} · ₹${back} back from ${MUKADAM.name}` };
   }
   const h = hires.find((x) => x.who === a.who && x.day === c.day);
-  if (!h || now < dawnOf(h.day)) return fail(`${who.name} isn't working for you ${h ? "yet — they come at 6 am" : "today"}.`);
+  if (!h || now < arriveAt(h)) return fail(`${who.name} isn't working for you ${!h ? "today" : h.from ? "yet — they're still on the way" : "yet — they come at 6 am"}.`);
   if (h.job) return fail(`${who.name} already has the day's work.`);
   if (c.hour >= ORDER_BY) return fail("It's too late in the day to start in the fields.");
   const p = Number.isInteger(a.plot) ? world.plots[a.plot] : undefined;
