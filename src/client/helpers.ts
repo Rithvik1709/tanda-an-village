@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { advance, CROP_IDS, CROPS, type CropId } from "../shared/crops";
-import { CANCEL_REFUND, HELPER_IDS, HELPER_MIN_PLOTS, type HelperId, type HelperJob, helperPhase, type HelperPhase, HELPERS, type Hire, hireDay, HIRE_MAX, JOB_NAMES, MUKADAM, ORDER_BY } from "../shared/helpers";
+import { CANCEL_REFUND, HELPER_IDS, HELPER_MIN_PLOTS, type HelperId, type HelperJob, helperPhase, type HelperPhase, HELPERS, type Hire, hireDay, HIRE_MAX, JOB_NAMES, MUKADAM, ORDER_BY, restMs } from "../shared/helpers";
 import type { Action, Result } from "../shared/rules";
 import type { Save } from "../shared/save";
 import { clock } from "../shared/time";
@@ -14,8 +14,10 @@ import { banjaraWoman, Figure } from "./scene/figure";
 /*
  * Majoor: Devidas Chavan the mukadam at his door on the chowk, the labourers who sit outside his
  * house until someone hires them, and — on the day you've hired them — the same labourers waiting
- * in your aangan (they walk over as soon as you hire them, and sit there till dusk if they start tomorrow), walking out to your field, and working it patch by patch. Where they stand is
- * drawn from the save (shared/helpers.ts decides what they've done); this file only shows it.
+ * in your aangan (they walk over as soon as you hire them, and sit there till dusk if they start
+ * tomorrow), walking out to your field, working it patch by patch, and sleeping on a charpai by the
+ * field between jobs, with a countdown till they're up. Where they stand is drawn from the save
+ * (shared/helpers.ts decides what they've done); this file only shows it.
  */
 type P = { x: number; z: number };
 type Button = { label: string; sub?: string; onClick: () => void };
@@ -42,6 +44,61 @@ const DAYTIME = (h: number) => h >= 7 && h < 19.5; // the mukadam keeps village 
 const WORKDAY = (h: number) => h >= 6 && h < 19.5; // labourers start at 6
 const SPEED = 2.2; // a brisk walk out to the fields (you walk at 3.4)
 const rs = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+
+/** A charpai: a rope-strung cot on four legs, 1.9 m long, its length along z. */
+function charpai() {
+  const g = new THREE.Group();
+  const wood = new THREE.MeshLambertMaterial({ color: "#6e4a2a" });
+  const rope = new THREE.MeshLambertMaterial({ color: "#cdb07a" });
+  const box = (w: number, h: number, d: number, m: THREE.Material, x: number, y: number, z: number) => {
+    const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+    o.position.set(x, y, z);
+    o.castShadow = true;
+    g.add(o);
+  };
+  for (const x of [-0.42, 0.42]) for (const z of [-0.9, 0.9]) box(0.07, 0.4, 0.07, wood, x, 0.2, z);
+  for (const x of [-0.42, 0.42]) box(0.06, 0.06, 1.9, wood, x, 0.38, 0);
+  for (const z of [-0.9, 0.9]) box(0.9, 0.06, 0.06, wood, 0, 0.38, z);
+  box(0.8, 0.02, 1.76, rope, 0, 0.39, 0);
+  return g;
+}
+const BED_TOP = 0.41;
+
+/** A little sign over a sleeping labourer: 💤 and how long till they're up. */
+class Countdown {
+  readonly sprite: THREE.Sprite;
+  private g: CanvasRenderingContext2D;
+  private tex: THREE.CanvasTexture;
+  private text = "";
+  constructor() {
+    const c = document.createElement("canvas");
+    c.width = 160;
+    c.height = 64;
+    this.g = c.getContext("2d")!;
+    this.tex = new THREE.CanvasTexture(c);
+    this.tex.colorSpace = THREE.SRGBColorSpace;
+    this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.tex, depthWrite: false, toneMapped: false }));
+    this.sprite.scale.set(1.0, 0.4, 1);
+  }
+  set(ms: number) {
+    const sec = Math.max(0, Math.ceil(ms / 1000));
+    const text = `💤 ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+    if (text === this.text) return;
+    this.text = text;
+    const g = this.g;
+    g.clearRect(0, 0, 160, 64);
+    g.fillStyle = "rgba(24, 18, 40, 0.85)";
+    g.beginPath();
+    g.roundRect(4, 6, 152, 52, 26);
+    g.fill();
+    g.fillStyle = "#e9e4ff";
+    g.font = "700 32px system-ui";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(text, 80, 34);
+    this.tex.needsUpdate = true;
+  }
+}
 
 class Labourer {
   readonly fig: Figure;
@@ -107,6 +164,8 @@ export class Helpers {
   private aanganAt: P[];
   private crew: Labourer[];
   private marks = new Map<HelperId, THREE.Sprite>();
+  private beds = new Map<HelperId, THREE.Group>();
+  private timers = new Map<HelperId, Countdown>();
   private seen = new Map<HelperId, string>();
 
   constructor(private d: Deps) {
@@ -126,6 +185,11 @@ export class Helpers {
       mark.scale.set(0.5, 0.5, 1);
       this.group.add(mark);
       this.marks.set(l.id, mark);
+      const bed = charpai(), timer = new Countdown();
+      bed.visible = timer.sprite.visible = false;
+      this.group.add(bed, timer.sprite);
+      this.beds.set(l.id, bed);
+      this.timers.set(l.id, timer);
     }
   }
 
@@ -178,7 +242,10 @@ export class Helpers {
     if (!n || !(n.kind === "mukadam" ? DAYTIME : WORKDAY)(hour)) return "";
     if (n.kind === "mukadam") return `<kbd>E</kbd> ${MUKADAM.name}, the mukadam <small class="hours">· hire labourers for ${this.forToday() ? "today" : "tomorrow"}</small>`;
     const w = HELPERS[n.id], h = this.hire(n.id), j = h?.job;
-    if (this.phase(n.id) === "booked") return `${w.name} <small class="hours">· ${h ? "just arriving" : "starts work here at 6 am tomorrow"}</small>`;
+    const ph = this.phase(n.id);
+    if (ph === "booked") return `${w.name} <small class="hours">· ${h ? "just arriving" : "starts work here at 6 am tomorrow"}</small>`;
+    if (ph === "sleeping") return `${w.name} is asleep <small class="hours">· up in ${this.upIn(n.id)}s</small>`;
+    if (ph === "waiting" && j) return `<kbd>E</kbd> Give ${w.name} the next job <small class="hours">· ${this.doneLine(j)}</small>`;
     if (!j) return `<kbd>E</kbd> Tell ${w.name} the day's work`;
     const plot = this.d.world.plots[j.plot].name;
     return `${w.name} · ${j.kind === "plant" ? `sowing ${CROPS[j.crop as CropId].name.toLowerCase()}` : j.kind === "water" ? "watering" : "harvesting"} in ${plot} <small class="hours">· ${j.done} patches done${j.full ? " · the godown is full" : ""}</small>`;
@@ -190,12 +257,41 @@ export class Helpers {
     if (!n || !(n.kind === "mukadam" ? DAYTIME : WORKDAY)(hour)) return false;
     if (n.kind === "mukadam") this.hireDialogue();
     else if (this.phase(n.id) === "booked") this.d.toast(`${HELPERS[n.id].name}: "Ram Ram, malak. ${this.hire(n.id) ? "Give me a moment to set down my things." : "I'll be here at 6 am, ready for whatever you say."}"`);
-    else if (!this.hire(n.id)!.job) this.orderDialogue(n.id);
+    else if (this.phase(n.id) === "sleeping") this.d.toast(`${HELPERS[n.id].name} snores on the charpai · up in ${this.upIn(n.id)}s`);
+    else if (this.phase(n.id) === "waiting") this.orderDialogue(n.id);
     else {
       const w = HELPERS[n.id], j = this.hire(n.id)!.job!;
-      this.d.toast(`${w.name}: "${j.full ? "The godown's full, malak — I've left the rest standing." : j.idle ? "Nothing more to do here for now. I'll wait till something needs me." : `Don't worry, I'll ${JOB_NAMES[j.kind]} before dusk.`}"`);
+      this.d.toast(`${w.name}: "${j.over ? "The day's done, malak. I'm going home." : `Don't worry, I'll ${JOB_NAMES[j.kind]}. Then I'll rest a little, and you can give me the next job.`}"`);
     }
     return true;
+  }
+
+  /** Seconds till a sleeping labourer is up. */
+  private upIn(id: HelperId) {
+    const j = this.hire(id)?.job;
+    return j?.doneAt === undefined ? 0 : Math.max(0, Math.ceil((j.doneAt + restMs(id) - this.d.now()) / 1000));
+  }
+  /** What the last job came to: "6 patches sown in Aamrai". */
+  private doneLine(j: NonNullable<Hire["job"]>) {
+    return `${j.done} patches ${j.kind === "plant" ? "sown" : j.kind === "water" ? "watered" : "harvested"} in ${this.d.world.plots[j.plot].name}${j.full ? " · the godown is full" : ""}`;
+  }
+  /**
+   * A labourer's charpai by the field they're working: outside the fence on the gate side, just past
+   * the gate, its head to the fence. Cots stand side by side — the first labourer on that field gets
+   * the one nearest the gate, the second the next — so one worker means one cot, two mean two.
+   * `feet`: where they lie from; `face`: the yaw that lays them (head along local -z) head to the fence.
+   */
+  private bedAt(id: HelperId, plot: number): { at: P; feet: P; stand: P; face: number } {
+    const p = this.d.world.plots[plot];
+    const g = p.gate ?? { x: p.x0, z: Math.round((p.z0 + p.z1) / 2), side: "W" as const };
+    const [nx, nz] = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] }[g.side]; // out of the field
+    const [tx, tz] = [-nz, nx]; // along the fence
+    const today = clock(this.d.now()).day;
+    const onField = (this.d.save().helpers ?? []).filter((h) => h.day === today && h.job?.plot === plot);
+    const slot = Math.max(0, onField.findIndex((h) => h.who === id));
+    const along = 2.4 + slot * 1.15, out = 1.5; // past the 3-wide gate; the fence is ~0.5 out from the cell centre
+    const at = { x: g.x + 0.5 + nx * out + tx * along, z: g.z + 0.5 + nz * out + tz * along };
+    return { at, feet: { x: at.x + nx * 0.9, z: at.z + nz * 0.9 }, stand: { x: at.x + nx * 1.5, z: at.z + nz * 1.5 }, face: Math.atan2(nx, nz) };
   }
 
   private close = () => this.d.closeDialogue();
@@ -250,9 +346,10 @@ export class Helpers {
     const who = `${w.name} · ${w.local}`;
     if (clock(this.d.now()).hour >= ORDER_BY) return this.d.dialogue(who, "Too late", "It's nearly dusk, malak — too late to start in the fields. Better luck tomorrow.", [{ label: "All right", onClick: this.close }]);
     const pick = (job: HelperJob) => this.fieldDialogue(id, job);
-    this.d.dialogue(who, "The day's work", `Ram Ram, malak. What shall I do today? Once I start, I'll stick to it until dusk.`, [
+    const again = !!this.hire(id)?.job;
+    this.d.dialogue(who, again ? "The next job" : "The day's work", `${again ? "Rested and ready, malak. What next?" : "Ram Ram, malak. What shall I do today?"} One job at a time: when it's done I'll lie down a little, then you can give me the next.`, [
       { label: "Sow seeds", sub: "you hand over the seeds · only in hoed soil", onClick: () => pick("plant") },
-      { label: "Water a field", sub: "every dry patch, again as it dries", onClick: () => pick("water") },
+      { label: "Water a field", sub: "every dry patch", onClick: () => pick("water") },
       { label: "Harvest", sub: "the ripe crop goes straight to the godown", onClick: () => pick("harvest") },
       { label: "Not now", onClick: this.close },
     ]);
@@ -285,17 +382,22 @@ export class Helpers {
   }
 
   /** Where a labourer should be, and doing what, right now. */
-  private want(l: Labourer, i: number, ph: HelperPhase | null): { at: P; action: Figure["action"]; hold: "hoe" | "can" | "bag" | "none"; visible: boolean } {
+  private want(l: Labourer, i: number, ph: HelperPhase | null): { at: P; action: Figure["action"]; hold: "hoe" | "can" | "bag" | "none"; visible: boolean; lie?: boolean } {
     const h = this.hire(l.id), j = h?.job;
     // hired: straight over to your aangan — to start within the hour, or to sit there till tomorrow
     if (ph === "booked") return h?.from ? { at: this.aanganAt[i], action: "none", hold: "hoe", visible: true } : { at: this.aanganAt[i], action: "sit", hold: "none", visible: true };
     if (!ph) return { at: this.benchAt[i], action: "sit", hold: "none", visible: true };
     if (ph === "home") return { at: this.benchAt[i], action: "none", hold: "none", visible: false };
+    // between jobs: asleep on their charpai by the field, then up at its foot
+    if (j?.doneAt !== undefined && (ph === "sleeping" || ph === "waiting")) {
+      const b = this.bedAt(l.id, j.plot);
+      return ph === "sleeping" ? { at: b.feet, action: "none", hold: "none", visible: true, lie: true } : { at: b.stand, action: "none", hold: "hoe", visible: true };
+    }
     if (ph === "waiting" || !j) return { at: this.aanganAt[i], action: "none", hold: "hoe", visible: true };
     const hold = j.kind === "water" ? "can" : j.kind === "plant" ? "bag" : "hoe";
     const p = this.d.world.plots[j.plot];
     const edge = this.d.nav.open(p.gate ?? { x: p.x0 + 1, z: p.z0 + 1 });
-    if (ph === "walking" || !j.at) return { at: edge, action: ph === "resting" ? "sit" : "none", hold, visible: true };
+    if (ph === "walking" || !j.at) return { at: edge, action: "none", hold, visible: true };
     if (ph === "resting") return { at: edge, action: "sit", hold: "none", visible: true };
     const k = Number(j.at), x = k % W, z = Math.floor(k / W) % D;
     return { at: this.d.nav.open({ x: x + 0.5 - 0.7, z: z + 0.5 }), action: j.kind === "water" ? "pour" : "bend", hold, visible: true };
@@ -318,16 +420,33 @@ export class Helpers {
       // far from where they should be and not meant to be walking? they're already there
       // (and in the morning they're in your aangan before you are)
       const gap = Math.hypot(w.at.x - l.pos.x, w.at.z - l.pos.z);
-      const onTheWay = ph === "walking" || ph === "working" || ph === "booked";
+      const j = this.hire(l.id)?.job, bed = this.beds.get(l.id)!, timer = this.timers.get(l.id)!;
+      // their cot stands by the field all the while they work it, not only while they sleep
+      const b = j && ph && ph !== "booked" && ph !== "home" && !j.over ? this.bedAt(l.id, j.plot) : null;
+      bed.visible = !!b && Math.hypot(player.x - b.at.x, player.z - b.at.z) < Q.peopleFar;
+      if (b) {
+        bed.position.set(b.at.x, this.d.ground(b.at.x, b.at.z), b.at.z);
+        bed.rotation.y = b.face;
+      }
+      const onTheWay = ph === "walking" || ph === "working" || ph === "booked" || ph === "sleeping";
       if ((ph === "waiting" && gap > 3) || (!onTheWay && gap > 40)) l.jump(w.at);
       const there = l.walk(w.at, dt, this.d.nav);
       l.fig.action = there ? w.action : "none";
       l.fig.hold(there || w.hold !== "hoe" ? w.hold : "hoe");
       if (there && w.action === "none") l.turn(Math.atan2(player.x - l.pos.x, player.z - l.pos.z), dt);
       l.fig.animate(dt, there ? 0 : SPEED);
-      l.fig.root.rotation.y = l.heading;
+      // on the charpai: laid flat on his back from its foot, head along -z
+      const lying = there && !!w.lie && !!b;
+      if (lying) l.jump(b!.feet); // settle exactly onto the cot
+      l.fig.root.rotation.set(lying ? -Math.PI / 2 : 0, lying ? b!.face : l.heading, 0, "YXZ");
       const y = this.d.ground(l.pos.x, l.pos.z);
-      l.fig.root.position.set(l.pos.x, y, l.pos.z);
+      l.fig.root.position.set(l.pos.x, y + (lying ? BED_TOP + 0.12 : 0), l.pos.z);
+      timer.sprite.visible = l.fig.root.visible && ph === "sleeping";
+      if (timer.sprite.visible) {
+        timer.set(j!.doneAt! + restMs(l.id) - this.d.now());
+        const c = b?.at ?? l.pos;
+        timer.sprite.position.set(c.x, this.d.ground(c.x, c.z) + 1.4, c.z);
+      }
       if (mark.visible) mark.position.set(l.pos.x, y + 2.3, l.pos.z);
       if (Q.shadows) l.fig.setShadow(Math.hypot(player.x - l.pos.x, player.z - l.pos.z) < Q.peopleShadow);
     });
@@ -336,11 +455,15 @@ export class Helpers {
   /** A word when something changes out in the field: the godown filled up, or the day's work is done. */
   private notice(id: HelperId) {
     const j = this.hire(id)?.job, w = HELPERS[id];
-    const state = !j ? "" : j.over ? "over" : j.full ? "full" : "";
+    const state = !j ? "" : j.over ? "over" : j.doneAt !== undefined ? `done:${j.doneAt}` : "";
     const prev = this.seen.get(id);
     this.seen.set(id, state);
     if (prev === undefined || prev === state || !j) return; // first look after loading: say nothing
-    if (state === "full") this.d.toast(`The godown is full — ${w.name} has left the rest of the crop standing.`, "bad");
+    if (j.doneAt !== undefined && state !== "over") {
+      if (j.full) this.d.toast(`The godown is full — ${w.name} has left the rest of the crop standing.`, "bad");
+      else this.d.toast(`${w.name} has finished · ${this.doneLine(j)} · sleeping ${Math.round(restMs(id) / 1000)}s by the field, then ready for the next job`);
+      return;
+    }
     if (state === "over") this.d.toast(`${w.name} goes home for the night · ${j.done} patches ${j.kind === "plant" ? "sown" : j.kind === "water" ? "watered" : "harvested"} in ${this.d.world.plots[j.plot].name}`);
   }
 

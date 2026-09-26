@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GODOWN_CAPACITY } from "../src/shared/bank";
-import { dawnOf, duskOf, helperPhase, patchMs, WALK_MS } from "../src/shared/helpers";
+import { dawnOf, duskOf, helperPhase, patchMs, restMs, WALK_MS } from "../src/shared/helpers";
 import { apply, type Action, settleHelpers } from "../src/shared/rules";
 import { cloneSave, newSave, type Save } from "../src/shared/save";
 import { daySummary } from "../src/shared/summary";
@@ -100,20 +100,18 @@ describe("majoor", () => {
     expect(s.inv["seed:onion"]).toBe(seeds - 8);
   });
 
-  it("give back unsown seeds at dusk", () => {
+  it("give back unsown seeds as soon as the hoed soil runs out", () => {
     now = atHour(4, 14);
     const s = farmer(5);
     ok(s, { t: "hire", who: "parvati" });
     now = atHour(5, 7);
     const seeds = s.inv["seed:jowar"];
     ok(s, { t: "orderHelper", who: "parvati", job: "plant", plot: starter.id, crop: "jowar", seeds: 10 });
+    expect(s.inv["seed:jowar"]).toBe(seeds - 10); // in their bag
     now = atHour(5, 12);
-    settleHelpers(world, s, now);
-    expect(planted(s)).toBe(5);
-    expect(s.inv["seed:jowar"]).toBe(seeds - 10); // still in their bag
-    now = duskOf(5) + 1000;
     ok(s, { t: "setName", name: "Test" }); // any action settles
-    expect(s.inv["seed:jowar"]).toBe(seeds - 5);
+    expect(planted(s)).toBe(5);
+    expect(s.inv["seed:jowar"]).toBe(seeds - 5); // the other 5 came back when the job ended
     // the next day they're gone
     now = atHour(6, 8);
     settleHelpers(world, s, now);
@@ -219,5 +217,50 @@ describe("majoor", () => {
     expect(r.ok && r.msg).toMatch(/won't come today/);
     expect(s.money).toBe(m0);
     expect(s.helpers).toBeUndefined();
+  });
+
+  it("rest after each job — experts less — and then take the next one", () => {
+    now = atHour(4, 14);
+    const s = farmer(6);
+    ok(s, { t: "hire", who: "sakharam" });
+    ok(s, { t: "hire", who: "vithoba" });
+    expect(restMs("vithoba")).toBeCloseTo(restMs("sakharam") / 2, -1);
+    now = atHour(5, 7);
+    ok(s, { t: "orderHelper", who: "sakharam", job: "plant", plot: starter.id, crop: "onion", seeds: 6 });
+    const h = s.helpers!.find((x) => x.who === "sakharam")!;
+    // 6 patches, then a slot with nothing to do ends the job
+    const doneAt = h.job!.startAt + 7 * patchMs("sakharam");
+    now = doneAt - 1;
+    settleHelpers(world, s, now);
+    expect(h.job!.doneAt).toBeUndefined();
+    expect(no(s, { t: "orderHelper", who: "sakharam", job: "water", plot: starter.id })).toMatch(/already at work/);
+    now = doneAt;
+    settleHelpers(world, s, now);
+    expect(h.job!.doneAt).toBe(doneAt);
+    expect(h.job!.done).toBe(6);
+    expect(helperPhase(h, now)).toBe("sleeping");
+    expect(no(s, { t: "orderHelper", who: "sakharam", job: "water", plot: starter.id })).toMatch(/resting — up in \d+s/);
+    now = doneAt + restMs("sakharam");
+    expect(helperPhase(h, now)).toBe("waiting");
+    // up again: the next job, on the same field, starts at once (no walk)
+    const r = ok(s, { t: "orderHelper", who: "sakharam", job: "water", plot: starter.id });
+    expect(r.ok && r.msg).toMatch(/gets up to water/);
+    expect(h.job!.startAt).toBe(now);
+    expect(h.job!.doneAt).toBeUndefined();
+    now += 7 * patchMs("sakharam");
+    settleHelpers(world, s, now);
+    expect(Object.values(s.farm).every((c) => c.wetUntil > now - 7 * patchMs("sakharam"))).toBe(true);
+    expect(h.job!.doneAt).toBeDefined();
+  });
+
+  it("won't take a job there's nothing to do in", () => {
+    now = atHour(4, 14);
+    const s = farmer(4);
+    ok(s, { t: "hire", who: "sakharam" });
+    now = atHour(5, 7);
+    for (const k of Object.keys(s.farm)) s.farm[k].wetUntil = now + DAY_MS;
+    expect(no(s, { t: "orderHelper", who: "sakharam", job: "water", plot: starter.id })).toMatch(/watered already/);
+    ok(s, { t: "plant", x: starter.x0 + 2, y: starter.y, z: starter.z0 + 2, crop: "onion" });
+    expect(no(s, { t: "orderHelper", who: "sakharam", job: "harvest", plot: starter.id })).toMatch(/ripe yet/);
   });
 });

@@ -3,8 +3,8 @@ import { atHour, clock, DAY_MS } from "./time.js";
 /*
  * Majoor: labourers you hire by the day from Devidas Chavan, the mukadam. Hire in the morning and
  * they walk straight over to the aangan by Rathod Bhuvan; hire later, and they're there at 6 am the
- * next day. Tell them one job on one of your fields and
- * they stick to it until dusk. Their work is laid out on fixed time slots from the moment you give
+ * next day. Tell them one job on one of your fields; when it runs out they sleep a while on a
+ * charpai by the field (experts need less), then take the next job, until dusk. Their work is laid out on fixed time slots from the moment you give
  * the order, so the server can recompute exactly what they did, however often it looks.
  */
 export type HelperId = "sakharam" | "parvati" | "vithoba";
@@ -33,6 +33,8 @@ export const DAYLIGHT_HOUR_MS = atHour(0, 7) - atHour(0, 6);
 export const WALK_MS = DAYLIGHT_HOUR_MS;
 /** Real ms per patch for a labourer. */
 export const patchMs = (id: HelperId) => Math.round(DAYLIGHT_HOUR_MS / HELPERS[id].perHour);
+/** Real ms a labourer sleeps after finishing a job: a game hour, half that for an expert. */
+export const restMs = (id: HelperId) => Math.round(DAYLIGHT_HOUR_MS * (HELPERS[id].expert ? 0.5 : 1));
 
 /** A labourer you've hired for `day`; `job` once you've told them what to do. */
 export type Hire = {
@@ -48,7 +50,7 @@ export type Hire = {
     step: number; // time slots used so far (a slot with nothing to do is spent waiting)
     done: number; // patches actually worked
     at?: string; // the farm cell they worked last (where to draw them)
-    idle?: boolean; // nothing to do at the last slot: resting at the field's edge
+    doneAt?: number; // the work ran out: asleep by the field until doneAt + restMs, then ready for more
     full?: boolean; // the godown filled up; they stopped harvesting
     over?: boolean; // dusk has come and the day's work is settled
   };
@@ -65,13 +67,14 @@ export const dawnOf = (day: number) => atHour(day, 6);
 export const arriveAt = (h: Hire) => h.from ?? dawnOf(h.day);
 
 /** What a labourer is up to right now, for drawing them and for the hint line. */
-export type HelperPhase = "booked" | "waiting" | "walking" | "working" | "resting" | "home";
+export type HelperPhase = "booked" | "waiting" | "walking" | "working" | "sleeping" | "resting" | "home";
 export function helperPhase(h: Hire, now: number): HelperPhase {
   if (now < arriveAt(h)) return "booked";
   if (now >= duskOf(h.day) || now >= dawnOf(h.day) + DAY_MS) return "home";
   if (!h.job) return "waiting";
   if (now < h.job.startAt) return "walking";
-  return h.job.idle || h.job.full || h.job.over ? "resting" : "working";
+  if (h.job.doneAt !== undefined) return now < h.job.doneAt + restMs(h.who) ? "sleeping" : "waiting";
+  return h.job.over ? "resting" : "working";
 }
 
 export const JOB_NAMES: Record<HelperJob, string> = { plant: "sow seeds", water: "water the field", harvest: "harvest the ripe crop" };

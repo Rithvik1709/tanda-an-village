@@ -12,7 +12,7 @@ import { clock, DAY_MS, msBetween } from "./time.js";
 import { D, H, idx, talavOut, W, type World } from "./world.js";
 import { BASKET, biteFor, CASTS_PER_DAY, FISH, FISH_IDS, type FishId, fishCount, fishPrice, isFish } from "./fish.js";
 import { GIVERS, jobsFor } from "./jobs.js";
-import { arriveAt, CANCEL_REFUND, duskOf, HELPER_MIN_PLOTS, HELPERS, type HelperId, type HelperJob, hireDay, HIRE_MAX, type Hire, isHelper, MUKADAM, ORDER_BY, patchMs, WALK_MS } from "./helpers.js";
+import { arriveAt, CANCEL_REFUND, duskOf, HELPER_MIN_PLOTS, HELPERS, type HelperId, type HelperJob, hireDay, HIRE_MAX, type Hire, isHelper, JOB_NAMES, MUKADAM, ORDER_BY, patchMs, restMs, WALK_MS } from "./helpers.js";
 
 /*
  * The rules of the game: the ONLY way a save changes. The client runs these for instant feedback;
@@ -888,11 +888,18 @@ function needs(world: World, save: Save, j: Job, k: string, t: number) {
   return blockAt(world, save, x, y + 1, z, t) === B.AIR;
 }
 
+/** The job has run out (or the godown is full): unsown seeds come back, and they lie down to rest. */
+function finish(save: Save, j: Job, t: number) {
+  j.doneAt = t;
+  if (j.seeds && j.crop) save.inv[`seed:${j.crop}`] = (save.inv[`seed:${j.crop}`] ?? 0) + j.seeds;
+  j.seeds = 0;
+}
+
 /**
  * Bring every labourer's day up to `now`. From the moment they reach the field, each time slot goes
- * to the next patch (in row order) that needs their job; a slot with nothing to do is spent resting.
- * Harvests go straight to the godown. At dusk, unsown seeds come back to you. Returns the farm
- * cells that changed, so the client can redraw them.
+ * to the next patch (in row order) that needs their job; the first slot with nothing to do ends the
+ * job, and they rest before taking another. Harvests go straight to the godown. At dusk, unsown
+ * seeds come back to you. Returns the farm cells that changed, so the client can redraw them.
  */
 export function settleHelpers(world: World, save: Save, now: number): string[] {
   if (!save.helpers?.length) return [];
@@ -902,12 +909,12 @@ export function settleHelpers(world: World, save: Save, now: number): string[] {
     if (!j || j.over) continue;
     const end = duskOf(h.day), until = Math.min(now, end), ms = patchMs(h.who);
     let cells: string[] | null = null;
-    while (j.startAt + (j.step + 1) * ms <= until) {
+    while (j.doneAt === undefined && j.startAt + (j.step + 1) * ms <= until) {
       const t = j.startAt + ++j.step * ms;
       const k = save.plots.includes(j.plot) ? (cells ??= cellsOf(world, save, j.plot)).find((c) => needs(world, save, j, c, t)) : undefined;
       if (!k) {
-        j.idle = true;
-        continue;
+        finish(save, j, t);
+        break;
       }
       const cell = save.farm[k];
       if (j.kind === "plant") {
@@ -918,8 +925,9 @@ export function settleHelpers(world: World, save: Save, now: number): string[] {
         const p = advance(cell.plant!, cell.wetUntil, t);
         const n = yieldOf(p, cell.q);
         if (stored(save) + n > GODOWN_CAPACITY) {
-          j.full = j.idle = true;
-          continue;
+          j.full = true;
+          finish(save, j, t);
+          break;
         }
         // one lot per crop: its date is the weighted average, so rent stays fair
         const lot = save.godown[p.crop] ?? { n: 0, since: t };
@@ -928,7 +936,6 @@ export function settleHelpers(world: World, save: Save, now: number): string[] {
       }
       j.done++;
       j.at = k;
-      j.idle = false;
       changed.push(k);
     }
     if (now >= end) {
@@ -978,7 +985,12 @@ function hands(world: World, save: Save, a: Extract<Action, { t: "hire" | "cance
   }
   const h = hires.find((x) => x.who === a.who && x.day === c.day);
   if (!h || now < arriveAt(h)) return fail(`${who.name} isn't working for you ${!h ? "today" : h.from ? "yet — they're still on the way" : "yet — they come at 6 am"}.`);
-  if (h.job) return fail(`${who.name} already has the day's work.`);
+  if (h.job && !h.job.over) {
+    // one job at a time, and a rest after each
+    if (h.job.doneAt === undefined) return fail(`${who.name} is already at work in ${world.plots[h.job.plot].name}.`);
+    const up = h.job.doneAt + restMs(a.who);
+    if (now < up) return fail(`${who.name} is resting — up in ${Math.ceil((up - now) / 1000)}s.`);
+  }
   if (c.hour >= ORDER_BY) return fail("It's too late in the day to start in the fields.");
   const p = Number.isInteger(a.plot) ? world.plots[a.plot] : undefined;
   if (!p || !save.plots.includes(p.id)) return fail("Send them to one of your own fields.");
@@ -995,8 +1007,14 @@ function hands(world: World, save: Save, a: Extract<Action, { t: "hire" | "cance
   } else if (a.job === "water") {
     if (save.drip.includes(p.id)) return fail(`The drip lines already water ${p.name}.`);
     if (!cells.length) return fail(`Nothing is tilled in ${p.name} to water.`);
-  } else if (!cells.some((k) => save.farm[k].plant)) return fail(`Nothing is growing in ${p.name}.`);
-  h.job = { kind: a.job, plot: p.id, ...(a.job === "plant" ? { crop: a.crop } : {}), seeds, startAt: now + WALK_MS, step: 0, done: 0 };
-  const what = a.job === "plant" ? `sow ${seeds} ${CROPS[a.crop!].name.toLowerCase()}` : a.job === "water" ? "water" : "harvest";
-  return { ok: true, msg: `${who.name} sets off to ${what} in ${p.name}` };
+    if (!cells.some((k) => save.farm[k].wetUntil <= now)) return fail(`Everything in ${p.name} is watered already.`);
+  } else {
+    if (!cells.some((k) => save.farm[k].plant)) return fail(`Nothing is growing in ${p.name}.`);
+    if (!cells.some((k) => needs(world, save, { kind: "harvest", plot: p.id, seeds: 0, startAt: now, step: 0, done: 0 }, k, now))) return fail(`Nothing in ${p.name} is ripe yet.`);
+  }
+  // already standing by this field after the last job? straight to work
+  const walk = h.job?.plot === p.id ? 0 : WALK_MS;
+  h.job = { kind: a.job, plot: p.id, ...(a.job === "plant" ? { crop: a.crop } : {}), seeds, startAt: now + walk, step: 0, done: 0 };
+  const what = a.job === "plant" ? `sow ${seeds} ${CROPS[a.crop!].name.toLowerCase()}` : JOB_NAMES[a.job];
+  return { ok: true, msg: `${who.name} ${walk ? "sets off to" : "gets up to"} ${what} in ${p.name}` };
 }
