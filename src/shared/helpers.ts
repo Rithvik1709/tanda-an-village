@@ -8,7 +8,7 @@ import { atHour, clock, DAY_MS } from "./time.js";
  * the order, so the server can recompute exactly what they did, however often it looks.
  */
 export type HelperId = "sakharam" | "parvati" | "vithoba";
-export type HelperJob = "plant" | "water" | "harvest";
+export type HelperJob = "plant" | "water" | "harvest" | "sell"; // sell: the cart to the town mandi, experts only
 
 export const MUKADAM = { name: "Devidas Chavan", local: "देविदास चव्हाण", title: "the mukadam" };
 
@@ -46,6 +46,8 @@ export type Hire = {
     plot: number;
     crop?: string; // planting: the crop whose seeds you handed over
     seeds: number; // seeds still in their bag (back to you at dusk)
+    load?: Record<string, number>; // selling: the produce on the cart
+    sold?: number; // selling: what the mandi paid (once they get there)
     startAt: number; // when they reach the field and begin
     step: number; // time slots used so far (a slot with nothing to do is spent waiting)
     done: number; // patches actually worked
@@ -77,4 +79,8 @@ export function helperPhase(h: Hire, now: number): HelperPhase {
   return h.job.over ? "resting" : "working";
 }
 
-export const JOB_NAMES: Record<HelperJob, string> = { plant: "sow seeds", water: "water the field", harvest: "harvest the ripe crop" };
+export const JOB_NAMES: Record<HelperJob, string> = { plant: "sow seeds", water: "water the field", harvest: "harvest the ripe crop", sell: "take the cart to the Jalna mandi" };
+/** A mistry's run to the town mandi: when he gets there and sells, and when he's back with the cart. */
+export const sellTimes = (j: { startAt: number }, tripMs: number) => ({ sellAt: j.startAt + tripMs, backAt: j.startAt + 2 * tripMs });
+/** Is a labourer out on the road with your cart and bulls? */
+export const cartAway = (helpers: Hire[] | undefined) => !!helpers?.some((h) => h.job?.kind === "sell" && h.job.doneAt === undefined);

@@ -28,6 +28,10 @@ export class Farmyard {
   hasCart = false;
   onArrive: (dest: Dest) => void = () => {};
   private walkTo: { x: number; z: number } | null = null;
+  /** Vithoba mistry's run to the mandi with the cart: 0 → 0.5 out to the town, 0.5 → 1 back (null: not out). */
+  mistryAt: number | null = null;
+  private haul: { path: Pt[]; len: number } | null = null;
+  private hauling = false;
 
   constructor(private vox: Uint8Array, starter: Plot, private groundY: (x: number, z: number) => number, market: { x: number; z: number }) {
     this.town = { x: market.x + 5.5, z: market.z + 1.5, heading: -Math.PI / 2 };
@@ -46,7 +50,7 @@ export class Farmyard {
     this.hasBulls = hasBulls;
     this.hasCart = hasCart;
     this.rig.group.visible = hasBulls;
-    this.cart.visible = hasCart && !this.ride;
+    this.cart.visible = hasCart && !this.ride && !this.hauling;
   }
 
   distTo(p: { x: number; z: number }, x: number, z: number) {
@@ -72,7 +76,32 @@ export class Farmyard {
 
   update(dt: number, player: { x: number; z: number }) {
     const before = { ...this.pos };
-    if (this.ride) {
+    if (this.mistryAt !== null && !this.ride) {
+      // the mistry drives the cart from the gate to the town mandi and back, on the same road you ride
+      this.haul ??= (() => {
+        const path = findPath(this.vox, this.home, this.town);
+        return path && path.length > 1 ? { path, len: pathLength(path) } : null;
+      })();
+      if (this.haul) {
+        const f = Math.min(1, Math.max(0, this.mistryAt)), back = f > 0.5;
+        const p = along(this.haul.path, this.haul.len * (back ? 2 - 2 * f : 2 * f));
+        this.pos.x = p.x;
+        this.pos.z = p.z;
+        this.pos.heading = lerpAngle(this.pos.heading, back ? p.heading + Math.PI : p.heading, Math.min(1, dt * 3));
+        if (!this.hauling) {
+          this.hauling = true;
+          this.rig.setHitched(true);
+          this.cart.visible = false;
+        }
+      }
+    } else if (this.hauling) {
+      // home again: the cart is unhitched at its place by the gate
+      this.hauling = false;
+      this.rig.setHitched(false);
+      this.cartAt = { ...this.home };
+      this.cart.visible = this.hasCart;
+      Object.assign(this.pos, { x: this.home.x + 2, z: this.home.z });
+    } else if (this.ride) {
       const r = this.ride;
       r.d = Math.min(r.len, r.d + r.speed * dt);
       const p = along(r.path, r.d);

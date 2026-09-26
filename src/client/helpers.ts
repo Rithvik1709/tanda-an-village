@@ -1,5 +1,7 @@
 import * as THREE from "three";
+import { CART_CAPACITY, TRIP_MS } from "../shared/bulls";
 import { advance, CROP_IDS, CROPS, type CropId } from "../shared/crops";
+import { buyerPrice } from "../shared/economy";
 import { CANCEL_REFUND, HELPER_IDS, HELPER_MIN_PLOTS, type HelperId, type HelperJob, helperPhase, type HelperPhase, HELPERS, type Hire, hireDay, HIRE_MAX, JOB_NAMES, MUKADAM, ORDER_BY, restMs } from "../shared/helpers";
 import type { Action, Result } from "../shared/rules";
 import type { Save } from "../shared/save";
@@ -165,6 +167,8 @@ export class Helpers {
   private crew: Labourer[];
   private marks = new Map<HelperId, THREE.Sprite>();
   private beds = new Map<HelperId, THREE.Group>();
+  /** Where the driver sits on the cart while the mistry drives it (set by main from the farmyard). */
+  seat: { x: number; y: number; z: number; heading: number } | null = null;
   private timers = new Map<HelperId, Countdown>();
   private seen = new Map<HelperId, string>();
 
@@ -226,7 +230,7 @@ export class Helpers {
     let best: HelperId | null = null, bd = 2.2;
     for (const l of this.crew) {
       const ph = this.phase(l.id);
-      if (!ph || ph === "home") continue;
+      if (!ph || ph === "home" || !l.fig.root.visible) continue; // (out on the road to the mandi: not here)
       const dd = Math.hypot(p.x - l.pos.x, p.z - l.pos.z);
       if (dd < bd) {
         bd = dd;
@@ -266,6 +270,16 @@ export class Helpers {
     return true;
   }
 
+  /** How far the mistry is through his run to the mandi with the cart (0 → 0.5 out, → 1 back), or null if the cart's home. */
+  cartRun(): number | null {
+    const now = this.d.now();
+    for (const id of HELPER_IDS) {
+      const j = this.hire(id)?.job;
+      if (j?.kind === "sell" && j.doneAt === undefined && now >= j.startAt) return Math.min(1, (now - j.startAt) / (2 * TRIP_MS));
+    }
+    return null;
+  }
+
   /** Seconds till a sleeping labourer is up. */
   private upIn(id: HelperId) {
     const j = this.hire(id)?.job;
@@ -273,6 +287,7 @@ export class Helpers {
   }
   /** What the last job came to: "6 patches sown in Aamrai". */
   private doneLine(j: NonNullable<Hire["job"]>) {
+    if (j.kind === "sell") return `sold ${j.done} produce at the Jalna mandi for ${rs(j.sold ?? 0)}`;
     return `${j.done} patches ${j.kind === "plant" ? "sown" : j.kind === "water" ? "watered" : "harvested"} in ${this.d.world.plots[j.plot].name}${j.full ? " · the godown is full" : ""}`;
   }
   /**
@@ -351,8 +366,44 @@ export class Helpers {
       { label: "Sow seeds", sub: "you hand over the seeds · only in hoed soil", onClick: () => pick("plant") },
       { label: "Water a field", sub: "every dry patch", onClick: () => pick("water") },
       { label: "Harvest", sub: "the ripe crop goes straight to the godown", onClick: () => pick("harvest") },
+      // only a mistry is trusted with the cart and the traders at the mandi
+      ...(w.expert ? [{ label: "Take the cart to the mandi", sub: "Sarja & Raja pull your produce to Jalna · the town price", onClick: () => this.sellDialogue(id) }] : []),
       { label: "Not now", onClick: this.close },
     ]);
+  }
+
+  /** What goes on the cart: the godown's produce, what you carry, or both (up to the cart's 200). */
+  private sellDialogue(id: HelperId) {
+    const s = this.d.save(), w = HELPERS[id], day = clock(this.d.now()).day;
+    const who = `${w.name} · ${w.local}`;
+    const back = { label: "Back", onClick: () => this.orderDialogue(id) };
+    if (!s.inv.cart || !s.bulls) return this.d.dialogue(who, "No cart", "Without a cart and a pair of bulls, malak, I'd be carrying it on my head to Jalna. Sitabai sells both.", [back]);
+    const fill = (sources: Record<string, number>[]) => {
+      const load: Record<string, number> = {};
+      let room = CART_CAPACITY;
+      for (const src of sources)
+        for (const c of CROP_IDS) {
+          const n = Math.min(src[c] ?? 0, room);
+          if (n > 0) (load[c] = (load[c] ?? 0) + n), (room -= n);
+        }
+      return load;
+    };
+    const godown = Object.fromEntries(Object.entries(s.godown).map(([c, lot]) => [c, lot?.n ?? 0]));
+    const sacks = Object.fromEntries(CROP_IDS.map((c) => [c, s.inv[c] ?? 0]));
+    const count = (l: Record<string, number>) => Object.values(l).reduce((a, n) => a + n, 0);
+    const worth = (l: Record<string, number>) => Object.entries(l).reduce((a, [c, n]) => a + buyerPrice(c as CropId, day, "town") * n * (s.perks.includes("townContact") ? 1.15 : 1), 0);
+    const send = (load: Record<string, number>) => this.report(this.d.act({ t: "orderHelper", who: id, job: "sell", plot: s.plots[0], load }));
+    const options: [string, Record<string, number>][] = [["Everything", fill([godown, sacks])], ["The godown's produce", fill([godown])], ["What you're carrying", fill([sacks])]];
+    const seen = new Set<string>();
+    const buttons: Button[] = [];
+    for (const [label, load] of options) {
+      const n = count(load), key = JSON.stringify(load);
+      if (!n || seen.has(key)) continue;
+      seen.add(key);
+      buttons.push({ label: `${label} · ${n}`, sub: `about ${rs(Math.round(worth(load)))} at today's town price${n === CART_CAPACITY ? " · a full cart" : ""}`, onClick: () => send(load) });
+    }
+    if (!buttons.length) return this.d.dialogue(who, "Nothing to sell", "The godown's empty and so are your sacks, malak. Harvest something first.", [back]);
+    this.d.dialogue(who, "To the Jalna mandi", `I'll hitch Sarja and Raja, sell at the mandi and bring every rupee back — then I'll need a sleep. What shall I load? (From the godown, you pay the rent.)`, [...buttons, back]);
   }
 
   private fieldDialogue(id: HelperId, job: HelperJob) {
@@ -397,6 +448,8 @@ export class Helpers {
     const hold = j.kind === "water" ? "can" : j.kind === "plant" ? "bag" : "hoe";
     const p = this.d.world.plots[j.plot];
     const edge = this.d.nav.open(p.gate ?? { x: p.x0 + 1, z: p.z0 + 1 });
+    // to the cart by your first field, then away on the road with it
+    if (j.kind === "sell") return { at: edge, action: "none", hold: "none", visible: true };
     if (ph === "walking" || !j.at) return { at: edge, action: "none", hold, visible: true };
     if (ph === "resting") return { at: edge, action: "sit", hold: "none", visible: true };
     const k = Number(j.at), x = k % W, z = Math.floor(k / W) % D;
@@ -421,6 +474,21 @@ export class Helpers {
       // (and in the morning they're in your aangan before you are)
       const gap = Math.hypot(w.at.x - l.pos.x, w.at.z - l.pos.z);
       const j = this.hire(l.id)?.job, bed = this.beds.get(l.id)!, timer = this.timers.get(l.id)!;
+      if (j?.kind === "sell" && ph === "working") {
+        // on the cart's seat, driving Sarja & Raja to the mandi and back
+        const s = this.seat;
+        l.fig.root.visible = !!s && Math.hypot(player.x - s.x, player.z - s.z) < Q.peopleFar;
+        timer.sprite.visible = false;
+        if (!s) return;
+        l.jump(s);
+        l.heading = s.heading;
+        l.fig.action = "sit";
+        l.fig.hold("none");
+        l.fig.animate(dt, 0);
+        l.fig.root.rotation.set(0, s.heading, 0, "YXZ");
+        l.fig.root.position.set(s.x, s.y - 1.18, s.z);
+        return;
+      }
       // their cot stands by the field all the while they work it, not only while they sleep
       const b = j && ph && ph !== "booked" && ph !== "home" && !j.over ? this.bedAt(l.id, j.plot) : null;
       bed.visible = !!b && Math.hypot(player.x - b.at.x, player.z - b.at.z) < Q.peopleFar;

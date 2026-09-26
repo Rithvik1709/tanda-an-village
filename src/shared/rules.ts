@@ -12,7 +12,7 @@ import { clock, DAY_MS, msBetween } from "./time.js";
 import { D, H, idx, talavOut, W, type World } from "./world.js";
 import { BASKET, biteFor, CASTS_PER_DAY, FISH, FISH_IDS, type FishId, fishCount, fishPrice, isFish } from "./fish.js";
 import { GIVERS, jobsFor } from "./jobs.js";
-import { arriveAt, CANCEL_REFUND, duskOf, HELPER_MIN_PLOTS, HELPERS, type HelperId, type HelperJob, hireDay, HIRE_MAX, type Hire, isHelper, JOB_NAMES, MUKADAM, ORDER_BY, patchMs, restMs, WALK_MS } from "./helpers.js";
+import { arriveAt, CANCEL_REFUND, cartAway, duskOf, HELPER_MIN_PLOTS, HELPERS, type HelperId, type HelperJob, hireDay, HIRE_MAX, type Hire, isHelper, JOB_NAMES, MUKADAM, ORDER_BY, patchMs, restMs, sellTimes, WALK_MS } from "./helpers.js";
 
 /*
  * The rules of the game: the ONLY way a save changes. The client runs these for instant feedback;
@@ -60,7 +60,7 @@ export type Action =
   | { t: "kabaddi"; won: boolean }
   | { t: "hire"; who: HelperId }
   | { t: "cancelHire"; who: HelperId }
-  | { t: "orderHelper"; who: HelperId; job: HelperJob; plot: number; crop?: CropId; seeds?: number };
+  | { t: "orderHelper"; who: HelperId; job: HelperJob; plot: number; crop?: CropId; seeds?: number; load?: Record<string, number> };
 
 export type Result = { ok: true; msg?: string; gained?: Record<string, number> } | { ok: false; error: string };
 
@@ -446,6 +446,7 @@ function livestock(save: Save, a: Extract<Action, { t: "feed" | "startTrip" | "s
   }
   if (a.t === "startTrip") {
     if (!save.inv.cart) return fail("You need a bullock cart.");
+    if (cartAway(save.helpers)) return fail("Vithoba mistry is out on the road with your cart.");
     if (save.trip) return fail("The cart is already on the road.");
     if (b.mood < MIN_MOOD) return fail("The bulls are sulking — feed them first.");
     if (b.stamina < TRIP_COST) return fail("The bulls are too tired for the road. Let them rest or feed them.");
@@ -600,6 +601,7 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
     const p = Number.isInteger(a.plot) ? world.plots[a.plot] : undefined;
     if (!p || !save.plots.includes(p.id)) return fail("Your bulls plough only your own fields.");
     if (!save.bulls || !save.inv.plough) return fail("You need bulls and a plough (Sitabai sells both).");
+    if (cartAway(save.helpers)) return fail("Your bulls are out on the road to the mandi.");
     let b = bullsNow(save.bulls, now);
     if (b.mood < MIN_MOOD) return fail("The bulls are sulking — feed them first.");
     if (b.stamina < PLOUGH_COST) return fail("The bulls are tired. Let them rest or feed them.");
@@ -798,6 +800,7 @@ export function apply(world: World, save: Save, a: Action, now: number): Result 
 
     case "plough": {
       if (!save.bulls || !has("plough")) return fail("You need bulls and a plough.");
+      if (cartAway(save.helpers)) return fail("Your bulls are out on the road to the mandi.");
       const bl = bullsNow(save.bulls, now);
       save.bulls = bl;
       if (bl.mood < MIN_MOOD) return fail("The bulls are sulking — feed them first.");
@@ -888,6 +891,28 @@ function needs(world: World, save: Save, j: Job, k: string, t: number) {
   return blockAt(world, save, x, y + 1, z, t) === B.AIR;
 }
 
+/** A mistry's run to the town mandi: he sells the load at the town price when he gets there, and is back with the money after as long again. */
+function settleSale(save: Save, h: Hire, now: number) {
+  const j = h.job!;
+  if (j.doneAt !== undefined) return;
+  const { sellAt, backAt } = sellTimes(j, TRIP_MS);
+  if (j.sold === undefined && now >= sellAt) {
+    const day = clock(sellAt).day;
+    let total = 0;
+    for (const [item, n] of Object.entries(j.load ?? {})) {
+      const crop = item as CropId;
+      const amount = Math.round(buyerPrice(crop, day, "town") * n * (save.perks.includes("townContact") ? 1.15 : 1));
+      save.money += amount;
+      save.stats.earned += amount;
+      total += amount;
+      record(save, { day, kind: "sell", item, n, amount, where: `town · ${HELPERS[h.who].name}`, premium: amount - Math.round(buyerPrice(crop, day, "village") * n) });
+      j.done += n;
+    }
+    j.sold = total;
+  }
+  if (now >= backAt) finish(save, j, backAt);
+}
+
 /** The job has run out (or the godown is full): unsown seeds come back, and they lie down to rest. */
 function finish(save: Save, j: Job, t: number) {
   j.doneAt = t;
@@ -907,6 +932,10 @@ export function settleHelpers(world: World, save: Save, now: number): string[] {
   for (const h of save.helpers) {
     const j = h.job;
     if (!j || j.over) continue;
+    if (j.kind === "sell") {
+      settleSale(save, h, now);
+      continue;
+    }
     const end = duskOf(h.day), until = Math.min(now, end), ms = patchMs(h.who);
     let cells: string[] | null = null;
     while (j.doneAt === undefined && j.startAt + (j.step + 1) * ms <= until) {
@@ -951,6 +980,51 @@ export function settleHelpers(world: World, save: Save, now: number): string[] {
   return changed;
 }
 
+/**
+ * Sending an expert to the town mandi with the cart: the load comes out of the godown first (you
+ * pay the rent), then your sacks; the bulls spend a trip's stamina; after the run he sleeps by your
+ * first field, where the cart stands.
+ */
+function sellRun(world: World, save: Save, a: Extract<Action, { t: "orderHelper" }>, h: Hire, now: number): Result {
+  const who = HELPERS[a.who];
+  if (!who.expert) return fail(`${who.name}: "The cart and the mandi? Send Vithoba mistry, malak — the traders would cheat me."`);
+  if (!save.inv.cart || !save.bulls) return fail("You need a bullock cart and bulls for the mandi.");
+  if (save.trip) return fail("Your cart is already on the road.");
+  const b = bullsNow(save.bulls, now);
+  if (b.mood < MIN_MOOD) return fail("The bulls are sulking — feed them first.");
+  if (b.stamina < TRIP_COST) return fail("The bulls are too tired for the road. Let them rest or feed them.");
+  const load: Record<string, number> = {};
+  let total = 0, rent = 0;
+  for (const [item, n] of Object.entries(a.load ?? {})) {
+    if (!isCrop(item) || !qty(n)) return fail("Only produce goes in the cart.");
+    const lot = save.godown[item], fromGodown = Math.min(n, lot?.n ?? 0);
+    if (fromGodown + (save.inv[item] ?? 0) < n) return fail(`You don't have ${n} ${CROPS[item].name.toLowerCase()}.`);
+    if (fromGodown) rent += rentFor(lot!, fromGodown, now);
+    load[item] = n;
+    total += n;
+  }
+  if (!total) return fail("Load something first.");
+  if (total > CART_CAPACITY) return fail(`The cart holds ${CART_CAPACITY}.`);
+  if (save.money < rent) return fail(`The godown rent is ₹${rent}.`);
+  const day = clock(now).day;
+  for (const [item, n] of Object.entries(load)) {
+    const lot = save.godown[item], fromGodown = Math.min(n, lot?.n ?? 0);
+    if (fromGodown) {
+      lot!.n -= fromGodown;
+      if (!lot!.n) delete save.godown[item];
+    }
+    if (n > fromGodown) take(save, item, n - fromGodown);
+  }
+  if (rent) {
+    save.money -= rent;
+    record(save, { day, kind: "buy", item: "godown-rent", n: total, amount: rent });
+  }
+  save.bulls = { ...b, stamina: b.stamina - TRIP_COST, tied: false, sheltered: false };
+  const home = world.plots.find((p) => p.starter && save.plots.includes(p.id))?.id ?? save.plots[0];
+  h.job = { kind: "sell", plot: home, seeds: 0, load, startAt: now + WALK_MS, step: 0, done: 0 };
+  return { ok: true, msg: `${who.name} hitches Sarja & Raja and sets off for the Jalna mandi with ${total} produce${rent ? ` (godown rent ₹${rent})` : ""}` };
+}
+
 /** Hiring a labourer at the mukadam's, and telling one what to do in the morning. */
 function hands(world: World, save: Save, a: Extract<Action, { t: "hire" | "cancelHire" | "orderHelper" }>, now: number): Result {
   if (!isHelper(a.who)) return fail("Who?");
@@ -992,6 +1066,7 @@ function hands(world: World, save: Save, a: Extract<Action, { t: "hire" | "cance
     if (now < up) return fail(`${who.name} is resting — up in ${Math.ceil((up - now) / 1000)}s.`);
   }
   if (c.hour >= ORDER_BY) return fail("It's too late in the day to start in the fields.");
+  if (a.job === "sell") return sellRun(world, save, a, h, now);
   const p = Number.isInteger(a.plot) ? world.plots[a.plot] : undefined;
   if (!p || !save.plots.includes(p.id)) return fail("Send them to one of your own fields.");
   if (a.job !== "plant" && a.job !== "water" && a.job !== "harvest") return fail("What should they do?");

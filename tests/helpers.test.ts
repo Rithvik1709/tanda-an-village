@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { GODOWN_CAPACITY } from "../src/shared/bank";
-import { dawnOf, duskOf, helperPhase, patchMs, restMs, WALK_MS } from "../src/shared/helpers";
+import { TRIP_COST, TRIP_MS, newBulls } from "../src/shared/bulls";
+import { buyerPrice } from "../src/shared/economy";
+import { dawnOf, duskOf, helperPhase, patchMs, restMs, sellTimes, WALK_MS } from "../src/shared/helpers";
 import { apply, type Action, settleHelpers } from "../src/shared/rules";
 import { cloneSave, newSave, type Save } from "../src/shared/save";
 import { daySummary } from "../src/shared/summary";
@@ -262,5 +264,45 @@ describe("majoor", () => {
     expect(no(s, { t: "orderHelper", who: "sakharam", job: "water", plot: starter.id })).toMatch(/watered already/);
     ok(s, { t: "plant", x: starter.x0 + 2, y: starter.y, z: starter.z0 + 2, crop: "onion" });
     expect(no(s, { t: "orderHelper", who: "sakharam", job: "harvest", plot: starter.id })).toMatch(/ripe yet/);
+  });
+
+  it("only a mistry takes the cart to the mandi: godown first, then your sacks, paid at the town price", () => {
+    now = atHour(4, 14);
+    const s = farmer(0);
+    ok(s, { t: "hire", who: "vithoba" });
+    ok(s, { t: "hire", who: "sakharam" });
+    now = atHour(5, 7);
+    const sell = (who: "vithoba" | "sakharam", load: Record<string, number>): Action => ({ t: "orderHelper", who, job: "sell", plot: starter.id, load });
+    expect(no(s, sell("vithoba", { onion: 10 }))).toMatch(/cart and bulls/);
+    s.inv.cart = 1;
+    s.bulls = newBulls(now);
+    expect(no(s, sell("sakharam", { onion: 10 }))).toMatch(/Vithoba/);
+    expect(no(s, sell("vithoba", { onion: 10 }))).toMatch(/don't have 10/);
+    s.godown.onion = { n: 30, since: now };
+    s.inv.onion = 20;
+    expect(no(s, sell("vithoba", { onion: 999 }))).toMatch(/don't have|holds/);
+    const m0 = s.money;
+    ok(s, sell("vithoba", { onion: 40 }));
+    expect(s.godown.onion).toBeUndefined(); // all 30 from the godown…
+    expect(s.inv.onion).toBe(10); // …and 10 from the sacks
+    expect(s.bulls!.stamina).toBe(100 - TRIP_COST);
+    // the cart and bulls are gone till he's back
+    expect(no(s, { t: "startTrip", load: { onion: 5 } })).toMatch(/out on the road/);
+    const h = s.helpers!.find((x) => x.who === "vithoba")!;
+    const { sellAt, backAt } = sellTimes(h.job!, TRIP_MS);
+    settleHelpers(world, s, sellAt - 1);
+    expect(s.money).toBe(m0);
+    now = sellAt;
+    settleHelpers(world, s, now);
+    const paid = buyerPrice("onion", Math.floor((sellAt - atHour(0, 6)) / DAY_MS), "town") * 40;
+    expect(s.money).toBe(m0 + paid);
+    expect(h.job!.sold).toBe(paid);
+    expect(helperPhase(h, now)).toBe("working"); // still on the road home
+    now = backAt;
+    settleHelpers(world, s, now);
+    expect(h.job!.doneAt).toBe(backAt);
+    expect(helperPhase(h, now)).toBe("sleeping");
+    ok(s, { t: "startTrip", load: { onion: 5 } }); // the cart is home
+    expect(s.money).toBe(m0 + paid); // paid once, however often it's settled
   });
 });

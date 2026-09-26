@@ -61,7 +61,7 @@ import { HowToCard } from "./ui/howto";
 import { cropName, isEnglish, LANG as LANG_CODE, t as tr } from "./i18n";
 import { SHOP_HOURS } from "../shared/hours";
 import { arrived, firstTime, metric } from "./metrics";
-import { HELPER_MIN_PLOTS } from "../shared/helpers";
+import { cartAway, HELPER_MIN_PLOTS } from "../shared/helpers";
 
 type Hooks = {
   ready: boolean;
@@ -779,8 +779,8 @@ farmyard.onArrive = (dest) => {
   if (dest === "town") openStall("town");
   else hud.toast("Home again. Sarja and Raja deserve some kadba.");
 };
-const nearCart = () => game.save.inv.cart && !farmyard.ride && farmyard.distTo(body.pos, farmyard.cartAt.x, farmyard.cartAt.z) < 3.6;
-const nearBulls = () => game.save.bulls && !farmyard.ride && farmyard.distTo(body.pos, farmyard.pos.x, farmyard.pos.z) < 4.5;
+const nearCart = () => game.save.inv.cart && !cartAway(game.save.helpers) && !farmyard.ride && farmyard.distTo(body.pos, farmyard.cartAt.x, farmyard.cartAt.z) < 3.6;
+const nearBulls = () => game.save.bulls && !cartAway(game.save.helpers) && !farmyard.ride && farmyard.distTo(body.pos, farmyard.pos.x, farmyard.pos.z) < 4.5;
 const cartInTown = () => farmyard.distTo(farmyard.cartAt, farmyard.town.x, farmyard.town.z) < 3;
 function cartAction() {
   if (!nearCart()) return false;
@@ -1592,10 +1592,12 @@ renderer.setAnimationLoop(() => {
   if (frameTimes.length > 240) frameTimes.shift();
   last = now;
   farmyard.set(!!game.save.bulls, !!game.save.inv.cart);
+  farmyard.mistryAt = helpers.cartRun(); // the mistry driving the cart to the mandi and back
   const tb = game.save.bulls?.tied;
   farmyard.tiedAt = tb && !ploughJob ? { x: nights.home.yard.x + Math.sin(nights.home.yardFace) * 1.0, z: nights.home.yard.z + Math.cos(nights.home.yardFace) * 1.0, heading: nights.home.yardFace + Math.PI } : null;
   nights.setGotha(!!game.save.inv.gotha);
   farmyard.update(dt, body.pos);
+  helpers.seat = farmyard.mistryAt !== null ? { ...farmyard.seat(), heading: farmyard.pos.heading } : null;
   if (farmyard.ride) {
     // on the cart: the road does the walking, you look around — and your view turns with the cart
     controls.yaw += Math.atan2(Math.sin(farmyard.pos.heading - rideHeading), Math.cos(farmyard.pos.heading - rideHeading));
