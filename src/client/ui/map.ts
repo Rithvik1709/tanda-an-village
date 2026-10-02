@@ -193,7 +193,7 @@ export class MapView {
       place("school", L.school, "Z.P. school", "जिल्हा परिषद शाळा", "school", "#2d5fb8", 2),
       place("pir", L.pir, "Pir Baba", "पीर बाबा", "pir", "#2f8a4a", 2),
       place("tank", L.tank, "Water tank", undefined, "tank", "#3c86a8", 3),
-      place("market", L.market, "Pathrud market", "पाथरूड बाजार", "mandi", "#8a3a1c", 1),
+      place("market", L.market, "Pathrud market", "पाथ्रुड बाजार", "mandi", "#8a3a1c", 1),
       place("kabaddi", L.kabaddi, "Kabaddi maidan", "कबड्डी मैदान", "court", "#b9651a", 3),
       place("talav", L.talav, "Talav", "उखळी तलाव", "talav", "#2f7c98", 2),
       place("ghat", L.ghat, "Vihir", "field well", "well", "#5a7f8c", 3),

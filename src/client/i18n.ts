@@ -129,7 +129,7 @@ const D: Record<string, [string, string]> = {
   "Naik Dhavlu's kacheri": ["नायक धवलूंची कचेरी", "नायक धवलू की कचहरी"],
   "The Sahakari Bank": ["सहकारी बँक", "सहकारी बैंक"],
   "Sahukar Motilal": ["सावकार मोतीलाल", "साहूकार मोतीलाल"],
-  "The Pathrud market": ["पाथरूड बाजार", "पाथरूड बाज़ार"],
+  "The Pathrud market": ["पाथ्रुड बाजार", "पाथ्रुड बाज़ार"],
 
   // ---- action hints
   "Sell the load at the mandi": ["मंडीत माल विका", "मंडी में माल बेचें"],
