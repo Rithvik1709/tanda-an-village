@@ -73,7 +73,7 @@ function mirrorWork(base: string): THREE.CanvasTexture {
   return t;
 }
 /** The hero: back from the city — a checked shirt over a tee, jeans, white sneakers, a watch, a backpack. */
-export const FARMER: Look = { kurta: "#2f5f9e", dhoti: "#2c3e5c", hat: "#1a1210", hatStyle: "none", skin: "#9b6541", modern: true };
+export const FARMER: Look = { kurta: "#c4592f", dhoti: "#2b3d63", hat: "#17110d", hatStyle: "none", skin: "#9b6541", modern: true };
 
 const mats = new Map<string, THREE.MeshStandardMaterial>();
 const mat = (c: string, rough = 0.85) => {
@@ -99,6 +99,11 @@ export class Figure {
   private shoulders: THREE.Group[] = [];
   private elbows: THREE.Group[] = [];
   private head = new THREE.Group();
+  // the player's extra joints (villagers leave these empty)
+  private feet: THREE.Group[] = [];
+  private chest?: THREE.Group;
+  private bag?: THREE.Group;
+  private scarf?: THREE.Group;
   private t = Math.random() * 10;
   private shadowOn = true;
   private meshes?: THREE.Mesh[];
@@ -124,7 +129,7 @@ export class Figure {
       return;
     }
     if (look.modern) {
-      this.modern(look);
+      this.hero(look);
       mergeParts(this.root);
       return;
     }
@@ -190,80 +195,125 @@ export class Figure {
     mergeParts(this.root);
   }
 
-  private modern(look: Look) {
+  /**
+   * The player: home from the city to a Banjara tanda. A rust kurta with a cream hem and rolled
+   * sleeves over indigo jeans, white canvas sneakers, a mirror-work Banjara bag worn across the body,
+   * a checked red gamcha round the neck and a steel kada on the wrist. The rig adds what the
+   * villagers don't need: ankles that roll heel to toe, a chest that twists against the hips, and a
+   * bag and gamcha that swing on springs.
+   */
+  private hero(look: Look) {
     const b = this.body;
-    // jeans all the way down, white sneakers
+    const group = (parent: THREE.Object3D, x: number, y: number, z: number) => {
+      const g = new THREE.Group();
+      g.position.set(x, y, z);
+      parent.add(g);
+      return g;
+    };
+    const jeans = look.dhoti, cuff = "#3d5482", shoe = "#f4f1e8", sole = "#c0392b", trim = "#f1e4c4", hair = look.hat;
+
+    // legs: thigh, shin and an ankle, so the foot can strike with the heel and push off the toe
     for (const s of [-1, 1]) {
-      const hip = new THREE.Group();
-      hip.position.set(s * 0.1, 0.92, 0);
-      b.add(hip);
-      part(new THREE.CapsuleGeometry(0.075, 0.34, 4, 10), look.dhoti, hip, 0, -0.23, 0);
-      const knee = new THREE.Group();
-      knee.position.set(0, -0.46, 0);
-      hip.add(knee);
-      part(new THREE.CapsuleGeometry(0.062, 0.34, 4, 10), look.dhoti, knee, 0, -0.2, 0);
-      part(new THREE.BoxGeometry(0.11, 0.07, 0.27), "#f4f4f2", knee, 0, -0.44, 0.04, 0.5); // sneakers
-      part(new THREE.BoxGeometry(0.115, 0.02, 0.28), "#b8392b", knee, 0, -0.47, 0.04); // red soles
+      const hip = group(b, s * 0.1, 0.92, 0);
+      part(new THREE.CapsuleGeometry(0.09, 0.28, 4, 12), jeans, hip, 0, -0.22, 0);
+      const knee = group(hip, 0, -0.45, 0);
+      part(new THREE.CapsuleGeometry(0.074, 0.28, 4, 12), jeans, knee, 0, -0.19, 0);
+      part(new THREE.CylinderGeometry(0.079, 0.077, 0.05, 14), cuff, knee, 0, -0.36, 0); // a turned-up cuff
+      const ankle = group(knee, 0, -0.4, 0);
+      const upper = part(new THREE.CapsuleGeometry(0.056, 0.15, 4, 10), shoe, ankle, 0, -0.03, 0.045, 0.7);
+      upper.rotation.x = Math.PI / 2;
+      upper.scale.set(1, 1, 0.68);
+      part(new THREE.BoxGeometry(0.118, 0.026, 0.285), sole, ankle, 0, -0.064, 0.045, 0.9);
+      part(new THREE.BoxGeometry(0.05, 0.012, 0.09), "#d8d2c4", ankle, 0, 0.004, 0.06); // laces
       this.hips.push(hip);
       this.knees.push(knee);
+      this.feet.push(ankle);
     }
-    part(new THREE.CylinderGeometry(0.19, 0.19, 0.06, 18), "#2a1f18", b, 0, 0.93, 0); // a belt
-    // a white tee under an open checked shirt
-    part(lathe([[0.001, 0.9], [0.195, 0.9], [0.19, 1.05], [0.2, 1.3], [0.17, 1.4], [0.06, 1.45], [0.001, 1.45]], 22), "#f2f0ea", b);
-    const check = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.205, 0.215, 0.55, 22, 1, true, Math.PI * 0.12, Math.PI * 1.76),
-      new THREE.MeshStandardMaterial({ map: checkTex(look.kurta), roughness: 0.8, side: THREE.DoubleSide }),
-    );
-    check.position.set(0, 1.17, 0);
-    check.castShadow = true;
-    b.add(check);
-    part(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 10), look.skin, b, 0, 1.48, 0);
-    // a backpack from the city
-    part(new THREE.BoxGeometry(0.3, 0.38, 0.14), "#3a3f46", b, 0, 1.18, -0.24, 0.7);
-    for (const s of [-1, 1]) part(new THREE.BoxGeometry(0.04, 0.4, 0.03), "#2a2e33", b, s * 0.11, 1.2, -0.16);
+    part(new THREE.CapsuleGeometry(0.125, 0.09, 4, 12).rotateZ(Math.PI / 2), jeans, b, 0, 0.9, 0); // seat of the jeans
+
+    // the chest twists against the hips; arms, head, gamcha and bag ride on it
+    const chest = group(b, 0, 0.98, 0);
+    this.chest = chest;
+    const kurta = part(lathe([[0.001, -0.2], [0.205, -0.2], [0.188, -0.02], [0.2, 0.2], [0.208, 0.3], [0.185, 0.39], [0.07, 0.46], [0.001, 0.46]], 24), look.kurta, chest);
+    kurta.scale.z = 0.72;
+    const hem = part(new THREE.CylinderGeometry(0.207, 0.207, 0.035, 24, 1, true), trim, chest, 0, -0.185, 0);
+    hem.scale.z = 0.72;
+    part(new THREE.BoxGeometry(0.035, 0.17, 0.01), trim, chest, 0, 0.33, 0.141); // the placket
+    for (let i = 0; i < 3; i++) part(new THREE.SphereGeometry(0.009, 6, 4), "#5a3b22", chest, 0, 0.38 - i * 0.045, 0.148);
+    part(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 12), look.skin, chest, 0, 0.49, 0); // neck
+
+    // arms: kurta sleeves rolled to just above the elbow, bare forearms
     for (const s of [-1, 1]) {
-      const sh = new THREE.Group();
-      sh.position.set(s * 0.22, 1.36, 0);
-      b.add(sh);
-      const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, 0.24, 4, 10), new THREE.MeshStandardMaterial({ map: checkTex(look.kurta), roughness: 0.8 }));
-      sleeve.position.y = -0.14;
-      sleeve.castShadow = true;
-      sh.add(sleeve);
-      const el = new THREE.Group();
-      el.position.set(0, -0.32, 0);
-      sh.add(el);
-      part(new THREE.CapsuleGeometry(0.043, 0.22, 4, 10), look.skin, el, 0, -0.13, 0);
-      part(new THREE.SphereGeometry(0.05, 10, 8), look.skin, el, 0, -0.29, 0.01);
-      if (s < 0) part(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 12), "#1c1c1c", el, 0, -0.22, 0, 0.3); // a watch
+      const sh = group(chest, s * 0.235, 0.33, 0);
+      part(new THREE.CapsuleGeometry(0.068, 0.18, 4, 12), look.kurta, sh, 0, -0.11, 0);
+      part(new THREE.CylinderGeometry(0.073, 0.071, 0.05, 14), "#a8482a", sh, 0, -0.235, 0); // the rolled cuff
+      const el = group(sh, 0, -0.31, 0);
+      part(new THREE.CapsuleGeometry(0.045, 0.2, 4, 10), look.skin, el, 0, -0.12, 0);
+      part(new THREE.SphereGeometry(0.052, 12, 10), look.skin, el, 0, -0.285, 0.008).scale.set(0.9, 1.1, 0.8);
+      part(new THREE.SphereGeometry(0.022, 8, 6), look.skin, el, s * -0.035, -0.26, 0.035); // thumb
+      if (s < 0) part(new THREE.TorusGeometry(0.05, 0.011, 6, 16), "#c9ccd1", el, 0, -0.22, 0, 0.25).rotation.x = Math.PI / 2; // steel kada
       sh.rotation.z = s * 0.08;
       this.shoulders.push(sh);
       this.elbows.push(el);
     }
-    this.head.position.set(0, 1.53, 0);
-    b.add(this.head);
+
+    // the gamcha: draped round the neck, one end hanging down the front on a spring
+    const gamcha = new THREE.MeshStandardMaterial({ map: checkTex("#b3262f"), roughness: 0.9 });
+    const loop = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.034, 8, 20), gamcha);
+    loop.position.set(0, 0.44, 0.005);
+    loop.rotation.x = Math.PI / 2 - 0.18;
+    loop.scale.set(1, 0.82, 1);
+    loop.castShadow = true;
+    chest.add(loop);
+    const scarf = group(chest, 0.07, 0.42, 0.12);
+    const end = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.3, 0.016), gamcha);
+    end.position.set(0, -0.15, 0.012);
+    end.castShadow = true;
+    scarf.add(end);
+    this.scarf = scarf;
+
+    // the Banjara bag: strap over the left shoulder, the bag at the right hip, swinging from the shoulder
+    const bag = group(chest, -0.15, 0.39, 0);
+    const strapLen = Math.hypot(0.3, 0.42);
+    const front = part(new THREE.BoxGeometry(0.038, strapLen, 0.012), "#2a1c14", bag, 0.15, -0.21, 0.152);
+    front.rotation.z = Math.atan2(0.3, 0.42);
+    const back = part(new THREE.BoxGeometry(0.038, 0.5, 0.012), "#2a1c14", bag, 0.12, -0.2, -0.15);
+    back.rotation.z = 0.6;
+    const sack = group(bag, 0.31, -0.55, 0.13);
+    sack.rotation.y = 0.55; // follows the curve of the hip
+    part(new THREE.BoxGeometry(0.26, 0.24, 0.07), "#1f1a22", sack, 0, 0, 0, 0.95);
+    const bands = ["#c8302a", "#e8b830", "#2f8a4a"];
+    bands.forEach((c, i) => part(new THREE.BoxGeometry(0.262, 0.022, 0.072), c, sack, 0, 0.07 - i * 0.05, 0, 0.9));
+    for (let i = 0; i < 4; i++) {
+      const mirror = part(new THREE.CylinderGeometry(0.014, 0.014, 0.004, 10), "#e6edf0", sack, -0.09 + i * 0.06, -0.08, 0.037, 0.15);
+      mirror.rotation.x = Math.PI / 2;
+    }
+    for (let i = 0; i < 5; i++) part(new THREE.SphereGeometry(0.014, 6, 4), i % 2 ? "#e8b830" : "#c8302a", sack, -0.1 + i * 0.05, -0.135, 0.01); // tassels
+    this.bag = bag;
+
+    // head: an open face, brows, a short fade with a swept quiff
+    this.head.position.set(0, 0.55, 0);
+    chest.add(this.head);
     const h = this.head;
-    part(new THREE.SphereGeometry(0.115, 20, 16), look.skin, h, 0, 0.11, 0).scale.set(0.92, 1.05, 1);
-    part(new THREE.SphereGeometry(0.03, 10, 8), look.skin, h, 0, 0.1, 0.11);
+    part(new THREE.SphereGeometry(0.118, 22, 16), look.skin, h, 0, 0.115, 0).scale.set(0.93, 1.05, 1);
+    part(new THREE.SphereGeometry(0.092, 16, 12), look.skin, h, 0, 0.06, 0.018).scale.set(0.95, 0.82, 1); // jaw and chin
+    const nose = part(new THREE.CapsuleGeometry(0.017, 0.03, 3, 8), look.skin, h, 0, 0.1, 0.112);
+    nose.rotation.x = 0.35;
+    part(new THREE.BoxGeometry(0.042, 0.008, 0.01), "#6b3a2a", h, 0, 0.058, 0.103); // mouth
     for (const s of [-1, 1]) {
-      part(new THREE.SphereGeometry(0.014, 8, 6), "#1c1410", h, s * 0.042, 0.14, 0.102, 0.4);
-      part(new THREE.SphereGeometry(0.022, 8, 6), look.skin, h, s * 0.112, 0.11, 0);
+      part(new THREE.SphereGeometry(0.018, 10, 8), "#f4efe6", h, s * 0.042, 0.135, 0.098, 0.4).scale.set(1.2, 0.85, 0.6); // eye whites
+      part(new THREE.SphereGeometry(0.011, 8, 6), "#1c1410", h, s * 0.042, 0.135, 0.108, 0.3);
+      const brow = part(new THREE.BoxGeometry(0.046, 0.011, 0.012), hair, h, s * 0.044, 0.168, 0.104);
+      brow.rotation.z = s * -0.12;
+      part(new THREE.SphereGeometry(0.024, 8, 6), look.skin, h, s * 0.113, 0.11, -0.005).scale.set(0.6, 1, 1); // ears
     }
-    // a clean-shaven face and a modern cut: short faded back and sides, textured and pushed up at the front
-    // the hair shell is tilted back: it covers the crown and the back of the head low, the forehead high
-    const cap = part(new THREE.SphereGeometry(0.122, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), look.hat, h, 0, 0.115, -0.006);
-    cap.rotation.x = -0.45;
-    cap.scale.set(1.02, 1, 1.03);
-    // a short side-parted fringe at the front
-    const fringe = part(new THREE.SphereGeometry(0.06, 12, 8), look.hat, h, 0.03, 0.205, 0.07);
-    fringe.scale.set(1.5, 0.45, 0.8);
-    // wayfarer sunglasses
-    const shades = "#101216";
-    for (const s2 of [-1, 1]) {
-      const lens = part(new THREE.BoxGeometry(0.068, 0.04, 0.012), shades, h, s2 * 0.043, 0.138, 0.112, 0.2);
-      lens.rotation.y = s2 * 0.12;
-      part(new THREE.BoxGeometry(0.008, 0.012, 0.12), shades, h, s2 * 0.1, 0.145, 0.055, 0.3); // the arms back to the ears
+    const cap = part(new THREE.SphereGeometry(0.125, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), hair, h, 0, 0.118, -0.008);
+    cap.rotation.x = -0.4;
+    cap.scale.set(1.02, 1, 1.04);
+    // the quiff: a few soft lumps, swept to his right
+    for (const [x, y, z, sx] of [[0.02, 0.215, 0.05, 1.6], [-0.04, 0.22, 0.02, 1.3], [0.05, 0.205, -0.02, 1.2]] as const) {
+      part(new THREE.SphereGeometry(0.055, 12, 8), hair, h, x, y, z).scale.set(sx, 0.55, 1);
     }
-    part(new THREE.BoxGeometry(0.03, 0.01, 0.01), shades, h, 0, 0.148, 0.114, 0.3); // the bridge
   }
 
   private woman(look: Look) {
@@ -389,23 +439,62 @@ export class Figure {
     this.props.set(kind, g);
   }
 
-  animate(dt: number, speed: number) {
-    const walking = Math.min(1, speed / 3.5);
-    this.t += dt * (speed > 0.2 ? 1.6 + speed * 1.2 : 1);
-    const ph = this.t * (speed > 0.2 ? 4.2 : 0);
-    const swing = Math.sin(ph) * 0.55 * walking;
-    this.hips[0].rotation.x = swing;
-    this.hips[1].rotation.x = -swing;
-    this.knees[0].rotation.x = Math.max(0, -Math.sin(ph + 0.9)) * 0.7 * walking;
-    this.knees[1].rotation.x = Math.max(0, Math.sin(ph + 0.9)) * 0.7 * walking;
-    this.shoulders[0].rotation.x = -swing * 0.8;
-    this.shoulders[1].rotation.x = swing * 0.8;
-    this.elbows[0].rotation.x = -0.25 - Math.max(0, swing) * 0.4;
-    this.elbows[1].rotation.x = -0.25 - Math.max(0, -swing) * 0.4;
-    // a walk bob, and slow breathing when still
-    this.body.position.y = Math.abs(Math.cos(ph)) * 0.035 * walking + Math.sin(this.t * 1.6) * 0.004;
-    this.head.rotation.y = Math.sin(this.t * 0.35) * 0.15 * (1 - walking);
-    this.body.rotation.x = 0;
+  /** Walk phase in radians: one step per half cycle, advanced by distance so the feet keep pace with the ground. */
+  private phase = Math.random() * Math.PI * 2;
+  private lastSpeed = 0;
+
+  /** How far one step carries the body at a given speed (m): about 1.4 m at a brisk walk, 2.1 m at a run. */
+  static stepLength(speed: number) {
+    return Math.min(2.2, Math.max(0.5, 0.55 + 0.25 * speed));
+  }
+
+  // springs for the player's bag and gamcha: [angle, velocity]
+  private bagFwd = [0, 0];
+  private bagSide = [0, 0];
+  private scarfSwing = [0, 0];
+  private lean = 0;
+  private accelS = 0;
+  private airPose = 0;
+
+  /**
+   * `turn`: how fast the body is turning (rad/s, positive to the left), to lean into it.
+   * `air`: 1 while off the ground, for the jump pose. Both only matter for the player's rig.
+   */
+  animate(dt: number, speed: number, motion: { turn?: number; air?: number } = {}) {
+    const smooth = (a: number, b: number, x: number) => {
+      const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    };
+    const walking = smooth(0.15, 1.2, speed);
+    const run = smooth(3.6, 6, speed);
+    this.t += dt;
+    this.phase += ((Math.PI * speed) / Figure.stepLength(speed)) * dt;
+    const s = Math.sin(this.phase), c = Math.cos(this.phase);
+    // hips: forward is negative x. Leg 0 swings forward while cos > 0, leg 1 half a cycle behind,
+    // and the swinging leg lifts its knee to clear the ground while the other carries the body.
+    const stride = (0.42 + 0.2 * run) * walking;
+    const lift = (0.55 + 0.6 * run) * walking;
+    this.hips[0].rotation.x = -s * stride;
+    this.hips[1].rotation.x = s * stride;
+    this.knees[0].rotation.x = 0.04 * walking + Math.max(0, c) ** 1.5 * lift;
+    this.knees[1].rotation.x = 0.04 * walking + Math.max(0, -c) ** 1.5 * lift;
+    // arms swing against the legs, and bend more as the pace picks up
+    const arm = (0.4 + 0.35 * run) * walking;
+    this.shoulders[0].rotation.x = s * arm;
+    this.shoulders[1].rotation.x = -s * arm;
+    this.elbows[0].rotation.x = -0.2 - (0.15 + 0.9 * run) * walking - Math.max(0, -s) * 0.25 * walking;
+    this.elbows[1].rotation.x = -0.2 - (0.15 + 0.9 * run) * walking - Math.max(0, s) * 0.25 * walking;
+    // the body dips as the legs spread and rises over the planted foot (twice a cycle), leans into
+    // the pace and into speeding up, and the hips twist against the shoulders
+    const accel = dt > 0 ? (speed - this.lastSpeed) / dt : 0;
+    this.lastSpeed = speed;
+    const posed = this.action === "none" ? 1 : 0;
+    this.body.position.y = (-Math.abs(s) * 0.04 + 0.02) * walking - run * 0.02 + Math.sin(this.t * 1.6) * 0.004 * (1 - walking);
+    this.body.rotation.x = (0.03 * walking + 0.07 * run + THREE.MathUtils.clamp(accel * 0.012, -0.08, 0.08)) * posed;
+    this.body.rotation.y = s * 0.07 * walking * posed;
+    if (this.chest) this.extras(dt, speed, s, c, walking, run, accel, posed, motion);
+    // the head steadies itself against the twist, and glances around when standing
+    this.head.rotation.y = -s * 0.06 * walking + Math.sin(this.t * 0.35) * 0.15 * (1 - walking);
     // poses may spread the arms; every frame starts from the shoulders' resting angle
     this.restZ ??= this.shoulders.map((sh) => sh.rotation.z);
     this.shoulders.forEach((sh, i) => (sh.rotation.z = this.restZ![i]));
@@ -481,6 +570,65 @@ export class Figure {
         this.elbows[0].rotation.x = -0.8;
       }
     }
+  }
+
+  /** The player's rig on top of the shared walk: feet, chest, lean, jump, and the swinging bag and gamcha. */
+  private extras(dt: number, speed: number, s: number, c: number, walking: number, run: number, accel: number, posed: number, motion: { turn?: number; air?: number }) {
+    const k = (rate: number) => 1 - Math.exp(-rate * dt);
+    const ramp = (a: number, b: number, x: number) => {
+      const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    };
+    // Lean into acceleration and into speed; bank into turns. The logic is SADAK's hero animator
+    // (github.com/mittal-parth/sadak, used with its developer's permission), with its speeds mapped
+    // onto ours: SADAK walks at 4.6 m/s and sprints at 12, we walk at 3.4 and run at 6.2.
+    const toSadak = 12 / 6.2;
+    const sRun = ramp(2.2, 4.6, speed * toSadak), sSprint = ramp(5.5, 9.5, speed * toSadak);
+    this.accelS += (accel - this.accelS) * k(10); // frame-to-frame speed is noisy; smooth it first
+    const lean = THREE.MathUtils.clamp(this.accelS * 0.009 + sRun * 0.1 + sSprint * 0.12, -0.2, 0.3) * posed;
+    const bank = THREE.MathUtils.clamp(-(motion.turn ?? 0) * speed * toSadak * 0.02, -0.25, 0.25) * posed;
+    const pelvisRoll = s * (0.03 + 0.02 * sRun) * walking * posed;
+    this.lean += (bank - this.lean) * k(12);
+    this.body.rotation.x = lean * 0.4;
+    this.body.rotation.z = pelvisRoll + this.lean;
+    for (const hip of this.hips) hip.rotation.x -= lean * 0.4; // the legs stay under the body
+    this.chest!.rotation.x = lean; // the spine and chest take the rest of the lean
+    this.chest!.rotation.z = -pelvisRoll - this.lean * 0.5; // the chest rights itself half way
+    this.head.rotation.x = -lean * 0.7; // and the head keeps its gaze level
+    this.head.rotation.z = -this.lean * 0.4;
+    // heel strike as a leg reaches forward, toe-off as it leaves the ground behind, and the foot
+    // otherwise kept level under a bent knee
+    this.feet.forEach((f, i) => {
+      const fwd = i === 0 ? s : -s; // 1 = this leg fully forward
+      const level = -(this.hips[i].rotation.x + this.knees[i].rotation.x) * 0.85;
+      f.rotation.x = (level - Math.max(0, fwd) ** 2 * 0.28 + Math.max(0, -fwd) ** 2 * 0.42) * walking * posed;
+    });
+    // the chest turns against the hips, so the shoulders swing with the opposite arm
+    this.chest!.rotation.y = -s * 0.17 * walking * posed;
+    // in the air: knees tucked, arms up and out for balance
+    this.airPose += ((motion.air ?? 0) * posed - this.airPose) * k(motion.air ? 18 : 10);
+    const a = this.airPose;
+    if (a > 0.01) {
+      this.hips[0].rotation.x -= a * 0.7;
+      this.hips[1].rotation.x -= a * 0.15;
+      this.knees[0].rotation.x += a * 1.1;
+      this.knees[1].rotation.x += a * 0.45;
+      this.shoulders.forEach((sh, i) => {
+        sh.rotation.x -= a * 0.6;
+        sh.rotation.z += (i === 0 ? -1 : 1) * a * 0.45;
+      });
+    }
+    // springs: the bag swings back as you set off and forward as you stop, sways with each step and
+    // swings out on turns; the gamcha end flaps with the bob
+    const h = Math.min(dt, 1 / 30); // springs stay stable through a hitch
+    const spring = (st: number[], stiff: number, damping: number, drive: number, rest: number) => {
+      st[1] += (-stiff * (st[0] - rest) - damping * st[1] + drive) * h;
+      st[0] = THREE.MathUtils.clamp(st[0] + st[1] * h, -1, 1);
+      return st[0];
+    };
+    this.bag!.rotation.x = spring(this.bagFwd, 30, 5, -accel * 0.5 + Math.abs(c) * 5 * walking, 0.04 + run * 0.12);
+    this.bag!.rotation.z = spring(this.bagSide, 26, 5, s * 7 * walking + (motion.turn ?? 0) * 4, 0);
+    this.scarf!.rotation.x = spring(this.scarfSwing, 40, 6, Math.abs(c) * 9 * walking - accel * 0.4, -0.08 - run * 0.35);
   }
 
   /** Where the rod's tip is in the world (for the fishing line), or null without a rod in hand. */

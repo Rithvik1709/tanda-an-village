@@ -96,9 +96,21 @@ export class Controls {
     });
   }
 
+  /** How far you can look up and down. Third person narrows it (the camera rises rather than tips). */
+  pitchMin = -1.55;
+  pitchMax = 1.55;
+  private pendingX = 0;
+  private pendingY = 0;
+  /** Mouse (or touch) movement is only added up here; `applyLook` turns the view once per frame. A
+   *  1000 Hz mouse would otherwise turn it a dozen times between renders, which tears on fast turns. */
   look(dx: number, dy: number) {
-    this.yaw -= dx * this.sensitivity;
-    this.pitch = Math.max(-1.55, Math.min(1.55, this.pitch - dy * this.sensitivity));
+    this.pendingX += dx;
+    this.pendingY += dy;
+  }
+  applyLook() {
+    this.yaw -= this.pendingX * this.sensitivity;
+    this.pitch = Math.max(this.pitchMin, Math.min(this.pitchMax, this.pitch - this.pendingY * this.sensitivity));
+    this.pendingX = this.pendingY = 0;
   }
 
   /** Analog input from touch controls (added to the keys). */

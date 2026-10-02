@@ -227,8 +227,14 @@ export class Kabaddi {
   }
 
   /** No match: the boys jog round the court, stretch, and chat on the touchline. */
+  private jogT = 0;
   private practise(dt: number) {
-    const cx = (COURT.x0 + COURT.x1) / 2, cz = COURT.mid, rx = (COURT.x1 - COURT.x0) / 2 + 0.6, rz = (COURT.z1 - COURT.z0) / 2 + 0.4;
+    // the loop runs just inside the court lines, clear of the boys stretching on the touchline
+    const cx = (COURT.x0 + COURT.x1) / 2, cz = COURT.mid, rx = (COURT.x1 - COURT.x0) / 2 - 0.8, rz = (COURT.z1 - COURT.z0) / 2 - 0.8;
+    // the joggers share the loop evenly (a fixed gap per boy wrapped round and stacked two of them
+    // on the same spot)
+    const joggers = this.boys.filter((b, i) => b.team !== "ref" && i % 3 !== 2);
+    this.jogT += dt; // one clock for the whole loop, so the gaps hold
     this.boys.forEach((b, i) => {
       b.idle += dt;
       if (b.team === "ref") {
@@ -246,7 +252,7 @@ export class Kabaddi {
         return;
       }
       // a slow jog round the court, one behind the other
-      const a = b.idle * 0.22 + i * 0.9;
+      const a = this.jogT * 0.22 + (joggers.indexOf(b) / joggers.length) * Math.PI * 2;
       const nx = cx + Math.cos(a) * rx, nz = cz + Math.sin(a) * rz;
       b.heading = Math.atan2(nx - b.pos.x, nz - b.pos.z);
       b.speed = Math.hypot(nx - b.pos.x, nz - b.pos.z) / Math.max(dt, 1e-3);

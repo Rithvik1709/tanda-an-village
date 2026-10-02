@@ -94,6 +94,10 @@ export class Guide {
   private claiming = "";
   /** A place picked on the map: the marker and the arrow guide you there instead, until you arrive. */
   waypoint: { x: number; y: number; z: number; label: string } | null = null;
+  /** Where the current mission's next step wants you (null when the story has nowhere to point). */
+  get objective() {
+    return this.target;
+  }
   /** Set by the game when you're standing near the person who asks you to choose. */
   nearChoice = false;
   onToast: (m: string, k: "ok" | "bad") => void = () => {};
@@ -288,12 +292,12 @@ export class Guide {
       y *= k;
     }
     const ang = Math.atan2(-y, x);
-    // never on top of the goal card, or under a thumb on a phone
+    // never on top of the goal card or the minimap, or under a thumb on a phone
     const box = this.arrow.parentElement!.getBoundingClientRect();
     let ax = (x * 0.5 + 0.5) * box.width, ay = (-y * 0.5 + 0.5) * box.height;
     // (the arrow is centred on its point, so test its whole box, from its size last frame)
     const hw = (this.arrow.offsetWidth || 120) / 2 + 4, hh = (this.arrow.offsetHeight || 26) / 2 + 4;
-    for (const sel of [".goal", ".touch:not([hidden]) .t-stick", ".touch:not([hidden]) .t-use", ".touch:not([hidden]) .t-pad", ".touch:not([hidden]) .t-jump"]) {
+    for (const sel of [".goal", ".minimap:not([hidden])", ".touch:not([hidden]) .t-stick", ".touch:not([hidden]) .t-use", ".touch:not([hidden]) .t-pad", ".touch:not([hidden]) .t-jump"]) {
       const o = document.querySelector(sel)?.getBoundingClientRect();
       if (!o || !o.width) continue;
       const l = o.left - box.left, r = o.right - box.left, t = o.top - box.top, b = o.bottom - box.top;

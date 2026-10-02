@@ -25,6 +25,7 @@ import { Post } from "./scene/post";
 import { FARMER, Figure } from "./scene/figure";
 import { Walker } from "./player/walker";
 import { CameraRig } from "./player/camera-rig";
+import { MiniMap } from "./ui/minimap";
 import { skyColors, sunDirection } from "./engine/sky";
 import { Hud } from "./ui/hud";
 import { Npc } from "./engine/npc";
@@ -746,6 +747,8 @@ panels.onClose = () => resumePlay();
 
 // ---- the map (M) and the for-sale boards at plot gates ----
 const map = new MapView(document.getElementById("ui")!, world);
+const minimap = new MiniMap(document.getElementById("ui")!, () => map.sheet());
+minimap.onOpen = () => showMap();
 map.onClose = () => (panels.open ? hud.setPlaying(true) : resumePlay());
 map.onPick = (p) => {
   guide.waypoint = { x: p.x, y: hf.at(p.x, p.z), z: p.z, label: `📍 ${p.label}` };
@@ -753,12 +756,16 @@ map.onPick = (p) => {
   hud.toast(`Marker set: ${p.label} — follow the arrow`);
   audio.play("buy");
 };
-function showMap() {
-  closeWindows();
+/** Neighbours with a job for you today, and the mukadam once you have enough land. */
+function kaamSpots() {
   const kaam: { x: number; z: number; label: string }[] = jobs.open().map((id) => ({ ...jobs.spots().find((g) => g.id === id)!, label: GIVERS[id].name }));
   if (game.save.plots.length >= HELPER_MIN_PLOTS) kaam.push({ ...helpers.mukadamAt, label: "Mukadam · labourers" });
+  return kaam;
+}
+function showMap() {
+  closeWindows();
   map.waypoint = guide.waypoint;
-  map.show(game.save, clock(game.now()).day, { x: body.pos.x, z: body.pos.z, yaw: controls.yaw }, kaam, game.now());
+  map.show(game.save, clock(game.now()).day, { x: body.pos.x, z: body.pos.z, yaw: controls.yaw }, kaamSpots(), game.now(), guide.objective);
   hud.setPlaying(true);
   releaseMouse();
 }
@@ -1622,6 +1629,10 @@ renderer.setAnimationLoop(() => {
   frameTimes.push(now - last);
   if (frameTimes.length > 240) frameTimes.shift();
   last = now;
+  // looking around: once per frame, and in third person the camera rises to look down rather than tipping
+  controls.pitchMin = rig.view === "third" ? -0.85 : -1.55;
+  controls.pitchMax = rig.view === "third" ? 0.15 : 1.55;
+  controls.applyLook();
   farmyard.set(!!game.save.bulls, !!game.save.inv.cart);
   farmyard.mistryAt = helpers.cartRun(); // the mistry driving the cart to the mandi and back
   const tb = game.save.bulls?.tied;
@@ -1657,7 +1668,7 @@ renderer.setAnimationLoop(() => {
       fishing.update(dt, controls.held.has("Space"), !windowOpen() && (wants.forward !== 0 || wants.right !== 0), nowHour(), body.pos);
       body.heading = fishing.heading;
     }
-    rig.update(dt, body.pos, controls.yaw, controls.pitch);
+    rig.update(dt, body.pos, controls.yaw, controls.pitch, undefined, body.vel, walker.floorAt(body.pos.x, body.pos.z, body.pos.y));
     // aim along the crosshair; you can only reach what's near your farmer
     const ray = rig.ray();
     const cur = hotbar.current;
@@ -1783,15 +1794,19 @@ renderer.setAnimationLoop(() => {
     touch.setUse(kabaddi.active ? tr("Tag") : sm ? smartLabel(sm) : tr("Use"));
     touch.setTag(null);
   }
+  minimap.visible = mode === "play" && !titleScreen.open && !windowOpen() && !map.open && !farmyard.ride;
+  minimap.update(now, { x: body.pos.x, z: body.pos.z, yaw: controls.yaw }, guide.objective, kaamSpots, guide.waypoint);
   farmer.root.position.set(body.pos.x, body.pos.y, body.pos.z);
   farmer.root.rotation.y = body.heading;
-  farmer.visible = mode !== "title" && (rig.view === "third" || !!farmyard.ride);
+  farmer.visible = mode !== "title" && (rig.view === "third" || !!farmyard.ride) && !rig.tooClose;
   if (farmyard.ride) {
     // sitting on the cart, facing the road
     farmer.root.position.set(farmyard.seat().x, farmyard.seat().y - 0.95, farmyard.seat().z);
     farmer.root.rotation.y = farmyard.pos.heading;
   }
-  farmer.animate(dt, farmyard.ride ? 0 : body.speed);
+  // how fast the body is turning, so the farmer banks into turns; off the ground, the jump pose
+  const riding = !!farmyard.ride || !!seat;
+  farmer.animate(dt, farmyard.ride ? 0 : body.speed, { turn: riding ? 0 : body.turn, air: !riding && !body.onGround && body.wading < 0.3 ? 1 : 0 });
   worldRenderer.flush();
   const hour = hourOverride ?? (mode === "title" ? 17.4 : clock(game.now()).hour);
   sky.update(hour, dt, mode === "play" ? new THREE.Vector3(body.pos.x, body.pos.y, body.pos.z) : camera.position);

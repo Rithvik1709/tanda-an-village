@@ -7,12 +7,16 @@ import type { Input } from "./physics";
  */
 export type Ground = (x: number, z: number) => number;
 export type Solid = (x: number, y: number, z: number) => boolean;
+/** Body turn-rate limits, rad/s: brisk from a standstill, wider at a run. */
+const TURN_SLOW = 14, TURN_FAST = 6;
 export const WALK = { walk: 3.4, run: 6.2, jump: 5.2, gravity: 16, radius: 0.3, height: 1.7, step: 0.55 };
 
 export class Walker {
   pos = { x: 0, y: 0, z: 0 };
   vel = { x: 0, y: 0, z: 0 };
   heading = 0; // the way the body faces (0 = +z)
+  /** How fast the body turned on the last step, rad/s (positive = to the left). */
+  turn = 0;
   onGround = false;
   wading = 0; // water depth at the feet
 
@@ -52,11 +56,15 @@ export class Walker {
     const k = 1 - Math.exp(-(this.onGround || this.wading > 1.1 ? 12 : 3) * dt);
     this.vel.x += (wx * speed - this.vel.x) * k;
     this.vel.z += (wz * speed - this.vel.z) * k;
-    if (len > 0) {
-      const want = Math.atan2(wx, wz);
-      const d = Math.atan2(Math.sin(want - this.heading), Math.cos(want - this.heading));
-      this.heading += d * Math.min(1, dt * 10);
-    }
+    // face the way you're travelling, at a turn rate that narrows with speed: brisk from a
+    // standstill, carving at a run instead of snapping round (after SADAK's movement, by permission)
+    const moving = Math.hypot(this.vel.x, this.vel.z);
+    const face = moving > 0.15 ? Math.atan2(this.vel.x, this.vel.z) : len > 0 ? Math.atan2(wx, wz) : this.heading;
+    const want = Math.atan2(Math.sin(face - this.heading), Math.cos(face - this.heading));
+    const maxTurn = (TURN_SLOW + (TURN_FAST - TURN_SLOW) * Math.min(1, moving / WALK.run)) * dt;
+    const turned = Math.max(-maxTurn, Math.min(maxTurn, want));
+    this.heading += turned;
+    this.turn = turned / Math.max(dt, 1e-4);
 
     // horizontal moves, one axis at a time, with a small step-up
     for (const axis of ["x", "z"] as const) {

@@ -45,7 +45,15 @@ class Villager {
   private speed = 0.95; // an easy village pace (you walk at 3.4)
   private path: Pt[] = [];
   private stuck = 0;
+  // steering memory, so a crowded lane doesn't make someone flip direction every frame
+  private dir: Pt | null = null;
+  private side = 1;
+  private waited = 0;
+  private gait = 0;
   movedF = 0;
+  /** Times the walk direction reversed between frames (a shuffle back and forth). */
+  flips = 0;
+  private lastMove: Pt | null = null;
   blockedF = 0;
 
   constructor(look: Look, public role: Role, start: Pt, private scale = 0) {
@@ -63,12 +71,14 @@ class Villager {
     const r = this.role;
     const fig = this.fig;
     let moving = false;
+    const from = { x: this.pos.x, z: this.pos.z };
     const step = (p: Pt, speed: number) => {
       let dx = p.x - this.pos.x, dz = p.z - this.pos.z;
       const d = Math.hypot(dx, dz);
       if (d < 0.2) return true;
       dx /= d;
       dz /= d;
+      let clearAhead = 9;
       // someone in the way? veer to your right to pass them, as people do on a lane
       for (const o of others) {
         if (o === this) continue;
@@ -77,6 +87,7 @@ class Villager {
         if (od > 1.6 || od < 1e-4) continue;
         const ahead = (ox * dx + oz * dz) / od;
         if (ahead < 0.3) continue;
+        if (ahead > 0.6) clearAhead = Math.min(clearAhead, od);
         const w = (1 - od / 1.6) * ahead;
         const rx = dz, rz = -dx; // right-hand side
         dx += rx * w;
@@ -85,10 +96,32 @@ class Villager {
         dx /= l;
         dz /= l;
       }
-      const k = Math.min(d, speed * dt);
-      // blocked straight ahead (a wall, a well ring, a fence post)? turn and try the nearest open way
+      // ease into the new direction over a few frames instead of snapping to it
+      if (!this.dir) this.dir = { x: dx, z: dz };
+      const e = Math.min(1, dt * 7);
+      this.dir.x += (dx - this.dir.x) * e;
+      this.dir.z += (dz - this.dir.z) * e;
+      const dl = Math.hypot(this.dir.x, this.dir.z) || 1;
+      this.dir.x /= dl;
+      this.dir.z /= dl;
+      dx = this.dir.x;
+      dz = this.dir.z;
+      let k = Math.min(d, speed * dt);
+      // someone right in front: slow and wait a moment for them, as people do, rather than
+      // shuffling round them; if they don't move off, go round
+      if (clearAhead < 1.15 && this.waited < 1.5) {
+        const f = Math.min(1, Math.max(0, (clearAhead - 0.6) / 0.55));
+        k *= f;
+        if (f < 0.05) {
+          this.waited += dt;
+          return false;
+        }
+      } else if (clearAhead >= 1.15) this.waited = 0;
+      // blocked straight ahead (a wall, a well ring, a fence post)? turn and try the nearest open way,
+      // trying the side that worked last time first so the choice doesn't flip frame to frame
       let moved = false;
-      for (const turn of [0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6]) {
+      const sd = this.side;
+      for (const turn of [0, 0.5 * sd, -0.5 * sd, 1.0 * sd, -1.0 * sd, 1.6 * sd, -1.6 * sd]) {
         const c = Math.cos(turn), sn = Math.sin(turn);
         const tx = dx * c - dz * sn, tz = dx * sn + dz * c;
         const nx = this.pos.x + tx * k, nz = this.pos.z + tz * k;
@@ -97,6 +130,7 @@ class Villager {
         this.pos.z = nz;
         dx = tx;
         dz = tz;
+        if (turn) this.side = Math.sign(turn);
         moved = true;
         break;
       }
@@ -163,7 +197,17 @@ class Villager {
     }
     this.place(ground);
     fig.root.rotation.y = this.heading;
-    fig.animate(dt, moving ? this.speed : 0);
+    {
+      const mx = this.pos.x - from.x, mz = this.pos.z - from.z, ml = Math.hypot(mx, mz);
+      if (ml > 1e-4) {
+        if (this.lastMove && (mx * this.lastMove.x + mz * this.lastMove.z) / ml < -0.2) this.flips++;
+        this.lastMove = { x: mx / ml, z: mz / ml };
+      }
+    }
+    // legs follow how fast they really moved, eased, so a pause or a slow-down doesn't flicker the walk
+    const v = Math.hypot(this.pos.x - from.x, this.pos.z - from.z) / Math.max(dt, 1e-3);
+    this.gait += ((moving ? Math.min(v, this.speed * 1.5) : 0) - this.gait) * Math.min(1, dt * 8);
+    fig.animate(dt, this.gait);
   }
 }
 
@@ -253,7 +297,7 @@ export class Villagers {
 
   debug() {
     const walking = this.people.filter((p) => p.movedF + p.blockedF > 0);
-    return { blockedShare: walking.reduce((a, p) => a + p.blockedF, 0) / Math.max(1, walking.reduce((a, p) => a + p.movedF + p.blockedF, 0)), worstStuck: Math.max(...walking.map((p) => p.blockedF / (p.movedF + p.blockedF))), walkers: walking.length, worked: this.worked, visible: this.people.filter((p) => p.fig.root.visible).length, plants: this.fields.group.children.map((c) => (c as THREE.InstancedMesh).count).filter(Boolean) };
+    return { blockedShare: walking.reduce((a, p) => a + p.blockedF, 0) / Math.max(1, walking.reduce((a, p) => a + p.movedF + p.blockedF, 0)), worstStuck: Math.max(...walking.map((p) => p.blockedF / (p.movedF + p.blockedF))), flips: this.people.reduce((a, p) => a + p.flips, 0), worstFlips: Math.max(...this.people.map((p) => p.flips)), walkers: walking.length, worked: this.worked, visible: this.people.filter((p) => p.fig.root.visible).length, plants: this.fields.group.children.map((c) => (c as THREE.InstancedMesh).count).filter(Boolean) };
   }
 
   /** Everyone a walker should steer round: other villagers, the player, the stall keepers. */

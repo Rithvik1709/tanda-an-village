@@ -1,7 +1,7 @@
 /**
  * Headless real-Chrome screenshots + smoke checks. Fails (exit 1) on page errors or if the game never
  * reports ready. The game exposes window.__bailgaadi with ready flags and optional test hooks.
- *   node scripts/shots.mjs [--url http://localhost:5190] [--name tag] [--eval "js to run after ready"]
+ *   node scripts/shots.mjs [--url http://localhost:5190] [--name tag] [--init "js before load"] [--eval "js to run after ready"]
  */
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
@@ -28,6 +28,9 @@ await page.exposeFunction("__shot", async (n) => {
   await page.screenshot({ path: `out/${n}.png` });
   console.log(`shot out/${n}.png`);
 });
+// --init "js" runs before the game loads (e.g. to set saved settings)
+const init = opt("--init", "");
+if (init) await page.addInitScript(init);
 await page.goto(url, { waitUntil: "load" });
 await page.waitForFunction(() => window.__bailgaadi?.ready === true, null, { timeout: 60_000 });
 if (script) {
