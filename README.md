@@ -52,8 +52,8 @@ Created by **[Gajanan Rathod](https://github.com/gajanansr)**.
   a bamboo gal. Cast, strike when the float dips, and play the fish in without snapping the line.
 - **Banjara culture.** Mirror-work ghaghras, bangles and coin-edged odhnis, torans over the doors,
   Teej sprout baskets, and the Naik who heads the tanda.
-- **Saves and a leaderboard.** You start instantly as a guest. A recovery code moves your farm to
-  another device, and a public leaderboard ranks farmers by net worth.
+- **Saves and a leaderboard.** You start instantly as a guest, and signing in with Google or email
+  keeps your farm on any device. A public leaderboard ranks farmers by net worth.
 - **Look and sound.** Smooth terrain, wind-blown grass, painted skies, bloom and colour grading.
   Every sound is synthesized in WebAudio.
 

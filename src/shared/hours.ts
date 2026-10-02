@@ -11,7 +11,7 @@ export const SHOP_HOURS: Record<string, Hours> = {
   panchayat: { open: 9, close: 18, name: "The Sarpanch's desk at Rathod Bhuvan" },
   bank: { open: 9, close: 18, name: "The Sahakari Bank" },
   sahukar: { open: 7, close: 21, name: "Sahukar Motilal" },
-  town: { open: 5, close: 21, name: "The Jalna mandi" },
+  town: { open: 5, close: 21, name: "The Pathrud market" },
 };
 
 export const isOpen = (kind: string, hour: number) => {

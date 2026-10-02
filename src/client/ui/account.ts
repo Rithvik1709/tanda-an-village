@@ -19,7 +19,7 @@ export class AccountCard {
   onEmail: (email: string) => Promise<string | null> = async () => null;
   onSignOut: () => void = () => {};
 
-  constructor(parent: HTMLElement, private info: () => { account: AccountInfo | null; code: string; enabled: boolean }) {
+  constructor(parent: HTMLElement, private info: () => { account: AccountInfo | null; enabled: boolean }) {
     this.el = document.createElement("div");
     this.el.className = "panel account-card";
     this.el.hidden = true;
@@ -80,20 +80,19 @@ export class AccountCard {
     this.mission = mission;
     this.open = true;
     this.el.hidden = false;
-    const { account, code, enabled } = this.info();
+    const { account, enabled } = this.info();
     if (account) {
       const how = account.provider === "google" ? "your Google account" : "your email";
       this.el.innerHTML = `<div class="panel-card"><button class="x" data-close>✕</button>
         <div class="ac-icon">✅</div><h2>Your farm is saved</h2>
         <p class="lede">It's saved to ${how}, <b>${esc(account.email)}</b>. Sign in with it on any phone or computer and carry on where you left off.</p>
-        <div class="big-acts"><button data-close class="pm-primary">Back to the farm</button><button data-signout class="ghost">Sign out of this device</button></div>
-        <details class="ac-code"><summary>Recovery code</summary><p>Also works without signing in: <code>${esc(code)}</code></p></details></div>`;
+        <div class="big-acts"><button data-close class="pm-primary">Back to the farm</button><button data-signout class="ghost">Sign out of this device</button></div></div>`;
       return;
     }
     if (!enabled) {
       this.el.innerHTML = `<div class="panel-card"><button class="x" data-close>✕</button>
-        <div class="ac-icon">🔑</div><h2>Your recovery code</h2>
-        <p class="lede">Signing in isn't available right now. Keep this code; it brings your farm back on any device: <code class="big-code">${esc(code)}</code></p>
+        <div class="ac-icon">🌾</div><h2>Saving to an account isn't available right now</h2>
+        <p class="lede">Your farm is kept on this device. Try again later to save it to your account.</p>
         <div class="big-acts"><button data-close>Back to the farm</button></div></div>`;
       return;
     }
@@ -105,8 +104,7 @@ export class AccountCard {
       <form class="ac-email"><input type="email" name="email" placeholder="you@example.com" autocomplete="email" inputmode="email" required><button>Email me a link</button></form>
       <div class="ac-msg"></div>
       <p class="ac-legal">By signing in you agree to the <a href="/terms" target="_blank" rel="noopener">terms</a>. We keep only your email to save your farm: <a href="/privacy" target="_blank" rel="noopener">privacy</a>.</p>
-      ${prompted ? `<button class="ac-later" data-later>Maybe later</button>` : ""}
-      <details class="ac-code"><summary>Or keep your recovery code</summary><p>Without signing in, this code is the only way back to your farm: <code>${esc(code)}</code></p></details></div>`;
+      ${prompted ? `<button class="ac-later" data-later>Maybe later</button>` : ""}</div>`;
   }
 
   close() {

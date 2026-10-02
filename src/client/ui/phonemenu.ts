@@ -1,15 +1,14 @@
 /*
  * The phone menu (☰): everything the desktop pause panel and keyboard shortcuts give you, as big
- * buttons — and your recovery code.
+ * buttons.
  */
 export class PhoneMenu {
   private el: HTMLElement;
   open = false;
   onPick: (what: "map" | "board" | "help" | "settings" | "view" | "torch" | "account" | "log") => void = () => {};
-  onRestore: (code: string) => Promise<string | null> = async () => null;
   onClose: () => void = () => {};
 
-  constructor(parent: HTMLElement, private code: () => string) {
+  constructor(parent: HTMLElement) {
     this.el = document.createElement("div");
     this.el.className = "panel phone-menu";
     this.el.hidden = true;
@@ -20,20 +19,8 @@ export class PhoneMenu {
       if (t === this.el || t.closest("[data-close]")) return this.close();
       if (!b) return;
       const m = b.dataset.m!;
-      if (m === "copy") {
-        await navigator.clipboard?.writeText(this.code()).catch(() => {});
-        b.textContent = "Copied ✓";
-        return;
-      }
       this.close();
       this.onPick(m as "map");
-    });
-    this.el.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const f = e.target as HTMLFormElement;
-      const msg = this.el.querySelector(".pm-msg")!;
-      msg.textContent = "Checking…";
-      msg.textContent = (await this.onRestore((f.code as HTMLInputElement).value)) ?? "Loading that farm…";
     });
   }
 
@@ -54,9 +41,6 @@ export class PhoneMenu {
         <button data-m="help">How to play</button>
         <button data-m="settings">Settings</button>
       </div>
-      <div class="pm-code"><span>Your farm is saved online. Recovery code</span><code>${this.code()}</code><button data-m="copy">Copy</button></div>
-      <form class="pm-restore"><input name="code" placeholder="Have a code? XXXX-XXXX-XXXX" maxlength="16" autocomplete="off"><button>Continue that farm</button></form>
-      <div class="pm-msg"></div>
     </div>`;
   }
 

@@ -1283,7 +1283,7 @@ function sellRun(world: World, save: Save, a: Extract<Action, { t: "orderHelper"
   save.bulls = { ...b, stamina: b.stamina - TRIP_COST, tied: false, sheltered: false };
   const home = world.plots.find((p) => p.starter && save.plots.includes(p.id))?.id ?? save.plots[0];
   h.job = { kind: "sell", plot: home, seeds: 0, load, startAt: now + WALK_MS, step: 0, done: 0 };
-  return { ok: true, msg: `${who.name} hitches Sarja & Raja and sets off for the Jalna mandi with ${total} produce${rent ? ` (godown rent ₹${rent})` : ""}` };
+  return { ok: true, msg: `${who.name} hitches Sarja & Raja and sets off for the Pathrud market with ${total} produce${rent ? ` (godown rent ₹${rent})` : ""}` };
 }
 
 /** Hiring a labourer at the mukadam's, and telling one what to do in the morning. */

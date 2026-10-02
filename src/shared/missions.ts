@@ -121,9 +121,9 @@ export const MISSIONS: Mission[] = [
   },
   {
     id: "caravan", title: "Tandyacha Karwan", local: "तांड्याचा कारवाँ · The caravan", who: "Naik Dhavlu",
-    story: "Our grandfathers crossed the Deccan with a thousand oxen carrying salt and grain. You have two. Load your cart and reach the Jalna mandi before it closes at two o'clock — word is, a glut is coming.",
+    story: "Our grandfathers crossed the Deccan with a thousand oxen carrying salt and grain. You have two. Load your cart and reach the Pathrud market before it closes at two o'clock — word is, a glut is coming.",
     done: "The old caravan blood runs in you. Haribhau at the mandi says he'll pay you better from now on.",
-    objectives: [{ id: "town", text: "Sell 50 produce at the Jalna mandi before 2 pm (load the cart with R)", need: 50, have: (s) => since(s, "town:early") }],
+    objectives: [{ id: "town", text: "Sell 50 produce at the Pathrud market before 2 pm (load the cart with R)", need: 50, have: (s) => since(s, "town:early") }],
     reward: { perk: "townContact", rep: 10, text: "Haribhau pays you 15% more at the mandi · +10 reputation" },
   },
   {

@@ -44,8 +44,6 @@ const D: Record<string, [string, string]> = {
   Leaderboard: ["मानाचा फलक", "लीडरबोर्ड"],
   "The village": ["गाव", "गाँव"],
   Settings: ["सेटिंग्ज", "सेटिंग्स"],
-  "Continue a farm from another device": ["दुसऱ्या फोनवरचे शेत इथे चालू करा", "दूसरे फ़ोन का खेत यहाँ जारी रखें"],
-  "Continue that farm": ["ते शेत चालू करा", "वह खेत जारी रखें"],
   "Created by": ["निर्माते", "निर्माता"],
   "Preparing the village…": ["गाव तयार होत आहे…", "गाँव तैयार हो रहा है…"],
   "{n} field": ["{n} शेत", "{n} खेत"],
@@ -131,7 +129,7 @@ const D: Record<string, [string, string]> = {
   "Naik Dhavlu's kacheri": ["नायक धवलूंची कचेरी", "नायक धवलू की कचहरी"],
   "The Sahakari Bank": ["सहकारी बँक", "सहकारी बैंक"],
   "Sahukar Motilal": ["सावकार मोतीलाल", "साहूकार मोतीलाल"],
-  "The Jalna mandi": ["जालना मंडी", "जालना मंडी"],
+  "The Pathrud market": ["पाथरूड बाजार", "पाथरूड बाज़ार"],
 
   // ---- action hints
   "Sell the load at the mandi": ["मंडीत माल विका", "मंडी में माल बेचें"],

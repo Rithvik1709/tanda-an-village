@@ -1,6 +1,6 @@
 # Contributing to Tanda
 
-Thank you for wanting to help build Ukhali Tanda! This guide covers how to set up, how the code is
+Thank you for wanting to help build Tanda! This guide covers how to set up, how the code is
 laid out, the few rules that keep the game fair, and how to send a change.
 
 ## Ways to help

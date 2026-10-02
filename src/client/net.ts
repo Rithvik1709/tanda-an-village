@@ -68,15 +68,6 @@ export class Net {
     return this.accept(r.data);
   }
 
-  /** Continue a farm from another device. Returns an error message, or null on success. */
-  async restore(code: string): Promise<string | null> {
-    const s = await this.call<{ token?: string; error?: string }>("session", { recoveryCode: code });
-    if (s.status !== 200 || !s.data.token) return s.data.error ?? "Couldn't reach the village.";
-    this.token = s.data.token;
-    writeToken(this.token);
-    return null;
-  }
-
   private accept(d: StateReply) {
     this.recoveryCode = d.recoveryCode;
     this.account = d.account ?? null;

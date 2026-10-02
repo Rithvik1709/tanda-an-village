@@ -1,4 +1,4 @@
--- Tanda · Ukhali Tanda — database schema for Supabase (Postgres).
+-- Tanda — database schema for Supabase (Postgres).
 -- Run once: Supabase dashboard → SQL Editor → paste → Run.
 --
 -- The game's server functions (api/*.ts on Vercel) are the only thing that talks to these tables,

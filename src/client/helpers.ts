@@ -287,7 +287,7 @@ export class Helpers {
   }
   /** What the last job came to: "6 patches sown in Aamrai". */
   private doneLine(j: NonNullable<Hire["job"]>) {
-    if (j.kind === "sell") return `sold ${j.done} produce at the Jalna mandi for ${rs(j.sold ?? 0)}`;
+    if (j.kind === "sell") return `sold ${j.done} produce at the Pathrud market for ${rs(j.sold ?? 0)}`;
     return `${j.done} patches ${j.kind === "plant" ? "sown" : j.kind === "water" ? "watered" : "harvested"} in ${this.d.world.plots[j.plot].name}${j.full ? " · the godown is full" : ""}`;
   }
   /**
@@ -367,7 +367,7 @@ export class Helpers {
       { label: "Water a field", sub: "every dry patch", onClick: () => pick("water") },
       { label: "Harvest", sub: "the ripe crop goes straight to the godown", onClick: () => pick("harvest") },
       // only a mistry is trusted with the cart and the traders at the mandi
-      ...(w.expert ? [{ label: "Take the cart to the mandi", sub: "Sarja & Raja pull your produce to Jalna · the town price", onClick: () => this.sellDialogue(id) }] : []),
+      ...(w.expert ? [{ label: "Take the cart to the mandi", sub: "Sarja & Raja pull your produce to Pathrud · the market price", onClick: () => this.sellDialogue(id) }] : []),
       { label: "Not now", onClick: this.close },
     ]);
   }
@@ -377,7 +377,7 @@ export class Helpers {
     const s = this.d.save(), w = HELPERS[id], day = clock(this.d.now()).day;
     const who = `${w.name} · ${w.local}`;
     const back = { label: "Back", onClick: () => this.orderDialogue(id) };
-    if (!s.inv.cart || !s.bulls) return this.d.dialogue(who, "No cart", "Without a cart and a pair of bulls, malak, I'd be carrying it on my head to Jalna. Sitabai sells both.", [back]);
+    if (!s.inv.cart || !s.bulls) return this.d.dialogue(who, "No cart", "Without a cart and a pair of bulls, malak, I'd be carrying it on my head to Pathrud. Sitabai sells both.", [back]);
     const fill = (sources: Record<string, number>[]) => {
       const load: Record<string, number> = {};
       let room = CART_CAPACITY;
@@ -403,7 +403,7 @@ export class Helpers {
       buttons.push({ label: `${label} · ${n}`, sub: `about ${rs(Math.round(worth(load)))} at today's town price${n === CART_CAPACITY ? " · a full cart" : ""}`, onClick: () => send(load) });
     }
     if (!buttons.length) return this.d.dialogue(who, "Nothing to sell", "The godown's empty and so are your sacks, malak. Harvest something first.", [back]);
-    this.d.dialogue(who, "To the Jalna mandi", `I'll hitch Sarja and Raja, sell at the mandi and bring every rupee back — then I'll need a sleep. What shall I load? (From the godown, you pay the rent.)`, [...buttons, back]);
+    this.d.dialogue(who, "To the Pathrud market", `I'll hitch Sarja and Raja, sell at the mandi and bring every rupee back — then I'll need a sleep. What shall I load? (From the godown, you pay the rent.)`, [...buttons, back]);
   }
 
   private fieldDialogue(id: HelperId, job: HelperJob) {

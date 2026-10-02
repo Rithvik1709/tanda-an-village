@@ -560,7 +560,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     return { x: inner + 1, y: y0, z: doors[1] };
   })();
 
-  // the town mandi, where the main road leaves for Jalna in the west
+  // the Pathrud market, where the main road leaves in the west
   const market = (() => {
     const x0 = 3, z0 = 14, x1 = 27, z1 = 32;
     flatten(x0, z0, x1, z1, 15, B.DIRT);
@@ -578,7 +578,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       set(x, 16, z, B.HAY);
       structures.push({ kind: "hay", x, z, y: 16 });
     }
-    plate(16, 33.5, 16, 0, ["जालना बाजार समिती", "Jalna Mandi"], "#7c2d12");
+    plate(16, 33.5, 16, 0, ["पाथरूड बाजार", "Pathrud Market"], "#7c2d12");
     return { x: 15, y: 16, z: 23 };
   })();
   plate(84.5, 77, height[col(84, 77)] + 1, Math.PI * 0.85, ["उखळी तांडा", "Ukhali Tanda · ता. जि. जालना"], "#7c2d12");

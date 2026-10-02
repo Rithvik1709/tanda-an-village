@@ -186,7 +186,7 @@ export class Nights {
 export const FIRESIDE = [
   "Ramu kaka: \"Onion prices jump in the monsoon, beta. Keep some in the godown.\"",
   "Kamlabai: \"Drip lines save half the water. The panchayat should help every farmer buy them.\"",
-  "Sitaram: \"Remember when we raced bullock carts to the Jalna mandi? Sarja would have won.\"",
+  "Sitaram: \"Remember when we raced bullock carts to the Pathrud market? Sarja would have won.\"",
   "Laxmi: \"Next Teej, I'll grow the tallest wheat basket in the tanda. You'll see.\"",
   "Sitaram: \"The sahukar's interest eats a family alive. Borrow from the Sahakari Bank if you must.\"",
   "Ramu kaka: \"Our grandfathers walked the whole Deccan with their tandas. Now we have taps and a tanki!\"",

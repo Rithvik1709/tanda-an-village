@@ -20,8 +20,6 @@ export class Hud {
   private hint!: HTMLElement;
   private account: HTMLElement;
   debugOn = false;
-  /** Called with a recovery code the player typed; resolves to an error message or null. */
-  onRestore: (code: string) => Promise<string | null> = async () => null;
 
   constructor(parent: HTMLElement, _atlas: HTMLCanvasElement, private hotbar: Hotbar) {
     this.root = el("div", "hud", parent);
@@ -243,38 +241,19 @@ export class Hud {
   /** Opens the "Save your farm" card. */
   onAccountCard: () => void = () => {};
 
-  /** The pause panel's account box: where the farm is saved, and (folded away) the recovery code. */
-  setAccount(code: string, account: { email: string; provider: string } | null = null, authEnabled = false) {
+  /** The pause panel's account box: where the farm is saved, or a button to save it. */
+  setAccount(account: { email: string; provider: string } | null = null, authEnabled = false) {
     const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
     const line = account
       ? `<div class="account-line saved">✅ Saved to <b>${esc(account.email)}</b> <button data-acct>Account</button></div>`
       : authEnabled
         ? `<div class="account-line">Your farm is only on this device. <button data-acct>Save your farm</button></div>`
         : "";
-    this.account.innerHTML = `${line}
-      <details class="code-fold" ${line ? "" : "open"}><summary>Recovery code</summary>
-      <div class="code-row">Recovery code <code>${code}</code> <button data-copy>Copy</button></div>
-      <form class="restore"><input name="code" placeholder="Have a code? XXXX-XXXX-XXXX" maxlength="16" autocomplete="off" spellcheck="false"><button>Continue that farm</button></form>
-      <div class="restore-msg"></div></details>`;
+    this.account.innerHTML = line;
     this.account.querySelector("[data-acct]")?.addEventListener("click", (e) => {
       e.stopPropagation();
       this.onAccountCard();
     });
-    this.account.querySelector("summary")?.addEventListener("click", (e) => e.stopPropagation());
-    const msg = this.account.querySelector(".restore-msg") as HTMLElement;
-    this.account.querySelector("[data-copy]")!.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      await navigator.clipboard?.writeText(code).catch(() => {});
-      msg.textContent = "Copied. Keep it somewhere safe — it's the key to your farm.";
-    });
-    this.account.querySelector("form")!.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const input = (e.target as HTMLFormElement).code as HTMLInputElement;
-      msg.textContent = "Checking…";
-      msg.textContent = (await this.onRestore(input.value)) ?? "Loading that farm…";
-    });
-    // typing a code must not walk the farmer around
-    this.account.addEventListener("keydown", (e) => e.stopPropagation());
   }
 
   private fadeEl?: HTMLElement;

@@ -79,7 +79,7 @@ export function helperPhase(h: Hire, now: number): HelperPhase {
   return h.job.over ? "resting" : "working";
 }
 
-export const JOB_NAMES: Record<HelperJob, string> = { plant: "sow seeds", water: "water the field", harvest: "harvest the ripe crop", sell: "take the cart to the Jalna mandi" };
+export const JOB_NAMES: Record<HelperJob, string> = { plant: "sow seeds", water: "water the field", harvest: "harvest the ripe crop", sell: "take the cart to the Pathrud market" };
 /** A mistry's run to the town mandi: when he gets there and sells, and when he's back with the cart. */
 export const sellTimes = (j: { startAt: number }, tripMs: number) => ({ sellAt: j.startAt + tripMs, backAt: j.startAt + 2 * tripMs });
 /** Is a labourer out on the road with your cart and bulls? */

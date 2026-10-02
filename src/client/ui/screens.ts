@@ -48,7 +48,6 @@ export class TitleScreen {
   onPlay: () => void = () => {};
   onSettings: () => void = () => {};
   onBoard: () => void = () => {};
-  onRestore: (code: string) => Promise<string | null> = async () => null;
 
   constructor(parent: HTMLElement) {
     this.el = el("div", "title-screen", parent, `
@@ -64,7 +63,6 @@ export class TitleScreen {
             <button data-t="about">${t("The village")}</button>
             <button data-t="settings">${t("Settings")}</button>
           </div>
-          <button class="link" data-t="restore">${t("Continue a farm from another device")}</button>
           <div class="title-langs" role="group" aria-label="Language">${LANGS.map(([l, name]) => `<button data-lang="${l}" class="${l === LANG ? "on" : ""}" lang="${l}">${name}</button>`).join("")}</div>
         </div>
       </div>
@@ -100,18 +98,6 @@ export class TitleScreen {
       if (t.dataset.t === "about") {
         const c = this.el.querySelector(".about-card") as HTMLElement;
         c.hidden = !c.hidden;
-      }
-      if (t.dataset.t === "restore") {
-        t.outerHTML = `<form class="restore title-restore"><input name="code" placeholder="XXXX-XXXX-XXXX" maxlength="16" autocomplete="off" spellcheck="false"><button>${tr("Continue that farm")}</button></form><div class="restore-msg"></div>`;
-        const f = this.el.querySelector(".title-restore") as HTMLFormElement;
-        (f.code as HTMLInputElement).focus();
-        f.addEventListener("submit", async (ev) => {
-          ev.preventDefault();
-          const msg = this.el.querySelector(".restore-msg")!;
-          msg.textContent = "Checking…";
-          msg.textContent = (await this.onRestore((f.code as HTMLInputElement).value)) ?? "Loading that farm…";
-        });
-        f.addEventListener("keydown", (ev) => ev.stopPropagation());
       }
     });
     this.el.classList.add("busy");

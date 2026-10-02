@@ -347,8 +347,8 @@ settingsPanel.show = () => {
 let switching = false;
 let autoSkip = false; // test hook: scripts that aren't about the story tap its cards away before acting
 const STILL = { forward: 0, right: 0, jump: false, sprint: false };
-const phoneMenu = new PhoneMenu(uiRoot, () => net.recoveryCode);
-const accountCard = new AccountCard(uiRoot, () => ({ account: net.account, code: net.recoveryCode, enabled: net.authEnabled }));
+const phoneMenu = new PhoneMenu(uiRoot);
+const accountCard = new AccountCard(uiRoot, () => ({ account: net.account, enabled: net.authEnabled }));
 accountCard.onGoogle = () => net.google();
 accountCard.onEmail = (email) => net.emailLink(email);
 accountCard.onSignOut = () => net.signOut();
@@ -394,12 +394,6 @@ function windowOpen() {
 }
 phoneMenu.onPick = (what) => (what === "log" ? showLogWindow() : what === "account" ? showAccount() : what === "map" ? showMap() : what === "board" ? showBoard() : what === "help" ? controls.onHelp() : what === "view" ? controls.onView() : what === "torch" ? controls.onTorch() : settingsPanel.show());
 phoneMenu.onClose = () => resumePlay();
-phoneMenu.onRestore = async (code) => {
-  const err = await net.restore(code);
-  if (err) return err;
-  location.reload();
-  return null;
-};
 // tapping the dark area round a window closes it (not story cards: those need their buttons)
 uiRoot.addEventListener("click", (e) => {
   const t = e.target as HTMLElement;
@@ -423,7 +417,7 @@ if (touch) {
   const gate = document.createElement("div");
   gate.className = "fs-gate";
   const canFullscreen = !!document.documentElement.requestFullscreen;
-  gate.innerHTML = `<div class="panel-card"><div class="eyebrow">Tanda · उखळी तांडा</div><h2>Play full screen</h2>
+  gate.innerHTML = `<div class="panel-card"><div class="eyebrow">Tanda · तांडा</div><h2>Play full screen</h2>
     <p class="lede">${canFullscreen ? "Tanda is best played full screen, in landscape." : "Tip: for full screen on iPhone, tap Share → Add to Home Screen, then open Tanda from there."}</p>
     <div class="big-acts"><button data-go>▶ Tap to play</button></div></div>`;
   uiRoot.appendChild(gate);
@@ -1995,18 +1989,6 @@ net.onRejected = (errs) => {
   hud.toast(`The village refused: ${errs[0]}`, "bad");
   sfxQueue.push("refused");
 };
-titleScreen.onRestore = async (code) => {
-  const err = await net.restore(code);
-  if (err) return err;
-  location.reload();
-  return null;
-};
-hud.onRestore = async (code) => {
-  const err = await net.restore(code);
-  if (err) return err;
-  location.reload(); // simplest correct way to swap every block, crop and coin for the other farm
-  return null;
-};
 
 bootStep(0.64, "Loading your farm…");
 Promise.all([booted, workerReady]).then(async ([boot]) => {
@@ -2017,7 +1999,7 @@ Promise.all([booted, workerReady]).then(async ([boot]) => {
   booted_ = true;
   game.skew = boot.serverNow - Date.now();
   net.attach(game);
-  hud.setAccount(net.recoveryCode, net.account, await net.checkAuth());
+  hud.setAccount(net.account, await net.checkAuth());
   if (bootToast) setTimeout(() => bootToast && hud.toast(bootToast.msg, bootToast.kind), 1500);
   const t0 = performance.now();
   game.syncAll(); // saved edits and fields go to the worker before the first mesh

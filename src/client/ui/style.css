@@ -43,9 +43,7 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .account { margin-top: 8px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.15); display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .account code { font: 700 14px ui-monospace, Menlo, monospace; letter-spacing: 0.06em; color: #ffd98a; padding: 1px 6px; background: rgba(0,0,0,0.3); border-radius: 4px; }
 .account button { font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 0; background: #f4ecd8; color: #2a2530; cursor: pointer; }
-.account .restore { display: flex; gap: 6px; justify-content: center; }
 .account input { font: 13px ui-monospace, Menlo, monospace; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.3); color: #fff; width: 230px; text-transform: uppercase; }
-.account .restore-msg { min-height: 1em; opacity: 0.85; }
 .banner { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); padding: 6px 14px; border-radius: 8px; background: rgba(160, 60, 40, 0.8); font-weight: 600; }
 .sync { font-size: 12px; opacity: 0.8; }
 .sync.offline { color: #ffb4a0; opacity: 1; }
@@ -127,7 +125,7 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .title-save { min-height: 22px; font-size: 15px; color: #ffe6b0; }
 .title-buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 18px; width: min(420px, 100%); }
 .title-buttons .title-row button { padding: 11px 8px; white-space: nowrap; }
-.title-buttons button.primary, .title-buttons .link, .title-buttons .title-restore, .title-buttons .restore-msg { grid-column: 1 / -1; }
+.title-buttons button.primary, .title-buttons .link { grid-column: 1 / -1; }
 .title-row { display: contents; }
 .title-buttons button { width: 100%; text-align: center; }
 .title-buttons button.link { width: auto; justify-self: start; }
@@ -161,10 +159,6 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .mobile-note .panel-card { max-width: 420px; }
 .play-prompt .pause-buttons { display: flex; gap: 8px; justify-content: center; }
 .play-prompt .pause-buttons button { font: 600 12px system-ui; padding: 5px 12px; border-radius: 6px; border: 0; background: #f4ecd8; color: #2a2530; cursor: pointer; }
-.title-restore { display: flex; gap: 6px; }
-.title-restore input { font: 14px ui-monospace, Menlo, monospace; padding: 8px 10px; border-radius: 8px; border: 0; width: 200px; text-transform: uppercase; }
-.title-restore button { min-width: 0 !important; padding: 8px 14px !important; font-size: 14px !important; }
-.title-screen .restore-msg { color: #fff; font-size: 13px; min-height: 1em; }
 .panel-card, .map-card { box-sizing: border-box; }
 .mobile-note .panel-card { width: 100%; }
 .slot .icon svg { width: 40px; height: 40px; display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35)); }
@@ -273,7 +267,7 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px;
 .big-acts button:disabled, .panel-card .acts button:disabled, .order-card button:disabled { background: rgba(255, 236, 200, 0.12) !important; color: var(--ink-2) !important; box-shadow: none; transform: none; }
 .big-acts button.ghost, .plot-card button.ghost, .panel-card button.link { background: transparent !important; color: var(--gold-2) !important; box-shadow: none; border: 1px solid var(--line) !important; }
 /* inputs */
-.panel-card input, .plot-card input, .name-form input, .account input, .title-restore input {
+.panel-card input, .plot-card input, .name-form input, .account input {
   background: rgba(0, 0, 0, 0.3) !important; color: var(--ink) !important; border: 1px solid var(--line) !important; border-radius: 10px !important;
 }
 .settings-card label b { color: var(--gold) !important; }
@@ -356,12 +350,6 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 .phone-menu .pm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
 .phone-menu .pm-grid button { font: 700 15px system-ui; padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--glass-2); color: var(--ink); }
 .phone-menu .pm-grid .pm-primary { grid-column: 1 / -1; background: var(--rust); border: 0; color: #fff6e8; }
-.phone-menu .pm-code { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); }
-.phone-menu .pm-code code { color: var(--gold-2); font: 700 15px ui-monospace, Menlo, monospace; }
-.phone-menu .pm-code button, .phone-menu .pm-restore button { font: 600 13px system-ui; padding: 8px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--glass-2); color: var(--ink); }
-.phone-menu .pm-restore { display: flex; gap: 8px; margin-top: 10px; }
-.phone-menu .pm-restore input { flex: 1; padding: 8px 10px; font: 14px ui-monospace, Menlo, monospace; }
-.phone-menu .pm-msg { min-height: 1em; font-size: 12px; color: var(--ink-2); margin-top: 6px; }
 
 .is-touch .hud { font-size: 13px; }
 /* windows fill the screen, scroll inside, and close with a big ✕ */
@@ -458,17 +446,11 @@ html.rotated #game, html.rotated #ui { transform-origin: top left; transform: ro
 .account-card .ac-msg { min-height: 1.3em; margin-top: 8px; font-size: 13px; color: var(--ink-2); }
 .account-card .ac-msg.bad { color: #ffb4a0; }
 .account-card .ac-later { margin-top: 6px; background: none; border: 0; color: var(--ink-2); font: 600 13px system-ui; text-decoration: underline; cursor: pointer; }
-.account-card .ac-code { margin-top: 14px; font-size: 12px; color: var(--ink-2); text-align: left; }
-.account-card .ac-code summary { cursor: pointer; text-align: center; }
-.account-card .ac-code code { color: var(--gold-2, #f1d58a); font: 700 13px ui-monospace, Menlo, monospace; }
 .account-card .big-acts { display: flex; flex-direction: column; gap: 8px; }
 .account-card .big-acts .ghost { background: none !important; border: 1px solid var(--line) !important; color: var(--ink-2) !important; }
 .account-line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; font-size: 13px; }
 .account-line button { font: 700 13px system-ui; padding: 7px 12px; border-radius: 9px; border: 0; background: var(--rust); color: #fff; cursor: pointer; }
 .account-line.saved button { background: rgba(255,244,220,0.12); border: 1px solid var(--line); }
-.play-prompt .code-fold { margin-top: 8px; font-size: 12px; }
-.play-prompt .code-fold summary { cursor: pointer; opacity: 0.75; }
-.account-card .big-code { display: block; margin-top: 10px; font: 700 20px ui-monospace, Menlo, monospace; color: var(--gold-2, #f1d58a); letter-spacing: 0.06em; }
 .title-credit .legal a { color: inherit; opacity: 0.75; text-decoration: none; pointer-events: auto; }
 .title-credit .legal a:hover { opacity: 1; text-decoration: underline; }
 .title-credit { pointer-events: auto; }
