@@ -63,7 +63,7 @@ const NOT_GROUND = new Set<number>([
   B.ROOF_TILE, B.FENCE, B.SAFFRON, B.BLUE_WOOD, B.HAY,
 ]);
 
-type Glyph = "mandir" | "school" | "pir" | "tank" | "well" | "rupee" | "seed" | "scroll" | "bank" | "home" | "court" | "talav" | "mandi" | "people";
+type Glyph = "mandir" | "school" | "pir" | "tank" | "well" | "rupee" | "seed" | "scroll" | "bank" | "godown" | "home" | "court" | "talav" | "mandi" | "people";
 type Place = { key: string; lm: Landmark; en: string; mr?: string; glyph: Glyph; color: string; rank: number };
 type Pick = { x: number; z: number; label: string; kind: "pin" | "plot"; r: number; x0?: number; z0?: number; x1?: number; z1?: number };
 type Pt = { x: number; z: number; label: string };
@@ -202,6 +202,7 @@ export class MapView {
       place("seedShop", L.seedShop, "Sitabai seeds & tools", "सीताबाई बी-बियाणे", "seed", "#4f8a2c", 2),
       place("landOffice", L.landOffice, "Naik's kacheri", "नायक कचेरी", "scroll", "#7a4b8a", 2),
       place("bank", L.bank, "Sahakari bank", "सहकारी बँक", "bank", "#2f7a52", 3),
+      place("godown", L.godown, "Godown", "गोदाम", "godown", "#7c2d12", 3),
     ];
 
     // paint the sheet while the player is busy with something else, so the first M is instant
@@ -471,6 +472,9 @@ export class MapView {
         case "house":
           if (s.roof === "thatch") roof(s.x0, s.z0, s.w, s.d, "#d8b468", "#8a6a30");
           else roof(s.x0, s.z0, s.w, s.d, s.walls === "brick" ? "#b65a3c" : "#c8704a", "#6e3220");
+          break;
+        case "godown":
+          roof(s.x0, s.z0, s.w, s.d, "#9aa3a8", "#4b5357");
           break;
         case "wada":
           roof(s.x0, s.z0, s.w, s.d, "#9a6a3e", "#4e3018");
@@ -1256,6 +1260,11 @@ function drawBadge(g: CanvasRenderingContext2D, x: number, y: number, r: number,
       g.moveTo(-7, -2); g.lineTo(0, -7); g.lineTo(7, -2); g.closePath(); g.fill();
       g.fillRect(-6, 4, 12, 2);
       for (const xx of [-4.5, -0.75, 3]) g.fillRect(xx, -1, 1.6, 5);
+      break;
+    case "godown": // a long shed under a pitched roof, its wide doors
+      g.moveTo(-7, -1); g.lineTo(0, -6); g.lineTo(7, -1); g.closePath(); g.fill();
+      g.fillRect(-6, -1, 12, 7);
+      g.fillStyle = "rgba(0,0,0,0.35)"; g.fillRect(-2.5, 1, 5, 5);
       break;
     case "home":
       g.moveTo(-6, 0); g.lineTo(0, -6); g.lineTo(6, 0); g.lineTo(4.5, 0); g.lineTo(4.5, 6); g.lineTo(-4.5, 6); g.lineTo(-4.5, 0); g.closePath(); g.fill();

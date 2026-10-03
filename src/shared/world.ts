@@ -49,6 +49,8 @@ export type Structure =
   | { kind: "tank"; x: number; z: number; y: number }
   | { kind: "statue"; x: number; z: number; y: number; facing: number } // Vasantrao Naik, in bronze, in the chowk // the village's overhead water tank, on the tekdi top
   | { kind: "plate"; x: number; z: number; y: number; facing: number; lines: string[]; color?: string }
+  /** The godown: a long brick shed with a tin roof and wide doors on its west end (door at x0, z0 + d/2). */
+  | { kind: "godown"; x0: number; z0: number; w: number; d: number; y: number }
   /** Rathod Bhuvan: a long two-storey wooden wada, three homes under one roof, its back to the lane and
    *  its carved verandah facing the village (east). The player's home. */
   | { kind: "wada"; x0: number; z0: number; w: number; d: number; y: number; name: string }
@@ -77,7 +79,7 @@ export type World = {
   chowk: { x0: number; z0: number; x1: number; z1: number; y: number };
   trees: Tree[];
   structures: Structure[];
-  landmarks: Record<"spawn" | "temple" | "hanuman" | "school" | "pir" | "tank" | "home" | "trader" | "seedShop" | "landOffice" | "bank" | "well" | "market" | "ghat" | "kabaddi" | "talav" | "mukadam", Landmark>;
+  landmarks: Record<"spawn" | "temple" | "hanuman" | "school" | "pir" | "tank" | "home" | "trader" | "seedShop" | "landOffice" | "bank" | "godown" | "well" | "market" | "ghat" | "kabaddi" | "talav" | "mukadam", Landmark>;
 };
 
 export const idx = (x: number, y: number, z: number) => x + W * (z + D * y);
@@ -446,6 +448,23 @@ export function generateWorld(seed = WORLD_SEED): World {
   plate(seedShop.x, seedShop.z - 1.2, seedShop.y, 0, ["सीताबाई बी-बियाणे", "Sitabai Seeds & Tools", `Open ${hoursText("shop")}`]);
   plate(landOffice.x + 0.3, landOffice.z + 1.8, landOffice.y + 1.4, Math.PI / 2, ["नायक कचेरी", "Naik's Kacheri", `Open ${hoursText("land")}`]);
   plate(bank.x - 0.3, bank.z - 1.8, bank.y + 1.4, -Math.PI / 2, ["सहकारी बँक, उखळी तांडा", "Sahakari Bank", `Open ${hoursText("bank")}`], "#15803d");
+  // the godown, across the lane east of the bank: a long brick shed, its wide doors facing the lane
+  const godown = (() => {
+    const x0 = 133, z0 = 127, w = 9, d = 5, x1 = x0 + w - 1, z1 = z0 + d - 1, y0 = 16;
+    const dz = z0 + Math.floor(d / 2);
+    pad(x0 - 1, z0 - 1, x1 + 1, z1 + 1, y0 - 1);
+    structures.push({ kind: "godown", x0, z0, w, d, y: y0 });
+    for (let y = y0; y < y0 + 3; y++)
+      for (let z = z0; z <= z1; z++)
+        for (let x = x0; x <= x1; x++) {
+          if (x !== x0 && x !== x1 && z !== z0 && z !== z1) continue;
+          if (x === x0 && Math.abs(z - dz) <= 1 && y < y0 + 2) continue; // the doors, three wide
+          set(x, y, z, (x === x0 || x === x1) && (z === z0 || z === z1) ? B.LOG : B.BRICK);
+        }
+    for (let z = z0 - 1; z <= z1 + 1; z++) for (let x = x0 - 1; x <= x1 + 1; x++) set(x, y0 + 3, z, B.ROOF_TILE);
+    plate(x0 - 0.3, dz - 2, y0 + 1.4, -Math.PI / 2, ["गोदाम, उखळी तांडा", "Godown", `Open ${hoursText("godown")}`], "#7c2d12");
+    return { x: x0 - 1, y: y0, z: dz + 0.5 };
+  })();
 
   // wells: the village well by the chowk, and the round vihir out in the fields
   const makeWell = (cx: number, cz: number) => {
@@ -796,6 +815,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       seedShop: lm(seedShop, "Seed & tool shop"),
       landOffice: lm(landOffice, "Naik's kacheri"),
       bank: lm(bank, "Cooperative bank"),
+      godown: lm(godown, "Godown"),
       well: lm(well, "Well"),
       market: lm(market, "Town market"),
       ghat: { ...vihir, label: "Vihir (field well)" },

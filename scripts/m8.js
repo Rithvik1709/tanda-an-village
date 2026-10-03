@@ -1,4 +1,4 @@
-// M8 scripted: bank loan + sahukar loan → grow onions → store them in the godown → rent on the way
+// M8 scripted: bank loan + sahukar loan → grow onions → store them in the godown (its own shed east of the bank) → rent on the way
 // out → let the sahukar loan go overdue (bank refuses) → repay everything → net worth and a new title.
 (async () => { window.__bailgaadi.setView("first");
   const g = window.__bailgaadi;
@@ -14,6 +14,7 @@
   g.setHour(10.5);
   const visit = async (kind, x, y, z) => { g.teleport(x, y, z, 0, -0.05); await wait(250); g.openStall(kind); await wait(150); };
   const bank = g.landmarks().bank;
+  const godown = g.landmarks().godown;
 
   // 1) borrow the most the bank allows, and a little from the sahukar
   await visit("bank", bank.x + 0.5, bank.y, bank.z - 2.5);
@@ -59,12 +60,11 @@
   log.overdueAfterWeek = g.worth().loans.map((l) => l.lender);
 
   // 3) the godown: store all, a day passes, take ten out (rent)
-  await visit("bank", bank.x + 0.5, bank.y, bank.z - 2.5);
-  await click('[data-do="tab:godown"]');
+  await visit("godown", godown.x - 1, godown.y, godown.z);
   await click('[data-do="store:onion:all"]');
   log.stored = g.worth().godown;
   await g.skip(DAY);
-  g.openStall("bank", "godown");
+  g.openStall("godown");
   await wait(150);
   const m2 = g.money();
   document.querySelector('input[data-gd="onion"]').value = "10";
@@ -72,7 +72,8 @@
   log.rentPaid = m2 - g.money();
   await window.__shot("m8-godown");
   // 4) overdue: the bank won't lend to a defaulter
-  await click('[data-do="tab:loans"]');
+  g.closePanel();
+  await visit("bank", bank.x + 0.5, bank.y, bank.z - 2.5);
   const borrowBtn = document.querySelector('[data-do^="borrow:"]');
   log.bankRefusesDefaulter = !borrowBtn && !!document.querySelector(".news.glut");
   await window.__shot("m8-overdue");
@@ -93,7 +94,7 @@
   const before = g.worth();
   log.before = { title: before.title, total: before.total };
   await g.grant(90000);
-  g.openStall("bank", "godown");
+  g.openStall("godown");
   await wait(150);
   await click('[data-do="store:onion:all"]'); // any accepted action lets the server confirm the title
   g.closePanel();

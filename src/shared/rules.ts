@@ -17,7 +17,7 @@ import { deskOn, requestsFor } from "./panchayat.js";
 import { COLLECT_EACH, dutyFor, DUTY_HONOUR, DUTY_REP, FRIEND_HEARTS, KARBHARI_FRIENDS, KARBHARI_REP, PANCH_DAYS, PANCH_REP, PANCH_VOTES, verdicts, WARD } from "./roles.js";
 import { closedText, isOpen } from "./hours.js";
 import { BHOG_N, BHOG_REP, DIYA_BOND, DIYA_REP, FEST_HOUR, FESTIVALS, festivalOn, gher, HOLIKA_REP, yearOf } from "./festivals.js";
-import { arriveAt, CANCEL_REFUND, cartAway, duskOf, HELPER_MIN_PLOTS, HELPERS, type HelperId, type HelperJob, hireDay, HIRE_MAX, type Hire, isHelper, JOB_NAMES, MUKADAM, ORDER_BY, patchMs, restMs, sellTimes, WALK_MS } from "./helpers.js";
+import { arriveAt, CANCEL_REFUND, cartAway, duskOf, HELPER_MIN_PLOTS, HELPERS, type HelperId, type HelperJob, hireDay, HIRE_MAX, type Hire, inSacks, isHelper, JOB_NAMES, MUKADAM, ORDER_BY, patchMs, restMs, sellTimes, WALK_MS } from "./helpers.js";
 
 /*
  * The rules of the game: the ONLY way a save changes. The client runs these for instant feedback;
@@ -649,7 +649,9 @@ function finance(world: World, save: Save, a: Extract<Action, { t: "borrow" | "r
     case "store": {
       if (!isCrop(a.item) || !qty(a.n)) return fail("Store produce, in whole units.");
       if ((save.inv[a.item] ?? 0) < a.n) return fail(`You don't have ${a.n} ${CROPS[a.item].name.toLowerCase()}.`);
-      if (stored(save) + a.n > GODOWN_CAPACITY) return fail("The godown is full.");
+      // keep room for what your labourers bring in at dusk
+      const coming = inSacks(save.helpers);
+      if (stored(save) + coming + a.n > GODOWN_CAPACITY) return fail(coming ? `The godown is full — ${coming} more is coming in your labourers' sacks tonight.` : "The godown is full.");
       const lot = save.godown[a.item] ?? { n: 0, since: now };
       // one lot per crop: its date is the weighted average, so rent stays fair
       save.godown[a.item] = { n: lot.n + a.n, since: Math.round((lot.since * lot.n + now * a.n) / (lot.n + a.n)) };
@@ -1184,61 +1186,81 @@ function finish(save: Save, j: Job, t: number) {
 /**
  * Bring every labourer's day up to `now`. From the moment they reach the field, each time slot goes
  * to the next patch (in row order) that needs their job; the first slot with nothing to do ends the
- * job, and they rest before taking another. Harvests go straight to the godown. At dusk, unsown
- * seeds come back to you. Returns the farm cells that changed, so the client can redraw them.
+ * job, and they rest before taking another. Harvests go in their sacks; at dusk they leave them at
+ * the godown, and unsown seeds come back to you. Returns the farm cells that changed, so the client
+ * can redraw them.
  */
 export function settleHelpers(world: World, save: Save, now: number): string[] {
   if (!save.helpers?.length) return [];
   const changed: string[] = [];
   for (const h of save.helpers) {
-    const j = h.job;
-    if (!j || j.over) continue;
-    if (j.kind === "sell") {
-      settleSale(save, h, now);
-      continue;
-    }
-    const end = duskOf(h.day), until = Math.min(now, end), ms = patchMs(h.who);
-    let cells: string[] | null = null;
-    while (j.doneAt === undefined && j.startAt + (j.step + 1) * ms <= until) {
-      const t = j.startAt + ++j.step * ms;
-      const k = save.plots.includes(j.plot) ? (cells ??= cellsOf(world, save, j.plot)).find((c) => needs(world, save, j, c, t)) : undefined;
-      if (!k) {
-        finish(save, j, t);
-        break;
-      }
-      const cell = save.farm[k];
-      if (j.kind === "plant") {
-        sow(save, cell, j.crop as CropId, t);
-        j.seeds--;
-      } else if (j.kind === "water") wet(cell, t);
-      else {
-        const p = advance(cell.plant!, cell.wetUntil, t);
-        const n = yieldOf(p, cell.q);
-        if (stored(save) + n > GODOWN_CAPACITY) {
-          j.full = true;
-          finish(save, j, t);
-          break;
-        }
-        // one lot per crop: its date is the weighted average, so rent stays fair
-        const lot = save.godown[p.crop] ?? { n: 0, since: t };
-        save.godown[p.crop] = { n: lot.n + n, since: Math.round((lot.since * lot.n + t * n) / (lot.n + n)) };
-        reaped(save, cell, n, t);
-      }
-      j.done++;
-      j.at = k;
-      changed.push(k);
-    }
-    if (now >= end) {
-      j.over = true;
-      if (j.seeds && j.crop) save.inv[`seed:${j.crop}`] = (save.inv[`seed:${j.crop}`] ?? 0) + j.seeds;
-      j.seeds = 0;
-    }
+    settleJob(world, save, h, now, changed);
+    if (now >= duskOf(h.day) && h.sacks) bank(save, h, duskOf(h.day));
   }
   // yesterday's labourers have been paid and gone home
   const today = clock(now).day;
   save.helpers = save.helpers.filter((h) => h.day >= today);
   if (!save.helpers.length) delete save.helpers;
   return changed;
+}
+
+/** On the way home at dusk: the day's sacks go into the godown (rent counts from now). */
+function bank(save: Save, h: Hire, t: number) {
+  let total = 0;
+  for (const [crop, n] of Object.entries(h.sacks!)) {
+    if (!n) continue;
+    // one lot per crop: its date is the weighted average, so rent stays fair
+    const lot = save.godown[crop] ?? { n: 0, since: t };
+    save.godown[crop] = { n: lot.n + n, since: Math.round((lot.since * lot.n + t * n) / (lot.n + n)) };
+    total += n;
+  }
+  delete h.sacks;
+  h.banked = (h.banked ?? 0) + total;
+}
+
+/** One labourer's job, brought up to `now`. */
+function settleJob(world: World, save: Save, h: Hire, now: number, changed: string[]) {
+  const j = h.job;
+  if (!j || j.over) return;
+  if (j.kind === "sell") {
+    settleSale(save, h, now);
+    return;
+  }
+  const end = duskOf(h.day), until = Math.min(now, end), ms = patchMs(h.who);
+  let cells: string[] | null = null;
+  while (j.doneAt === undefined && j.startAt + (j.step + 1) * ms <= until) {
+    const t = j.startAt + ++j.step * ms;
+    const k = save.plots.includes(j.plot) ? (cells ??= cellsOf(world, save, j.plot)).find((c) => needs(world, save, j, c, t)) : undefined;
+    if (!k) {
+      finish(save, j, t);
+      break;
+    }
+    const cell = save.farm[k];
+    if (j.kind === "plant") {
+      sow(save, cell, j.crop as CropId, t);
+      j.seeds--;
+    } else if (j.kind === "water") wet(cell, t);
+    else {
+      const p = advance(cell.plant!, cell.wetUntil, t);
+      const n = yieldOf(p, cell.q);
+      // stop while what's in everyone's sacks still fits in the godown tonight
+      if (stored(save) + inSacks(save.helpers) + n > GODOWN_CAPACITY) {
+        j.full = true;
+        finish(save, j, t);
+        break;
+      }
+      h.sacks = { ...h.sacks, [p.crop]: (h.sacks?.[p.crop] ?? 0) + n };
+      reaped(save, cell, n, t);
+    }
+    j.done++;
+    j.at = k;
+    changed.push(k);
+  }
+  if (now >= end) {
+    j.over = true;
+    if (j.seeds && j.crop) save.inv[`seed:${j.crop}`] = (save.inv[`seed:${j.crop}`] ?? 0) + j.seeds;
+    j.seeds = 0;
+  }
 }
 
 /**

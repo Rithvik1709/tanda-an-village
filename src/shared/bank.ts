@@ -1,6 +1,7 @@
 import { bullsNow } from "./bulls.js";
 import { CROP_IDS, CROPS, type CropId } from "./crops.js";
 import { marketPrice, shopItem } from "./economy.js";
+import { inSacks } from "./helpers.js";
 import { landValue, valuePlot } from "./land.js";
 import type { Save } from "./save.js";
 import { DAY_MS } from "./time.js";
@@ -57,7 +58,7 @@ export type Worth = { money: number; land: number; goods: number; livestock: num
 export function netWorth(world: World, s: Save, now: number, day: number): Worth {
   const land = s.plots.reduce((a, id) => a + valuePlot(world, s, world.plots[id], now, day).total, 0);
   const goods = Math.round(
-    CROP_IDS.reduce((a, c: CropId) => a + ((s.inv[c] ?? 0) + (s.godown[c]?.n ?? 0) + (s.trip?.load[c] ?? 0)) * marketPrice(c, day), 0),
+    CROP_IDS.reduce((a, c: CropId) => a + ((s.inv[c] ?? 0) + (s.godown[c]?.n ?? 0) + inSacks(s.helpers, c) + (s.trip?.load[c] ?? 0)) * marketPrice(c, day), 0),
   );
   const resale = (id: string) => (s.inv[id] ? (shopItem(id)?.price ?? 0) * 0.6 : 0);
   const fit = s.bulls ? 0.8 + 0.2 * (bullsNow(s.bulls, now).mood / 100) : 1;

@@ -113,6 +113,7 @@ export class Village {
       else if (s.kind === "statue") this.statue(s, M);
       else if (s.kind === "plate") this.plate(s);
       else if (s.kind === "wada") this.wada(s, M);
+      else if (s.kind === "godown") this.godown(s, M);
     }
     for (const p of plots) this.fence(p, M, groundAt);
     for (const b of this.buckets.values()) {
@@ -170,6 +171,44 @@ export class Village {
     const lean = new THREE.BoxGeometry(side[0] ? 2.4 : span * 2 + 0.8, 0.1, side[0] ? span * 2 + 0.8 : 2.4);
     const tilt = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(along[0], 0, along[1]), (side[0] + side[1]) * -0.18 * (side[0] ? -1 : 1));
     this.put(roofKey, M[roofKey], lean, tilt.setPosition(vx - side[0] * 0.2, y + 0.3 + 2.45, vz - side[1] * 0.2));
+  }
+
+  /** A long brick shed on a high plinth (to keep the grain dry), tin roof, wide steel doors on the west end. */
+  private godown(s: Extract<Structure, { kind: "godown" }>, M: Record<string, () => THREE.Material>) {
+    const { x0, z0, w, d, y } = s;
+    const cx = x0 + w / 2, cz = z0 + d / 2, H = 3, P = 0.5;
+    if (!M.tin) M.tin = () => new THREE.MeshStandardMaterial({ color: "#8e979b", roughness: 0.45, metalness: 0.6 });
+    if (!M.steel) M.steel = () => new THREE.MeshStandardMaterial({ color: "#3f6b4f", roughness: 0.6, metalness: 0.3 });
+    this.box("stone", M.stone, w + 0.4, P, d + 0.4, cx, y + P / 2 - 0.1, cz);
+    this.box("brick", M.brick, w, H, d, cx, y + P + H / 2 - 0.1, cz);
+    const top = y + P + H - 0.1;
+    // the doors: two steel leaves, a lintel, and a ramp down to the lane for the sacks
+    this.box("steel", M.steel, 0.08, 2.3, 2.8, x0 - 0.04, y + P + 1.05, cz);
+    this.box("dark", M.dark, 0.1, 2.3, 0.06, x0 - 0.06, y + P + 1.05, cz);
+    this.box("stone", M.stone, 0.2, 0.25, 3.2, x0 - 0.1, y + P + 2.3, cz);
+    const ramp = new THREE.BoxGeometry(1.4, 0.12, 2.8);
+    this.put("stone", M.stone, ramp, new THREE.Matrix4().makeRotationZ(0.3).setPosition(x0 - 0.7, y + P / 2 - 0.15, cz));
+    // vents high on the long walls
+    for (let i = 1; i < w; i += 2)
+      for (const sz of [-1, 1]) this.box("dark", M.dark, 0.6, 0.25, 0.08, x0 + i + 0.5, top - 0.5, cz + sz * (d / 2 + 0.03));
+    // a gable tin roof, ridge along the length, with gable walls closing the ends
+    const over = 0.5, pitch = 0.32, half = d / 2 + over, slope = half / Math.cos(pitch);
+    for (const sz of [-1, 1]) {
+      const sheet = new THREE.BoxGeometry(w + over * 2, 0.06, slope);
+      const m = new THREE.Matrix4().makeRotationX(sz * pitch).setPosition(cx, top + (half * Math.tan(pitch)) / 2, cz + (sz * half) / 2);
+      this.put("tin", M.tin, sheet, m);
+    }
+    const rise = (d / 2) * Math.tan(pitch);
+    for (const ex of [x0 + 0.1, x0 + w - 0.1]) {
+      const gable = new THREE.BufferGeometry();
+      gable.setAttribute("position", new THREE.BufferAttribute(new Float32Array([0, 0, -d / 2, 0, 0, d / 2, 0, rise, 0, 0, 0, d / 2, 0, 0, -d / 2, 0, rise, 0]), 3));
+      gable.computeVertexNormals();
+      this.put("brick", M.brick, gable, new THREE.Matrix4().makeTranslation(ex, top, cz));
+    }
+    this.bulb(x0 - 0.4, y + P + 2.6, cz + 1.8);
+    // sacks waiting by the door
+    const r = mulberry32(x0 * 17 + z0);
+    for (let i = 0; i < 5; i++) this.box("sack", M.sack, 0.5, 0.55, 0.42, x0 - 0.5 - (i % 2) * 0.55, y + 0.27 + (i > 3 ? 0.55 : 0), cz + 1.9 + Math.floor(i / 2) * 0.5, r() * 0.5);
   }
 
   private stall(s: Extract<Structure, { kind: "stall" }>, M: Record<string, () => THREE.Material>) {

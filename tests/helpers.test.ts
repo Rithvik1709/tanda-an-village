@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GODOWN_CAPACITY } from "../src/shared/bank";
 import { TRIP_COST, TRIP_MS, newBulls } from "../src/shared/bulls";
 import { buyerPrice } from "../src/shared/economy";
-import { dawnOf, duskOf, helperPhase, patchMs, restMs, sellTimes, WALK_MS } from "../src/shared/helpers";
+import { dawnOf, duskOf, helperPhase, inSacks, patchMs, restMs, sellTimes, WALK_MS } from "../src/shared/helpers";
 import { apply, type Action, settleHelpers } from "../src/shared/rules";
 import { cloneSave, newSave, type Save } from "../src/shared/save";
 import { daySummary } from "../src/shared/summary";
@@ -145,6 +145,37 @@ describe("majoor", () => {
     settleHelpers(world, s, now);
     const cells = Object.values(s.farm);
     expect(cells.every((c) => c.wetUntil > now)).toBe(true);
+  });
+
+  it("carry the harvest in their sacks all day, and leave it at the godown at dusk", () => {
+    now = atHour(4, 14);
+    const s = farmer(8);
+    for (let i = 0; i < 8; i++) ok(s, { t: "plant", x: starter.x0 + 2 + i, y: starter.y, z: starter.z0 + 2, crop: "onion" });
+    now += 12 * DAY_MS;
+    const day = Math.floor((now - atHour(0, 6)) / DAY_MS);
+    now = atHour(day, 14);
+    ok(s, { t: "hire", who: "sakharam" });
+    now = dawnOf(day + 1) + 1000;
+    ok(s, { t: "orderHelper", who: "sakharam", job: "harvest", plot: starter.id });
+    now = atHour(day + 1, 12);
+    settleHelpers(world, s, now);
+    expect(planted(s)).toBe(0); // all reaped…
+    expect(s.godown.onion).toBeUndefined(); // …but still in the sacks
+    const carrying = inSacks(s.helpers);
+    expect(carrying).toBeGreaterThan(0);
+    // what's coming tonight keeps its room in the godown
+    s.inv.onion = 5;
+    s.godown.jowar = { n: GODOWN_CAPACITY - carrying - 3, since: now };
+    expect(no(s, { t: "store", item: "onion", n: 5 })).toMatch(/coming in your labourers' sacks/);
+    delete s.godown.jowar;
+    now = duskOf(day + 1) + 1;
+    settleHelpers(world, s, now);
+    expect(s.godown.onion).toEqual({ n: carrying, since: duskOf(day + 1) }); // rent counts from dusk
+    expect(s.helpers![0].sacks).toBeUndefined();
+    expect(s.helpers![0].banked).toBe(carrying);
+    // settling again doesn't put it in twice
+    settleHelpers(world, s, now + 1000);
+    expect(s.godown.onion!.n).toBe(carrying);
   });
 
   it("harvest into the godown, and stop when it's full", () => {

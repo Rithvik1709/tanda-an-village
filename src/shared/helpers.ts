@@ -4,8 +4,10 @@ import { atHour, clock, DAY_MS } from "./time.js";
  * Majoor: labourers you hire by the day from Devidas Chavan, the mukadam. Hire in the morning and
  * they walk straight over to the aangan by Rathod Bhuvan; hire later, and they're there at 6 am the
  * next day. Tell them one job on one of your fields; when it runs out they sleep a while on a
- * charpai by the field (experts need less), then take the next job, until dusk. Their work is laid out on fixed time slots from the moment you give
- * the order, so the server can recompute exactly what they did, however often it looks.
+ * charpai by the field (experts need less), then take the next job, until dusk. What they harvest goes
+ * in their sacks, and on the way home at dusk they leave it all at the godown. Their work is laid out
+ * on fixed time slots from the moment you give the order, so the server can recompute exactly what
+ * they did, however often it looks.
  */
 export type HelperId = "sakharam" | "parvati" | "vithoba";
 export type HelperJob = "plant" | "water" | "harvest" | "sell"; // sell: the cart to the town mandi, experts only
@@ -41,6 +43,8 @@ export type Hire = {
   who: HelperId;
   day: number;
   from?: number; // hired the same morning: when they reach your aangan (otherwise 6 am)
+  sacks?: Record<string, number>; // the day's harvest, carried to the godown at dusk
+  banked?: number; // what they left at the godown at dusk
   job?: {
     kind: HelperJob;
     plot: number;
@@ -53,7 +57,7 @@ export type Hire = {
     done: number; // patches actually worked
     at?: string; // the farm cell they worked last (where to draw them)
     doneAt?: number; // the work ran out: asleep by the field until doneAt + restMs, then ready for more
-    full?: boolean; // the godown filled up; they stopped harvesting
+    full?: boolean; // the godown (with what's already in their sacks) filled up; they stopped harvesting
     over?: boolean; // dusk has come and the day's work is settled
   };
 };
@@ -84,3 +88,6 @@ export const JOB_NAMES: Record<HelperJob, string> = { plant: "sow seeds", water:
 export const sellTimes = (j: { startAt: number }, tripMs: number) => ({ sellAt: j.startAt + tripMs, backAt: j.startAt + 2 * tripMs });
 /** Is a labourer out on the road with your cart and bulls? */
 export const cartAway = (helpers: Hire[] | undefined) => !!helpers?.some((h) => h.job?.kind === "sell" && h.job.doneAt === undefined);
+/** Produce in the labourers' sacks, on its way to the godown at dusk. */
+export const inSacks = (helpers: Hire[] | undefined, crop?: string) =>
+  (helpers ?? []).reduce((a, h) => a + Object.entries(h.sacks ?? {}).reduce((b, [c, n]) => b + (crop === undefined || c === crop ? n : 0), 0), 0);

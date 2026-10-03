@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { CART_CAPACITY, TRIP_MS } from "../shared/bulls";
 import { advance, CROP_IDS, CROPS, type CropId } from "../shared/crops";
 import { buyerPrice } from "../shared/economy";
-import { CANCEL_REFUND, HELPER_IDS, HELPER_MIN_PLOTS, type HelperId, type HelperJob, helperPhase, type HelperPhase, HELPERS, type Hire, hireDay, HIRE_MAX, JOB_NAMES, MUKADAM, ORDER_BY, restMs } from "../shared/helpers";
+import { CANCEL_REFUND, HELPER_IDS, HELPER_MIN_PLOTS, type HelperId, type HelperJob, helperPhase, type HelperPhase, HELPERS, type Hire, hireDay, HIRE_MAX, inSacks, JOB_NAMES, MUKADAM, ORDER_BY, restMs } from "../shared/helpers";
 import type { Action, Result } from "../shared/rules";
 import type { Save } from "../shared/save";
 import { clock } from "../shared/time";
@@ -171,6 +171,7 @@ export class Helpers {
   seat: { x: number; y: number; z: number; heading: number } | null = null;
   private timers = new Map<HelperId, Countdown>();
   private seen = new Map<HelperId, string>();
+  private banked = new Map<HelperId, number>();
 
   constructor(private d: Deps) {
     // the mukadam's house, south of the chowk, its door facing east (shared/world.ts puts his board by the door)
@@ -249,10 +250,10 @@ export class Helpers {
     const ph = this.phase(n.id);
     if (ph === "booked") return `${w.name} <small class="hours">· ${h ? "just arriving" : "starts work here at 6 am tomorrow"}</small>`;
     if (ph === "sleeping") return `${w.name} is asleep <small class="hours">· up in ${this.upIn(n.id)}s</small>`;
-    if (ph === "waiting" && j) return `<kbd>E</kbd> Give ${w.name} the next job <small class="hours">· ${this.doneLine(j)}</small>`;
+    if (ph === "waiting" && j) return `<kbd>E</kbd> Give ${w.name} the next job <small class="hours">· ${this.doneLine(j)}${h?.sacks ? ` · ${inSacks([h])} in the sacks for the godown` : ""}</small>`;
     if (!j) return `<kbd>E</kbd> Tell ${w.name} the day's work`;
     const plot = this.d.world.plots[j.plot].name;
-    return `${w.name} · ${j.kind === "plant" ? `sowing ${CROPS[j.crop as CropId].name.toLowerCase()}` : j.kind === "water" ? "watering" : "harvesting"} in ${plot} <small class="hours">· ${j.done} patches done${j.full ? " · the godown is full" : ""}</small>`;
+    return `${w.name} · ${j.kind === "plant" ? `sowing ${CROPS[j.crop as CropId].name.toLowerCase()}` : j.kind === "water" ? "watering" : "harvesting"} in ${plot} <small class="hours">· ${j.done} patches done${h.sacks ? ` · ${inSacks([h])} in the sacks for the godown` : ""}${j.full ? " · the godown is full" : ""}</small>`;
   }
 
   /** E: talk to the mukadam or a labourer. False if nobody's here. */
@@ -365,7 +366,7 @@ export class Helpers {
     this.d.dialogue(who, again ? "The next job" : "The day's work", `${again ? "Rested and ready, malak. What next?" : "Ram Ram, malak. What shall I do today?"} One job at a time: when it's done I'll lie down a little, then you can give me the next.`, [
       { label: "Sow seeds", sub: "you hand over the seeds · only in hoed soil", onClick: () => pick("plant") },
       { label: "Water a field", sub: "every dry patch", onClick: () => pick("water") },
-      { label: "Harvest", sub: "the ripe crop goes straight to the godown", onClick: () => pick("harvest") },
+      { label: "Harvest", sub: "the ripe crop goes in my sacks · I leave it at the godown at dusk", onClick: () => pick("harvest") },
       // only a mistry is trusted with the cart and the traders at the mandi
       ...(w.expert ? [{ label: "Take the cart to the mandi", sub: "Sarja & Raja pull your produce to Pathrud · the market price", onClick: () => this.sellDialogue(id) }] : []),
       { label: "Not now", onClick: this.close },
@@ -520,15 +521,19 @@ export class Helpers {
     });
   }
 
-  /** A word when something changes out in the field: the godown filled up, or the day's work is done. */
+  /** A word when something changes out in the field: the godown filled up, the day's work is done, the sacks are in. */
   private notice(id: HelperId) {
     const j = this.hire(id)?.job, w = HELPERS[id];
+    // at dusk, the day's sacks go into the godown
+    const banked = this.hire(id)?.banked ?? 0, was = this.banked.get(id);
+    this.banked.set(id, banked);
+    if (was !== undefined && banked > was) this.d.toast(`${w.name} has left ${banked - was} produce at the godown on the way home`, "ok");
     const state = !j ? "" : j.over ? "over" : j.doneAt !== undefined ? `done:${j.doneAt}` : "";
     const prev = this.seen.get(id);
     this.seen.set(id, state);
     if (prev === undefined || prev === state || !j) return; // first look after loading: say nothing
     if (j.doneAt !== undefined && state !== "over") {
-      if (j.full) this.d.toast(`The godown is full — ${w.name} has left the rest of the crop standing.`, "bad");
+      if (j.full) this.d.toast(`The godown will be full tonight — ${w.name} has left the rest of the crop standing.`, "bad");
       else this.d.toast(`${w.name} has finished · ${this.doneLine(j)} · sleeping ${Math.round(restMs(id) / 1000)}s by the field, then ready for the next job`);
       return;
     }

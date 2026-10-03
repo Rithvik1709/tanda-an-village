@@ -18,13 +18,13 @@ import { clock } from "../../shared/time";
 import type { World } from "../../shared/world";
 import { FISH, FISH_IDS, type FishId, fishPrice } from "../../shared/fish";
 import { GIVERS } from "../../shared/jobs";
-import { HELPERS, type HelperId } from "../../shared/helpers";
+import { HELPERS, type HelperId, inSacks } from "../../shared/helpers";
 
 /*
  * The trader's and shopkeeper's panels. They only ever call `act` — the same actions the server
  * re-checks — and re-render from the save after each one.
  */
-export type PanelKind = "trader" | "shop" | "land" | "cart" | "town" | "bank" | "sahukar" | "mandir" | "kamlabai" | "shankar";
+export type PanelKind = "trader" | "shop" | "land" | "cart" | "town" | "bank" | "godown" | "sahukar" | "mandir" | "kamlabai" | "shankar";
 type Ctx = {
   save: () => Save;
   now: () => number;
@@ -63,7 +63,7 @@ export class Panels {
 
   show(kind: PanelKind, tab?: string) {
     this.open = kind;
-    this.tab = tab ?? (kind === "trader" ? "sell" : kind === "land" ? "plots" : kind === "cart" ? "load" : kind === "town" ? "mandi" : kind === "bank" ? "loans" : kind === "sahukar" ? "loans" : kind === "mandir" ? "offer" : "buy");
+    this.tab = tab ?? (kind === "trader" ? "sell" : kind === "land" ? "plots" : kind === "cart" ? "load" : kind === "town" ? "mandi" : kind === "bank" ? "loans" : kind === "godown" ? "godown" : kind === "sahukar" ? "loans" : kind === "mandir" ? "offer" : "buy");
     this.ctx.onTab(this.tab);
     this.el.hidden = false;
     this.render();
@@ -207,7 +207,9 @@ export class Panels {
       this.open === "cart" || this.open === "town" || this.open === "mandir" || this.open === "kamlabai" || this.open === "shankar"
         ? []
         : this.open === "bank"
-          ? [["loans", "Loans"], ["godown", "Godown"], ["worth", "Your worth"]]
+          ? [["loans", "Loans"], ["worth", "Your worth"]]
+          : this.open === "godown"
+            ? []
           : this.open === "sahukar"
             ? [["loans", "Loans"]]
         : this.open === "trader" ? [["sell", "Sell"], ["prices", "Prices"], ["ledger", "Ledger"]] : this.open === "land" ? [["plots", "Plots"], ["mine", "Your land"], ["tanda", "Tanda duties"]] : [["buy", "Buy"], ["ledger", "Ledger"]];
@@ -221,7 +223,9 @@ export class Panels {
           : this.open === "mandir"
           ? `<h2>Sevalal Maharaj mandir <small>संत सेवालाल महाराज</small></h2><p class="lede">White flags flutter over the shrine. The tanda brings its first harvest here.</p>`
           : this.open === "bank"
-          ? `<h2>Sahakari Bank &amp; godown <small>Joshi saheb, manager · सहकारी बँक</small></h2><p class="lede">"We lend at one rupee in a hundred a day, against your land. Pay on time and we're friends for life."</p>`
+          ? `<h2>Sahakari Bank <small>Joshi saheb, manager · सहकारी बँक</small></h2><p class="lede">"We lend at one rupee in a hundred a day, against your land. Pay on time and we're friends for life."</p>`
+          : this.open === "godown"
+          ? `<h2>The godown <small>Bhimrao, keeper · गोदाम</small></h2><p class="lede">"Dry floor, tight roof, no rats — I see to it. Leave your sacks with me and sell when the price is right."</p>`
           : this.open === "sahukar"
             ? `<h2>Sahukar Motilal <small>moneylender · सावकार</small></h2><p class="lede">"No papers, no waiting. Money today — five in a hundred a day, mind you, and I don't like waiting."</p>`
             : this.open === "cart"
@@ -433,7 +437,7 @@ export class Panels {
       return `<tr><td><i class="dot" style="background:${CROP_COLOR[c]}"></i>${CROPS[c].name}</td><td class="num">${s.inv[c] ?? 0}</td><td class="num">${lot?.n ?? 0}</td><td class="num">${rent ? rs(rent) : "—"}</td>
         <td class="acts"><input class="qty" data-gd="${c}" type="number" min="1" value="10"><button data-do="store:${c}" ${s.inv[c] ? "" : "disabled"}>Store</button><button data-do="store:${c}:all" ${s.inv[c] ? "" : "disabled"}>All</button><button data-do="withdraw:${c}" ${lot ? "" : "disabled"}>Take</button></td></tr>`;
     }).join("");
-    return `<p class="hint">You can carry ${CARRY} (carrying ${carried(s)}). The godown holds ${GODOWN_CAPACITY} (${stored(s)} stored); rent is ₹${GODOWN_RENT} per unit per day, paid when you take it out. Hold a crop here through a glut and sell when the price recovers.</p>
+    return `<p class="hint">You can carry ${CARRY} (carrying ${carried(s)}). The godown holds ${GODOWN_CAPACITY} (${stored(s)} stored${inSacks(s.helpers) ? `, ${inSacks(s.helpers)} more coming at dusk in your labourers' sacks` : ""}); rent is ₹${GODOWN_RENT} per unit per day, paid when you take it out. Hold a crop here through a glut and sell when the price recovers.</p>
       <table><thead><tr><th>Produce</th><th class="num">Carrying</th><th class="num">Stored</th><th class="num">Rent due</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 

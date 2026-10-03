@@ -496,7 +496,13 @@ const STALLS: { kind: PanelKind; at: { x: number; y: number; z: number }; npc: N
     kind: "bank",
     at: { x: world.landmarks.bank.x + 0.5, y: world.landmarks.bank.y, z: world.landmarks.bank.z - 0.3 },
     npc: new Npc({ kurta: "#dfe6ee", dhoti: "#3a3a44", hat: "#2a2a30", skin: "#b07a52" }, world.landmarks.bank.x - 0.75, world.landmarks.bank.y, world.landmarks.bank.z + 1.45, -Math.PI / 2), // beside the door, outside the wall
-    label: "Loans & the godown at the Sahakari Bank",
+    label: "Loans at the Sahakari Bank",
+  },
+  {
+    kind: "godown",
+    at: { x: world.landmarks.godown.x, y: world.landmarks.godown.y, z: world.landmarks.godown.z },
+    npc: new Npc({ kurta: "#e9dcc0", dhoti: "#f0ead8", hat: "#f6f2e8", skin: "#9a6440" }, world.landmarks.godown.x + 0.4, world.landmarks.godown.y, world.landmarks.godown.z - 2.3, -Math.PI / 2), // beside the doors
+    label: "Store produce with Bhimrao at the godown",
   },
   {
     kind: "sahukar",
